@@ -53,23 +53,38 @@ export async function generatePayrollAction(month: number, year: number, notes?:
     return { error: `Failed to create payroll summary: ${payrollError?.message}` }
   }
 
-  // 5. Generate matching payslips for all active employees
-  // We'll set a standard base pay depending on role or fallback to default
+  // 5. Fetch custom salary settings
+  const { data: salarySettings } = await supabase
+    .from('salary_settings')
+    .select('*')
+
+  const settingsMap = new Map((salarySettings || []).map(s => [s.employee_id, s]))
+
+  // 6. Generate matching payslips for all active employees using custom settings
   const payslipsToInsert = staffProfiles.map(staff => {
-    let basicPay = 1500000 // default TZS
-    if (staff.role === 'Principal') basicPay = 3500000
-    if (staff.role === 'Director') basicPay = 4500000
-    if (staff.role === 'Accountant') basicPay = 2000000
-    if (staff.role === 'Teacher') basicPay = 1200000
+    const setting = settingsMap.get(staff.id)
+    let basicPay = setting ? Number(setting.basic_salary) : 1500000
+    let allowances = setting ? Number(setting.allowances) : 0
+    let deductions = setting ? Number(setting.deductions) : 0
+
+    // fallback base pay if no setting exists
+    if (!setting) {
+      if (staff.role === 'Principal') basicPay = 3500000
+      if (staff.role === 'Director') basicPay = 4500000
+      if (staff.role === 'Accountant') basicPay = 2000000
+      if (staff.role === 'Teacher') basicPay = 1200000
+    }
+
+    const netSalary = basicPay + allowances - deductions
 
     return {
       employee_id: staff.id,
       month,
       year,
       basic_pay: basicPay,
-      total_allowances: 0,
-      total_deductions: 0,
-      net_salary: basicPay,
+      total_allowances: allowances,
+      total_deductions: deductions,
+      net_salary: netSalary,
       status: 'Pending',
       details: JSON.stringify({ role: staff.role })
     }

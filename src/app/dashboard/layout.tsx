@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import InactivityTimeout from '@/components/InactivityTimeout'
 
 export default async function DashboardLayout({
   children,
@@ -40,6 +41,11 @@ export default async function DashboardLayout({
     )
   }
 
+  // Parse comma-separated roles for dual-role capability
+  const userRoles = profile?.role 
+    ? profile.role.split(',').map((r: string) => r.trim()) 
+    : (user?.email === 'admin@leaders.ac.tz' ? ['System Admin'] : [])
+
   // Fetch unread notifications count
   const { count: unreadCount } = await supabase
     .from('notifications')
@@ -49,6 +55,8 @@ export default async function DashboardLayout({
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', flexDirection: 'column' }}>
+      <InactivityTimeout />
+      
       {/* Top Navbar */}
       <header style={{ 
         height: '64px', 
@@ -128,7 +136,7 @@ export default async function DashboardLayout({
             School Calendar
           </Link>
 
-          {(profile?.role === 'System Admin' || profile?.role === 'Director' || profile?.role === 'Principal' || profile?.role === 'Teacher') && (
+          {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal') || userRoles.includes('Teacher')) && (
             <Link href="/dashboard/students" style={{
               display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
               textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
@@ -137,7 +145,7 @@ export default async function DashboardLayout({
             </Link>
           )}
 
-          {(profile?.role === 'System Admin' || profile?.role === 'Director' || profile?.role === 'Principal') && (
+          {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal')) && (
             <Link href="/dashboard/staff" style={{
               display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
               textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
@@ -146,7 +154,7 @@ export default async function DashboardLayout({
             </Link>
           )}
 
-          {(profile?.role === 'System Admin' || profile?.role === 'Director' || profile?.role === 'Principal') && (
+          {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal')) && (
             <Link href="/dashboard/principal/lesson-plans" style={{
               display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
               textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
@@ -155,7 +163,7 @@ export default async function DashboardLayout({
             </Link>
           )}
 
-          {(profile?.role === 'System Admin' || profile?.role === 'Director') && (
+          {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
             <Link href="/dashboard/users" style={{
               display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
               textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
@@ -164,7 +172,7 @@ export default async function DashboardLayout({
             </Link>
           )}
 
-          {profile?.role === 'System Admin' && (
+          {userRoles.includes('System Admin') && (
             <>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Administration
@@ -190,17 +198,43 @@ export default async function DashboardLayout({
             </>
           )}
 
-          {profile?.role === 'Teacher' && (
-            <Link href="/dashboard/teacher" style={{
-              display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
-              textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
-            }}>
-              Teacher Portal
-            </Link>
+          {userRoles.includes('Teacher') && (
+            <>
+              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
+                Teacher Portal
+              </div>
+              <Link href="/dashboard/teacher" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                My Classes
+              </Link>
+              <Link href="/dashboard/teacher/class-activities" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Class Activities
+              </Link>
+            </>
+          )}
+
+          {/* Student Portal Links */}
+          {userRoles.includes('Student') && (
+            <>
+              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
+                Student Portal
+              </div>
+              <Link href="/dashboard/student" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Student Dashboard
+              </Link>
+            </>
           )}
 
           {/* Finance Portal Links */}
-          {(profile?.role === 'System Admin' || profile?.role === 'Accountant') && (
+          {(userRoles.includes('System Admin') || userRoles.includes('Accountant')) && (
             <>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Finance Portal
@@ -214,7 +248,7 @@ export default async function DashboardLayout({
             </>
           )}
 
-          {profile?.role === 'Accountant' && (
+          {userRoles.includes('Accountant') && (
             <>
               <Link href="/dashboard/accountant/invoices" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
@@ -240,6 +274,12 @@ export default async function DashboardLayout({
               }}>
                 Payroll Management
               </Link>
+              <Link href="/dashboard/accountant/payroll/salary-setup" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Salary Setup
+              </Link>
               <Link href="/dashboard/accountant/reports" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
@@ -250,7 +290,7 @@ export default async function DashboardLayout({
           )}
 
           {/* Principal Cashier & Review Links */}
-          {profile?.role === 'Principal' && (
+          {userRoles.includes('Principal') && (
             <>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Principal Operations
@@ -285,6 +325,18 @@ export default async function DashboardLayout({
               }}>
                 Payroll Review
               </Link>
+              <Link href="/dashboard/principal/lesson-plans/review" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Lesson Plans Review
+              </Link>
+              <Link href="/dashboard/principal/academic-reports" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Academic Report Cards
+              </Link>
               <Link href="/dashboard/principal/reports" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
@@ -294,12 +346,18 @@ export default async function DashboardLayout({
             </>
           )}
 
-          {/* Parent Billing Link */}
-          {profile?.role === 'Parent' && (
+          {/* Parent Portal */}
+          {userRoles.includes('Parent') && (
             <>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Parent Portal
               </div>
+              <Link href="/dashboard/parent/dashboard" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Parent Dashboard
+              </Link>
               <Link href="/dashboard/parent/billing" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
@@ -316,7 +374,7 @@ export default async function DashboardLayout({
           )}
 
           {/* Dean Operations Links */}
-          {profile?.role === 'Dean' && (
+          {userRoles.includes('Dean') && (
             <>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Dean Operations
@@ -330,8 +388,23 @@ export default async function DashboardLayout({
             </>
           )}
 
-          {/* Director Finance & Review Links */}
-          {profile?.role === 'Director' && (
+          {/* Head of Section Operations */}
+          {userRoles.includes('Head of Section') && (
+            <>
+              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
+                Section Operations
+              </div>
+              <Link href="/dashboard/hos" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Section Dashboard
+              </Link>
+            </>
+          )}
+
+          {/* Director Operations Links */}
+          {userRoles.includes('Director') && (
             <>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Director Operations
@@ -341,6 +414,12 @@ export default async function DashboardLayout({
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
               }}>
                 Finance Overview
+              </Link>
+              <Link href="/dashboard/director/staff" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Staff Records Setup
               </Link>
               <Link href="/dashboard/director/attendance" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
@@ -360,11 +439,23 @@ export default async function DashboardLayout({
               }}>
                 Staff Advance Requests
               </Link>
+              <Link href="/dashboard/director/leave-advance-records" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Staff Requests Archive
+              </Link>
               <Link href="/dashboard/director/payrolls" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
               }}>
                 Payroll Approvals
+              </Link>
+              <Link href="/dashboard/accountant/fee-structures" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Fee Structures (CRUD)
               </Link>
               <Link href="/dashboard/director/reports" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
@@ -382,7 +473,7 @@ export default async function DashboardLayout({
           )}
 
           {/* Staff Self-Service Links (Visible to all staff members except Director) */}
-          {(profile?.role === 'System Admin' || ['Principal', 'Accountant', 'Teacher', 'Dean', 'Head of Section', 'Clinic', 'Transport'].includes(profile?.role || '')) && (
+          {(userRoles.includes('System Admin') || ['Principal', 'Accountant', 'Teacher', 'Dean', 'Head of Section', 'Clinic', 'Transport'].some(r => userRoles.includes(r))) && (
             <>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Staff Self-Service
@@ -422,7 +513,7 @@ export default async function DashboardLayout({
         </aside>
 
         {/* Main Content Area */}
-        <main style={{ flex: 1, padding: '2rem', backgroundColor: 'var(--color-bg)' }}>
+        <main style={{ flex: 1, padding: '2rem', backgroundColor: 'var(--color-bg)', overflowY: 'auto' }}>
           {children}
         </main>
       </div>
