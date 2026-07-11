@@ -41,7 +41,7 @@ export default async function FeeStructuresPage() {
         <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
           <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Create Fee Item</h2>
           
-          <form action={saveFeeStructureAction} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <form action={saveFeeStructureAction as any} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div className="form-group">
               <label className="form-label">Academic Year</label>
               <select name="academic_year" className="input-field" required defaultValue="2025-2026">

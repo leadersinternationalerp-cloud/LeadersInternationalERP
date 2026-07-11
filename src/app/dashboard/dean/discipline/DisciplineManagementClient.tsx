@@ -36,7 +36,7 @@ type RecordItem = {
   profiles?: {
     first_name: string
     last_name: string
-  } | null -- Dean profile creator
+  } | null // Dean profile creator
 }
 
 export default function DisciplineManagementClient({

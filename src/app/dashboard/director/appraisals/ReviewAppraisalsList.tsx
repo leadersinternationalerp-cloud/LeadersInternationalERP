@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { saveReviewerEvaluationAction } from './actions'
+import { formatDate } from '@/utils/date'
 
 interface Indicator {
   name: string
@@ -141,7 +142,7 @@ export function ReviewAppraisalsList({ cycles, employees, appraisals }: ReviewAp
 
           {selectedCycle && (
             <div style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', textAlign: 'right' }}>
-              <strong>Period:</strong> {new Date(selectedCycle.start_date).toLocaleDateString()} to {new Date(selectedCycle.end_date).toLocaleDateString()}<br />
+              <strong>Period:</strong> {formatDate(selectedCycle.start_date)} to {formatDate(selectedCycle.end_date)}<br />
               <strong>Indicators:</strong> {selectedCycle.indicators.map((i) => `${i.name} (max ${i.max_score})`).join(', ')}
             </div>
           )}

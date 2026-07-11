@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { formatDate } from '@/utils/date'
 
 export default function ParentBillingClient({ childrenData }: { childrenData: any[] }) {
   const [activeChildIndex, setActiveChildIndex] = useState(0)
@@ -130,7 +131,7 @@ export default function ParentBillingClient({ childrenData }: { childrenData: an
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
                     <div>
                       <h3 style={{ fontSize: '1.1rem', margin: 0 }}>{inv.term} ({inv.academic_year})</h3>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Due Date: {new Date(inv.due_date).toLocaleDateString()}</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Due Date: {formatDate(inv.due_date)}</span>
                     </div>
                     <span style={{
                       padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
@@ -184,7 +185,7 @@ export default function ParentBillingClient({ childrenData }: { childrenData: an
                 <div>
                   <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{pay.receipt_number}</div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                    {pay.payment_method} • {new Date(pay.payment_date).toLocaleDateString()}
+                    {pay.payment_method} • {formatDate(pay.payment_date)}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>

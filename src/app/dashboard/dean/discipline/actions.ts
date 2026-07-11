@@ -99,7 +99,7 @@ export async function saveDisciplineRecordAction(data: DisciplineRecordInput) {
       action_taken: data.action_taken,
       follow_up_required: data.follow_up_required,
       follow_up_date: data.follow_up_required ? data.follow_up_date : null,
-      parent_notified,
+      parent_notified: parentNotified,
       created_by: user.id
     })
     .select()

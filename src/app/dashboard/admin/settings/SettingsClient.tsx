@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { saveSystemSettingsAction, saveAcademicYearAction } from './actions'
+import { formatDate } from '@/utils/date'
 
 interface TermDetail {
   term_name: string
@@ -535,13 +536,13 @@ export default function SettingsClient({
                       )}
                     </td>
                     <td style={{ padding: '1rem', fontSize: '0.85rem' }}>
-                      {t1.start_date ? `${new Date(t1.start_date).toLocaleDateString()} to ${new Date(t1.end_date).toLocaleDateString()}` : 'N/A'}
+                      {t1.start_date ? `${formatDate(t1.start_date)} to ${formatDate(t1.end_date)}` : 'N/A'}
                     </td>
                     <td style={{ padding: '1rem', fontSize: '0.85rem' }}>
-                      {t2.start_date ? `${new Date(t2.start_date).toLocaleDateString()} to ${new Date(t2.end_date).toLocaleDateString()}` : 'N/A'}
+                      {t2.start_date ? `${formatDate(t2.start_date)} to ${formatDate(t2.end_date)}` : 'N/A'}
                     </td>
                     <td style={{ padding: '1rem', fontSize: '0.85rem' }}>
-                      {t3.start_date ? `${new Date(t3.start_date).toLocaleDateString()} to ${new Date(t3.end_date).toLocaleDateString()}` : 'N/A'}
+                      {t3.start_date ? `${formatDate(t3.start_date)} to ${formatDate(t3.end_date)}` : 'N/A'}
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'right' }}>
                       <button

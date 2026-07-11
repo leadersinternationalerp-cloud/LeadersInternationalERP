@@ -60,7 +60,7 @@ export async function triggerPaymentRecorded(paymentId: string) {
         first_name,
         last_name,
         email,
-        phone_number -- Assuming this column is available/added in profiles
+        phone
       )
     `)
     .eq('student_id', payment.student_id)
@@ -78,10 +78,11 @@ export async function triggerPaymentRecorded(paymentId: string) {
       })
 
       // B. Simulate generating PDF Receipt URL
-      const pdfReceiptUrl = `https://jxbcramrwmvnpodhrvee.supabase.co/storage/v1/object/public/receipts/${payment.receipt_number}.pdf`
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://zqcjnfcwxkeapwzhifsy.supabase.co'
+      const pdfReceiptUrl = `${supabaseUrl}/storage/v1/object/public/receipts/${payment.receipt_number}.pdf`
 
       // C. Send SMS Notification
-      const parentPhone = parentProfile.phone_number || '+255770000000' -- fallback Zanzibar country code
+      const parentPhone = parentProfile.phone || '+255770000000' // fallback Zanzibar country code
       const smsMessage = `Dear Parent, a payment of ${formattedAmount} has been recorded for ${studentName}. Receipt No: ${payment.receipt_number}. Thank you.`
       await sendSMS(parentPhone, smsMessage)
 

@@ -234,7 +234,7 @@ export async function toggleUserStatusAction(
 
     // 3. Ban/unban in auth admin API
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-      ban: !active
+      ban_duration: active ? 'none' : '87600h'
     })
 
     if (authError) throw authError

@@ -1,5 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
-import { applySalaryAdvanceAction } from '../actions'
+import { applySalaryAdvanceAction } from '../../actions'
 
 export default async function AdvancesPage() {
   const supabase = await createClient()
@@ -9,7 +9,7 @@ export default async function AdvancesPage() {
 
   // Fetch salary configuration or default
   // Attempt to select from salaries table (we will assume it's created or fallback safely)
-  let netSalary = 1500000 -- Default fallback TZS
+  let netSalary = 1500000 // Default fallback TZS
   try {
     const { data: sal } = await supabase
       .from('salaries')
@@ -95,7 +95,7 @@ export default async function AdvancesPage() {
                 )}
               </div>
             ) : (
-              <form action={applySalaryAdvanceAction} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <form action={applySalaryAdvanceAction as any} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div style={{ padding: '0.75rem', backgroundColor: 'rgba(59, 179, 195, 0.05)', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
                   Your Current Net Salary: <strong>{formatTZS(netSalary)}</strong><br />
                   Maximum Advance Allowed (50%): <strong>{formatTZS(maxAdvanceAllowed)}</strong>

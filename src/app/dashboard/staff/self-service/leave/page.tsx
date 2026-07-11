@@ -1,5 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
-import { applyLeaveAction } from '../actions'
+import { applyLeaveAction } from '../../actions'
 
 export default async function LeavePage() {
   const supabase = await createClient()
@@ -66,7 +66,7 @@ export default async function LeavePage() {
           <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
             <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Request Leave</h2>
             
-            <form action={applyLeaveAction} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <form action={applyLeaveAction as any} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div className="form-group">
                 <label className="form-label">Leave Type</label>
                 <select name="leave_type" className="input-field" required>

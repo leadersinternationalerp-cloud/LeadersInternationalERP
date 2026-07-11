@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { saveSelfAssessmentAction } from '../../director/appraisals/actions'
+import { saveSelfAssessmentAction } from '../../../director/appraisals/actions'
+import { formatDate } from '@/utils/date'
 
 interface Indicator {
   name: string
@@ -158,7 +159,7 @@ export function StaffAppraisalsClient({ cycles, appraisals }: StaffAppraisalsCli
                     </span>
                   </div>
                   <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                    End Date: {new Date(c.end_date).toLocaleDateString()}
+                    End Date: {formatDate(c.end_date)}
                   </span>
                 </div>
               )
@@ -200,7 +201,7 @@ export function StaffAppraisalsClient({ cycles, appraisals }: StaffAppraisalsCli
             <div style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
               <h2 style={{ fontSize: '1.35rem' }}>{selectedCycle.name} Details</h2>
               <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-                Evaluation period: {new Date(selectedCycle.start_date).toLocaleDateString()} to {new Date(selectedCycle.end_date).toLocaleDateString()}
+                Evaluation period: {formatDate(selectedCycle.start_date)} to {formatDate(selectedCycle.end_date)}
               </p>
             </div>
 

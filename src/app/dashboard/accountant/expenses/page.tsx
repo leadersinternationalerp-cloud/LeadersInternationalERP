@@ -36,7 +36,7 @@ export default async function ExpensesPage() {
         <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
           <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Record School Expense</h2>
 
-          <form action={saveExpenseAction} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <form action={saveExpenseAction as any} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div className="form-group">
               <label className="form-label">Expense Category</label>
               <select name="category" className="input-field" required>

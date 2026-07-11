@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { type User } from './types'
 import { updateUserAction, toggleUserStatusAction, resetUserPasswordAction } from './actions'
+import { formatDate } from '@/utils/date'
 
 interface UserTableProps {
   users: User[]
@@ -190,7 +191,7 @@ export function UserTable({ users, currentUserId }: UserTableProps) {
                     </span>
                   </td>
                   <td style={{ padding: '1rem', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
-                    {new Date(u.created_at).toLocaleDateString()}
+                    {formatDate(u.created_at)}
                   </td>
                   <td style={{ padding: '1rem', textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
