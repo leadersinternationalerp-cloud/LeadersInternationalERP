@@ -86,6 +86,32 @@ export default async function PrincipalLessonPlanReviewPage({
 
     if (error) {
       console.error('Error reviewing lesson plan:', error.message)
+    } else {
+      // Notify the teacher
+      try {
+        const { data: plan } = await supabase
+          .from('lesson_plans')
+          .select(`
+            teacher_id,
+            week_number,
+            classes (name),
+            subjects (name)
+          `)
+          .eq('id', planId)
+          .single()
+
+        if (plan) {
+          const className = (plan.classes as any)?.name || 'Class'
+          const subjectName = (plan.subjects as any)?.name || 'Subject'
+          await supabase.from('notifications').insert({
+            user_id: plan.teacher_id,
+            message: `Your lesson plan for ${className} - ${subjectName} (Week ${plan.week_number}) was ${status}. Notes: ${notes || 'None'}`,
+            link_url: `/dashboard/teacher`
+          })
+        }
+      } catch (notifErr) {
+        console.error('Error triggering lesson plan review notification:', notifErr)
+      }
     }
 
     revalidatePath(`/dashboard/principal/lesson-plans/review`)

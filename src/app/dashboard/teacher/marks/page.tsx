@@ -40,6 +40,26 @@ export default async function TeacherMarksPage({
     .select('*')
     .order('name', { ascending: true })
 
+  // Fetch system settings for grading scale thresholds
+  const { data: settingsData } = await supabase
+    .from('system_settings')
+    .select('key, value')
+    .in('key', ['grading_scale_a', 'grading_scale_b', 'grading_scale_c', 'grading_scale_d'])
+
+  const gradingScale = {
+    A: 80,
+    B: 70,
+    C: 60,
+    D: 50
+  }
+
+  settingsData?.forEach(item => {
+    if (item.key === 'grading_scale_a') gradingScale.A = Number(item.value)
+    if (item.key === 'grading_scale_b') gradingScale.B = Number(item.value)
+    if (item.key === 'grading_scale_c') gradingScale.C = Number(item.value)
+    if (item.key === 'grading_scale_d') gradingScale.D = Number(item.value)
+  })
+
   const params = await searchParams
   const selectedClassId = params.class_id || (classes && classes.length > 0 ? classes[0].id : '')
   const selectedSubjectId = params.subject_id || (subjects && subjects.length > 0 ? subjects[0].id : '')
@@ -219,6 +239,7 @@ export default async function TeacherMarksPage({
           subjectId={selectedSubjectId}
           assessmentType={selectedAssessmentType}
           term={selectedTerm}
+          gradingScale={gradingScale}
           saveAction={handleSaveMarks}
         />
       ) : (

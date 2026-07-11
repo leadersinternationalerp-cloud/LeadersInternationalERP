@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import FeeRemindersForm from './FeeRemindersForm'
+import { sendSMS, sendEmail } from '@/utils/notifications'
 
 export default async function AccountantFeeRemindersPage() {
   const supabase = await createClient()
@@ -86,12 +87,15 @@ export default async function AccountantFeeRemindersPage() {
           .from('student_parents')
           .select(`
             parent_id,
-            profiles:parent_id (phone)
+            profiles:parent_id (first_name, last_name, phone, email)
           `)
           .eq('student_id', inv.student_id)
 
         if (parents) {
           for (const link of parents) {
+            const parentProfile: any = link.profiles
+            if (!parentProfile) continue
+
             // A. Create In-App Notification
             await supabase.from('notifications').insert({
               user_id: link.parent_id,
@@ -99,9 +103,27 @@ export default async function AccountantFeeRemindersPage() {
               link_url: `/dashboard/parent/billing`
             })
 
-            // B. Simulate SMS
-            const parentPhone = (link.profiles as any)?.phone || '+255770000000'
-            console.log(`[SMS SENDER] Sending to ${parentPhone}: "${msg}"`)
+            // B. Dispatch SMS
+            if (parentProfile.phone) {
+              await sendSMS(parentProfile.phone, msg)
+            }
+
+            // C. Dispatch Email Reminder
+            if (parentProfile.email) {
+              const parentName = `${parentProfile.first_name} ${parentProfile.last_name}`
+              const emailHtml = `
+                <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.6;">
+                  <h2 style="color: #3bb3c3;">Fee Outstanding Reminder</h2>
+                  <p>Dear ${parentName},</p>
+                  <p>${msg}</p>
+                  <p>Please log in to your parent dashboard to view billing records and make payments.</p>
+                  <br/>
+                  <p>Best regards,</p>
+                  <p><strong>Leaders International School Accounts Department</strong></p>
+                </div>
+              `
+              await sendEmail(parentProfile.email, 'Outstanding Fee Payment Reminder', emailHtml)
+            }
           }
         }
       }

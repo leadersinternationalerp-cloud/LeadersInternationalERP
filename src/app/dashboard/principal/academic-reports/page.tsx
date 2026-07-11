@@ -44,6 +44,26 @@ export default async function PrincipalAcademicReportsPage({
     selectedStudent = students.find(s => s.id === selectedStudentId) || null
   }
 
+  // Fetch system settings for grading scale thresholds
+  const { data: settingsData } = await supabase
+    .from('system_settings')
+    .select('key, value')
+    .in('key', ['grading_scale_a', 'grading_scale_b', 'grading_scale_c', 'grading_scale_d'])
+
+  const gradingScale = {
+    A: 80,
+    B: 70,
+    C: 60,
+    D: 50
+  }
+
+  settingsData?.forEach(item => {
+    if (item.key === 'grading_scale_a') gradingScale.A = Number(item.value)
+    if (item.key === 'grading_scale_b') gradingScale.B = Number(item.value)
+    if (item.key === 'grading_scale_c') gradingScale.C = Number(item.value)
+    if (item.key === 'grading_scale_d') gradingScale.D = Number(item.value)
+  })
+
   // Fetch real released marks for student
   let realMarks: any[] = []
   if (selectedStudentId) {
@@ -62,10 +82,10 @@ export default async function PrincipalAcademicReportsPage({
   const subjectsReport = realMarks.map(m => {
     const scoreVal = Number(m.score)
     let grade = 'F'
-    if (scoreVal >= 80) grade = 'A'
-    else if (scoreVal >= 70) grade = 'B'
-    else if (scoreVal >= 60) grade = 'C'
-    else if (scoreVal >= 50) grade = 'D'
+    if (scoreVal >= gradingScale.A) grade = 'A'
+    else if (scoreVal >= gradingScale.B) grade = 'B'
+    else if (scoreVal >= gradingScale.C) grade = 'C'
+    else if (scoreVal >= gradingScale.D) grade = 'D'
 
     return {
       subject: m.subjects?.name || 'Unknown',
@@ -79,10 +99,10 @@ export default async function PrincipalAcademicReportsPage({
   const averageScore = subjectsReport.length > 0 ? totalScore / subjectsReport.length : 0
 
   let overallGrade = 'F'
-  if (averageScore >= 80) overallGrade = 'A'
-  else if (averageScore >= 70) overallGrade = 'B'
-  else if (averageScore >= 60) overallGrade = 'C'
-  else if (averageScore >= 50) overallGrade = 'D'
+  if (averageScore >= gradingScale.A) overallGrade = 'A'
+  else if (averageScore >= gradingScale.B) overallGrade = 'B'
+  else if (averageScore >= gradingScale.C) overallGrade = 'C'
+  else if (averageScore >= gradingScale.D) overallGrade = 'D'
 
   return (
     <div>

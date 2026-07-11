@@ -1,4 +1,45 @@
 import { createClient } from '@/utils/supabase/server'
+import { formatDate } from '@/utils/date'
+
+// Centralized Email Sender - supports SendGrid API with easily swappable fallback log simulator
+export async function sendEmail(to: string, subject: string, htmlContent: string) {
+  const apiKey = process.env.SENDGRID_API_KEY
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@leaders.ac.tz'
+
+  if (apiKey) {
+    console.log(`[EMAIL SENDER] Dispatching real email to ${to} via SendGrid...`)
+    try {
+      const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: to }] }],
+          from: { email: fromEmail, name: 'Leaders International ERP' },
+          subject: subject,
+          content: [{ type: 'text/html', value: htmlContent }]
+        })
+      })
+
+      if (response.ok) {
+        console.log('[EMAIL SENDER] SendGrid email sent successfully.')
+        return { success: true }
+      } else {
+        const errText = await response.text()
+        console.error('[EMAIL SENDER] SendGrid API failed:', errText)
+        return { success: false, error: errText }
+      }
+    } catch (e: any) {
+      console.error('[EMAIL SENDER] Request failed:', e.message)
+      return { success: false, error: e.message }
+    }
+  } else {
+    console.log(`[EMAIL SIMULATOR] Outbox to ${to} | Subject: "${subject}" | Content Preview: "${htmlContent.replace(/<[^>]*>/g, '').trim().substring(0, 100)}..."`)
+    return { success: true }
+  }
+}
 
 // Modular SMS Sender - supports Africa's Talking API and easily swappable for Tanzanian systems (e.g. Beem/NextSMS)
 export async function sendSMS(phone: string, message: string) {
@@ -41,7 +82,7 @@ export async function sendWhatsApp(phone: string, message: string, mediaUrl?: st
   return { success: true }
 }
 
-// Trigger payment recorded notifications (in-app, SMS, WhatsApp receipt delivery)
+// Trigger payment recorded notifications (in-app, SMS, WhatsApp receipt delivery, and Email)
 export async function triggerPaymentRecorded(paymentId: string) {
   const supabase = await createClient()
 
@@ -112,11 +153,28 @@ export async function triggerPaymentRecorded(paymentId: string) {
       // D. Send WhatsApp Receipt PDF
       const whatsappMessage = `Dear Parent, a payment of ${formattedAmount} has been recorded for ${studentName}. Your invoice receipt PDF is attached.`
       await sendWhatsApp(parentPhone, whatsappMessage, pdfReceiptUrl)
+
+      // E. Send Email Confirmation
+      if (parentProfile.email) {
+        const parentName = `${parentProfile.first_name} ${parentProfile.last_name}`
+        const emailHtml = `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.6;">
+            <h2 style="color: #3bb3c3;">Payment Receipt Confirmed</h2>
+            <p>Dear ${parentName},</p>
+            <p>We are pleased to inform you that a payment of <strong>${formattedAmount}</strong> has been successfully received and recorded for <strong>${studentName}</strong> for <strong>${termInfo}</strong>.</p>
+            <p><strong>Receipt Number:</strong> ${payment.receipt_number}</p>
+            <p>You can download your official PDF receipt by clicking the link below:</p>
+            <p><a href="${pdfReceiptUrl}" style="background-color: #3bb3c3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">Download Receipt PDF</a></p>
+            <br/>
+            <p>Best regards,</p>
+            <p><strong>Leaders International School</strong></p>
+          </div>
+        `
+        await sendEmail(parentProfile.email, `School Payment Receipt Confirmation - Receipt: ${payment.receipt_number}`, emailHtml)
+      }
     }
   }
 }
-
-import { formatDate } from '@/utils/date'
 
 // Global helper to create in-app and SMS notifications
 export async function createSystemNotification(userId: string, message: string, linkUrl?: string, phone?: string) {
@@ -157,10 +215,10 @@ export async function triggerLeaveSubmitted(leaveId: string) {
   const employeeName = `${(leave.employee as any)?.profiles?.first_name} ${(leave.employee as any)?.profiles?.last_name}`
   const message = `Leave request submitted by ${employeeName} (${leave.leave_type}, ${leave.days} days, starting ${formatDate(leave.start_date)}).`
 
-  // Find all Principals and Directors
+  // Find all Principals and Directors with detailed contact info
   const { data: managers } = await supabase
     .from('profiles')
-    .select('id, phone, role')
+    .select('id, phone, email, role, first_name, last_name')
     .in('role', ['Principal', 'Director'])
 
   if (managers) {
@@ -171,8 +229,32 @@ export async function triggerLeaveSubmitted(leaveId: string) {
         message,
         link_url: linkUrl
       })
+
       if (manager.phone) {
         await sendSMS(manager.phone, message)
+      }
+
+      if (manager.email) {
+        const managerName = `${manager.first_name || 'Manager'}`
+        const emailHtml = `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.6;">
+            <h2 style="color: #3bb3c3;">New Leave Application Received</h2>
+            <p>Dear ${managerName},</p>
+            <p>A new leave application has been submitted by <strong>${employeeName}</strong> and requires your review.</p>
+            <p><strong>Details:</strong></p>
+            <ul>
+              <li><strong>Type:</strong> ${leave.leave_type}</li>
+              <li><strong>Duration:</strong> ${leave.days} days</li>
+              <li><strong>Start Date:</strong> ${formatDate(leave.start_date)}</li>
+            </ul>
+            <p>Please log in to the ERP portal to review and take action.</p>
+            <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}${linkUrl}" style="background-color: #3bb3c3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">Review Leave Request</a></p>
+            <br/>
+            <p>Best regards,</p>
+            <p><strong>Leaders International School ERP</strong></p>
+          </div>
+        `
+        await sendEmail(manager.email, 'New Leave Application Submission Alert', emailHtml)
       }
     }
   }
@@ -187,7 +269,7 @@ export async function triggerLeaveReviewed(leaveId: string) {
       *,
       employee:employee_id (
         id,
-        profiles (first_name, last_name, phone)
+        profiles (first_name, last_name, phone, email)
       ),
       reviewer:reviewer_id (
         profiles (first_name, last_name)
@@ -214,6 +296,24 @@ export async function triggerLeaveReviewed(leaveId: string) {
 
     if (employeeProfile.phone) {
       await sendSMS(employeeProfile.phone, message)
+    }
+
+    if (employeeProfile.email) {
+      const staffName = `${employeeProfile.first_name} ${employeeProfile.last_name}`
+      const emailHtml = `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.6;">
+          <h2 style="color: #3bb3c3;">Leave Request Reviewed</h2>
+          <p>Dear ${staffName},</p>
+          <p>Your leave request has been reviewed.</p>
+          <p><strong>Status:</strong> <strong style="color: ${leave.status === 'Approved' ? 'green' : 'red'};">${leave.status}</strong></p>
+          <p><strong>Reviewer:</strong> ${reviewerName}</p>
+          <p><strong>Notes:</strong> ${leave.reviewer_notes || 'None'}</p>
+          <br/>
+          <p>Best regards,</p>
+          <p><strong>Leaders International School ERP</strong></p>
+        </div>
+      `
+      await sendEmail(employeeProfile.email, `Leave Application Status: ${leave.status}`, emailHtml)
     }
   }
 }
@@ -247,10 +347,10 @@ export async function triggerSalaryAdvanceSubmitted(advanceId: string) {
 
   const message = `Salary advance request submitted by ${employeeName} (Requested: ${formattedAmount}).`
 
-  // Notify Accountants
+  // Notify Accountants with contact info
   const { data: accountants } = await supabase
     .from('profiles')
-    .select('id, phone')
+    .select('id, phone, email, first_name, last_name')
     .eq('role', 'Accountant')
 
   if (accountants) {
@@ -263,6 +363,23 @@ export async function triggerSalaryAdvanceSubmitted(advanceId: string) {
 
       if (accountant.phone) {
         await sendSMS(accountant.phone, message)
+      }
+
+      if (accountant.email) {
+        const accountantName = `${accountant.first_name || 'Accountant'}`
+        const emailHtml = `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.6;">
+            <h2 style="color: #3bb3c3;">New Salary Advance Request</h2>
+            <p>Dear ${accountantName},</p>
+            <p>A new salary advance request has been submitted by <strong>${employeeName}</strong> and is pending review.</p>
+            <p><strong>Amount Requested:</strong> ${formattedAmount}</p>
+            <p>Please log in to the ERP portal to review and manage payments.</p>
+            <br/>
+            <p>Best regards,</p>
+            <p><strong>Leaders International School ERP</strong></p>
+          </div>
+        `
+        await sendEmail(accountant.email, 'New Salary Advance Request Submission', emailHtml)
       }
     }
   }
@@ -277,7 +394,7 @@ export async function triggerSalaryAdvanceDisbursed(advanceId: string) {
       *,
       employee:employee_id (
         id,
-        profiles (first_name, last_name, phone)
+        profiles (first_name, last_name, phone, email)
       )
     `)
     .eq('id', advanceId)
@@ -308,6 +425,23 @@ export async function triggerSalaryAdvanceDisbursed(advanceId: string) {
     if (employeeProfile.phone) {
       await sendSMS(employeeProfile.phone, message)
     }
+
+    if (employeeProfile.email) {
+      const staffName = `${employeeProfile.first_name} ${employeeProfile.last_name}`
+      const emailHtml = `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.6;">
+          <h2 style="color: #3bb3c3;">Salary Advance Disbursed</h2>
+          <p>Dear ${staffName},</p>
+          <p>Your salary advance request has been approved and successfully disbursed.</p>
+          <p><strong>Amount Disbursed:</strong> <strong>${formattedAmount}</strong></p>
+          <p>You can check the details on your self-service dashboard.</p>
+          <br/>
+          <p>Best regards,</p>
+          <p><strong>Leaders International School ERP</strong></p>
+        </div>
+      `
+      await sendEmail(employeeProfile.email, 'Salary Advance Disbursed Notification', emailHtml)
+    }
   }
 }
 
@@ -329,10 +463,10 @@ export async function triggerPayrollProposed(payrollId: string) {
   const monthName = months[payroll.month - 1]
   const message = `Accountant has proposed a new payroll draft for ${monthName} ${payroll.year} for review.`
 
-  // Notify Principals
+  // Notify Principals with email
   const { data: principals } = await supabase
     .from('profiles')
-    .select('id, phone')
+    .select('id, phone, email, first_name, last_name')
     .eq('role', 'Principal')
 
   if (principals) {
@@ -345,6 +479,22 @@ export async function triggerPayrollProposed(payrollId: string) {
 
       if (principal.phone) {
         await sendSMS(principal.phone, message)
+      }
+
+      if (principal.email) {
+        const principalName = `${principal.first_name || 'Principal'}`
+        const emailHtml = `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.6;">
+            <h2 style="color: #3bb3c3;">Payroll Draft Proposed</h2>
+            <p>Dear ${principalName},</p>
+            <p>${message}</p>
+            <p>Please log in to the portal to review the payroll details.</p>
+            <br/>
+            <p>Best regards,</p>
+            <p><strong>Leaders International School ERP</strong></p>
+          </div>
+        `
+        await sendEmail(principal.email, `Payroll Proposed: ${monthName} ${payroll.year}`, emailHtml)
       }
     }
   }
@@ -373,7 +523,7 @@ export async function triggerPayrollReviewedPrincipal(payrollId: string, approve
   // Notify Accountants
   const { data: accountants } = await supabase
     .from('profiles')
-    .select('id, phone')
+    .select('id, phone, email, first_name, last_name')
     .eq('role', 'Accountant')
 
   if (accountants) {
@@ -387,6 +537,21 @@ export async function triggerPayrollReviewedPrincipal(payrollId: string, approve
       if (accountant.phone) {
         await sendSMS(accountant.phone, messageToAccountant)
       }
+
+      if (accountant.email) {
+        const accountantName = `${accountant.first_name || 'Accountant'}`
+        const emailHtml = `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.6;">
+            <h2 style="color: #3bb3c3;">Payroll Review Update</h2>
+            <p>Dear ${accountantName},</p>
+            <p>${messageToAccountant}</p>
+            <br/>
+            <p>Best regards,</p>
+            <p><strong>Leaders International School ERP</strong></p>
+          </div>
+        `
+        await sendEmail(accountant.email, `Payroll ${actionText.toUpperCase()} by Principal`, emailHtml)
+      }
     }
   }
 
@@ -394,7 +559,7 @@ export async function triggerPayrollReviewedPrincipal(payrollId: string, approve
   if (approve) {
     const { data: directors } = await supabase
       .from('profiles')
-      .select('id, phone')
+      .select('id, phone, email, first_name, last_name')
       .eq('role', 'Director')
 
     if (directors) {
@@ -407,6 +572,22 @@ export async function triggerPayrollReviewedPrincipal(payrollId: string, approve
 
         if (director.phone) {
           await sendSMS(director.phone, messageToDirector)
+        }
+
+        if (director.email) {
+          const directorName = `${director.first_name || 'Director'}`
+          const emailHtml = `
+            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.6;">
+              <h2 style="color: #3bb3c3;">Payroll Pending Final Approval</h2>
+              <p>Dear ${directorName},</p>
+              <p>${messageToDirector}</p>
+              <p>Please log in to review and authorize the final payroll disbursement.</p>
+              <br/>
+              <p>Best regards,</p>
+              <p><strong>Leaders International School ERP</strong></p>
+            </div>
+          `
+          await sendEmail(director.email, 'Payroll Approved by Principal - Pending Action', emailHtml)
         }
       }
     }
@@ -435,7 +616,7 @@ export async function triggerPayrollReviewedDirector(payrollId: string, approve:
   // Notify Accountants and Principals
   const { data: managers } = await supabase
     .from('profiles')
-    .select('id, phone, role')
+    .select('id, phone, email, role, first_name, last_name')
     .in('role', ['Accountant', 'Principal'])
 
   if (managers) {
@@ -449,6 +630,21 @@ export async function triggerPayrollReviewedDirector(payrollId: string, approve:
 
       if (manager.phone) {
         await sendSMS(manager.phone, message)
+      }
+
+      if (manager.email) {
+        const managerName = `${manager.first_name || 'Manager'}`
+        const emailHtml = `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.6;">
+            <h2 style="color: #3bb3c3;">Payroll Review Update</h2>
+            <p>Dear ${managerName},</p>
+            <p>${message}</p>
+            <br/>
+            <p>Best regards,</p>
+            <p><strong>Leaders International School ERP</strong></p>
+          </div>
+        `
+        await sendEmail(manager.email, `Payroll finalized by Director`, emailHtml)
       }
     }
   }

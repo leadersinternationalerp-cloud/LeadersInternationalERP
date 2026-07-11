@@ -63,6 +63,39 @@ export function LessonPlanForm({ classSubjects, teacherId }: { classSubjects: an
 
       if (dbError) throw dbError
 
+      // 3. Notify Deans and Heads of Section
+      try {
+        const { data: teacherProfile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('id', teacherId)
+          .single()
+
+        const teacherName = teacherProfile ? `${teacherProfile.first_name} ${teacherProfile.last_name}` : 'A teacher'
+
+        const { data: allProfiles } = await supabase
+          .from('profiles')
+          .select('id, role, roles')
+
+        const targetUsers = (allProfiles || []).filter(p => {
+          const userRoles = p.roles && Array.isArray(p.roles) && p.roles.length > 0
+            ? p.roles
+            : (p.role ? p.role.split(',').map((r: string) => r.trim()) : [])
+          return userRoles.includes('Head of Section') || userRoles.includes('Dean')
+        })
+
+        if (targetUsers.length > 0) {
+          const notifications = targetUsers.map(u => ({
+            user_id: u.id,
+            message: `New lesson plan submitted by ${teacherName} (Week ${week_number}). Please review.`,
+            link_url: `/dashboard/hos/lesson-plans`
+          }))
+          await supabase.from('notifications').insert(notifications)
+        }
+      } catch (notifErr) {
+        console.error('Error triggering lesson plan notifications:', notifErr)
+      }
+
       setSuccess(true)
       e.currentTarget.reset()
 

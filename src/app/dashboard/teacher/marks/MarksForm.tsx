@@ -25,6 +25,7 @@ export default function MarksForm({
   subjectId,
   assessmentType,
   term,
+  gradingScale,
   saveAction
 }: {
   students: Student[]
@@ -34,6 +35,7 @@ export default function MarksForm({
   subjectId: string
   assessmentType: string
   term: string
+  gradingScale: { A: number; B: number; C: number; D: number }
   saveAction: (formData: FormData) => Promise<void>
 }) {
   // Initialize state
@@ -50,14 +52,14 @@ export default function MarksForm({
   const [remarks, setRemarks] = useState<Record<string, string>>(initialRemarks)
   const [saving, setSaving] = useState(false)
 
-  // Live Kiswahili Grading Calculator
+  // Live Grading Calculator based on dynamic settings
   const getGrade = (scoreStr: string) => {
     const score = parseFloat(scoreStr)
     if (isNaN(score) || score < 0 || score > 100) return '-'
-    if (score >= 80) return 'A'
-    if (score >= 70) return 'B'
-    if (score >= 60) return 'C'
-    if (score >= 50) return 'D'
+    if (score >= gradingScale.A) return 'A'
+    if (score >= gradingScale.B) return 'B'
+    if (score >= gradingScale.C) return 'C'
+    if (score >= gradingScale.D) return 'D'
     return 'F'
   };
 

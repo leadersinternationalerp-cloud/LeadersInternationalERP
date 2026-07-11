@@ -35,6 +35,15 @@ export default function SettingsClient({
   const [contactPhone, setContactPhone] = useState(initialSettings.contact_phone || '')
   const [schoolLogo, setSchoolLogo] = useState(initialSettings.school_logo || '')
 
+  // Grading scale thresholds
+  const [scaleA, setScaleA] = useState<number>(Number(initialSettings.grading_scale_a) || 80)
+  const [scaleB, setScaleB] = useState<number>(Number(initialSettings.grading_scale_b) || 70)
+  const [scaleC, setScaleC] = useState<number>(Number(initialSettings.grading_scale_c) || 60)
+  const [scaleD, setScaleD] = useState<number>(Number(initialSettings.grading_scale_d) || 50)
+
+  const [savingScale, setSavingScale] = useState(false)
+  const [scaleMessage, setScaleMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsMessage, setSettingsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -120,6 +129,40 @@ export default function SettingsClient({
       setSettingsMessage({ type: 'error', text: `Failed to save settings: ${err.message}` })
     } finally {
       setSavingSettings(false)
+    }
+  }
+
+  // Handle saving grading scale
+  async function handleSaveScale(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingScale(true)
+    setScaleMessage(null)
+
+    if (scaleA <= scaleB || scaleB <= scaleC || scaleC <= scaleD || scaleD <= 0) {
+      setScaleMessage({ type: 'error', text: 'Invalid thresholds: Grades must follow a strictly descending order (A > B > C > D > 0).' })
+      setSavingScale(false)
+      return
+    }
+
+    try {
+      const results = await Promise.all([
+        saveSystemSettingsAction('grading_scale_a', scaleA),
+        saveSystemSettingsAction('grading_scale_b', scaleB),
+        saveSystemSettingsAction('grading_scale_c', scaleC),
+        saveSystemSettingsAction('grading_scale_d', scaleD),
+      ])
+
+      const failed = results.find((r) => r.error)
+      if (failed) {
+        throw new Error(failed.error)
+      }
+
+      setScaleMessage({ type: 'success', text: 'Grading scale settings updated successfully!' })
+    } catch (err: any) {
+      console.error(err)
+      setScaleMessage({ type: 'error', text: `Failed to save grading scale: ${err.message}` })
+    } finally {
+      setSavingScale(false)
     }
   }
 
@@ -479,6 +522,93 @@ export default function SettingsClient({
                   {savingYear ? 'Saving...' : 'Save Year Schedule'}
                 </button>
               </div>
+            </form>
+          </div>
+
+          {/* Grading Scale Form */}
+          <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
+            <h2 style={{ fontSize: '1.25rem', marginBottom: '1.25rem', fontWeight: 600 }}>Grading Scale Configurations</h2>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+              Set the minimum scores required for each official grade letter.
+            </p>
+
+            <form onSubmit={handleSaveScale} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontSize: '0.85rem' }}>Grade A</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    className="input-field"
+                    value={scaleA}
+                    onChange={(e) => setScaleA(Number(e.target.value))}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontSize: '0.85rem' }}>Grade B</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    className="input-field"
+                    value={scaleB}
+                    onChange={(e) => setScaleB(Number(e.target.value))}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontSize: '0.85rem' }}>Grade C</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    className="input-field"
+                    value={scaleC}
+                    onChange={(e) => setScaleC(Number(e.target.value))}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontSize: '0.85rem' }}>Grade D</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    className="input-field"
+                    value={scaleD}
+                    onChange={(e) => setScaleD(Number(e.target.value))}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                * Scores below Grade D will fall back to **Grade F** (0 to {scaleD - 1}).
+              </div>
+
+              {scaleMessage && (
+                <div style={{
+                  padding: '0.75rem',
+                  borderRadius: 'var(--radius-sm)',
+                  backgroundColor: scaleMessage.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                  color: scaleMessage.type === 'success' ? 'var(--color-success)' : 'var(--color-error)',
+                  fontSize: '0.875rem',
+                  borderLeft: `4px solid ${scaleMessage.type === 'success' ? 'var(--color-success)' : 'var(--color-error)'}`
+                }}>
+                  {scaleMessage.text}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={savingScale}
+                style={{ width: '100%', padding: '0.75rem' }}
+              >
+                {savingScale ? 'Saving scale...' : 'Save Grading Scale'}
+              </button>
             </form>
           </div>
         </div>
