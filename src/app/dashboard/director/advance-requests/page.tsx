@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { reviewSalaryAdvanceAction } from '../../staff/actions'
+import Link from 'next/link'
 
 export default async function DirectorAdvanceRequestsPage() {
   const supabase = await createClient()
@@ -30,7 +31,7 @@ export default async function DirectorAdvanceRequestsPage() {
     `)
     .eq('status', 'Pending')
 
-  const principalPending = pending?.filter((p: any) => p.employee?.role === 'Principal') || []
+  const staffPending = pending || []
 
   // Fetch reviewed advances
   const { data: reviewed } = await supabase
@@ -41,7 +42,7 @@ export default async function DirectorAdvanceRequestsPage() {
     `)
     .neq('status', 'Pending')
 
-  const principalReviewed = reviewed?.filter((r: any) => r.employee?.role === 'Principal') || []
+  const staffReviewed = reviewed || []
 
   function formatTZS(amount: number) {
     return new Intl.NumberFormat('en-TZ', {
@@ -75,23 +76,23 @@ export default async function DirectorAdvanceRequestsPage() {
   return (
     <div>
       <h1 style={{ fontSize: '1.75rem', marginBottom: '1.5rem', color: 'var(--color-primary)' }}>
-        Principal's Salary Advance Review
+        Staff Salary Advance Review
       </h1>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '2rem', alignItems: 'start' }}>
         {/* Pending Requests */}
         <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
           <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)', backgroundColor: 'rgba(0,0,0,0.02)', fontWeight: 600 }}>
-            Pending Salary Advances ({principalPending.length})
+            Pending Salary Advances ({staffPending.length})
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '1.5rem' }}>
-            {principalPending.map((adv: any) => (
+            {staffPending.map((adv: any) => (
               <div key={adv.id} style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
                   <div>
                     <h3 style={{ fontSize: '1.1rem', margin: 0 }}>
-                      {adv.employee?.first_name} {adv.employee?.last_name} (Principal)
+                      {adv.employee?.first_name} {adv.employee?.last_name} ({adv.employee?.role || 'Staff'})
                     </h3>
                   </div>
                   <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-secondary)' }}>
@@ -129,9 +130,9 @@ export default async function DirectorAdvanceRequestsPage() {
               </div>
             ))}
 
-            {principalPending.length === 0 && (
+            {staffPending.length === 0 && (
               <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '1rem' }}>
-                No pending salary advance requests from the Principal.
+                No pending salary advance requests.
               </p>
             )}
           </div>
@@ -144,10 +145,10 @@ export default async function DirectorAdvanceRequestsPage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem' }}>
-            {principalReviewed.map((adv: any) => (
+            {staffReviewed.map((adv: any) => (
               <div key={adv.id} style={{ padding: '1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span style={{ fontWeight: 600 }}>{adv.employee?.first_name} {adv.employee?.last_name}</span>
+                  <span style={{ fontWeight: 600 }}>{adv.employee?.first_name} {adv.employee?.last_name} ({adv.employee?.role || 'Staff'})</span>
                   <span style={{
                     padding: '0.1rem 0.4rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600,
                     backgroundColor: 
@@ -168,9 +169,9 @@ export default async function DirectorAdvanceRequestsPage() {
               </div>
             ))}
 
-            {principalReviewed.length === 0 && (
+            {staffReviewed.length === 0 && (
               <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '1rem' }}>
-                No reviewed Principal advance history.
+                No reviewed advance history.
               </p>
             )}
           </div>

@@ -136,33 +136,36 @@ export default async function DashboardLayout({
               Students
             </Link>
           )}
-          
+
           {(profile?.role === 'System Admin' || profile?.role === 'Director' || profile?.role === 'Principal') && (
-            <>
-              <Link href="/dashboard/staff" style={{
-                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
-                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
-              }}>
-                Staff & Teachers
-              </Link>
-              <Link href="/dashboard/principal/lesson-plans" style={{
-                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
-                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
-              }}>
-                Lesson Plan Reports
-              </Link>
-            </>
+            <Link href="/dashboard/staff" style={{
+              display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+              textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+            }}>
+              Staff & Teachers
+            </Link>
+          )}
+
+          {(profile?.role === 'System Admin' || profile?.role === 'Director' || profile?.role === 'Principal') && (
+            <Link href="/dashboard/principal/lesson-plans" style={{
+              display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+              textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+            }}>
+              Lesson Plan Reports
+            </Link>
           )}
 
           {(profile?.role === 'System Admin' || profile?.role === 'Director') && (
-            <>
-              <Link href="/dashboard/users" style={{
-                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
-                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
-              }}>
-                User Management
-              </Link>
+            <Link href="/dashboard/users" style={{
+              display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+              textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+            }}>
+              User Management
+            </Link>
+          )}
 
+          {profile?.role === 'System Admin' && (
+            <>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Administration
               </div>
@@ -187,7 +190,7 @@ export default async function DashboardLayout({
             </>
           )}
 
-          {(profile?.role === 'System Admin' || profile?.role === 'Teacher') && (
+          {profile?.role === 'Teacher' && (
             <Link href="/dashboard/teacher" style={{
               display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
               textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
@@ -196,7 +199,7 @@ export default async function DashboardLayout({
             </Link>
           )}
 
-          {/* Accountant Portal Links */}
+          {/* Finance Portal Links */}
           {(profile?.role === 'System Admin' || profile?.role === 'Accountant') && (
             <>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
@@ -208,6 +211,11 @@ export default async function DashboardLayout({
               }}>
                 Fee Structures
               </Link>
+            </>
+          )}
+
+          {profile?.role === 'Accountant' && (
+            <>
               <Link href="/dashboard/accountant/invoices" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
@@ -226,6 +234,12 @@ export default async function DashboardLayout({
               }}>
                 Expenses
               </Link>
+              <Link href="/dashboard/accountant/payroll" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Payroll Management
+              </Link>
               <Link href="/dashboard/accountant/reports" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
@@ -236,7 +250,7 @@ export default async function DashboardLayout({
           )}
 
           {/* Principal Cashier & Review Links */}
-          {(profile?.role === 'System Admin' || profile?.role === 'Principal') && (
+          {profile?.role === 'Principal' && (
             <>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Principal Operations
@@ -265,6 +279,12 @@ export default async function DashboardLayout({
               }}>
                 Staff Advance Requests
               </Link>
+              <Link href="/dashboard/principal/payrolls" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Payroll Review
+              </Link>
               <Link href="/dashboard/principal/reports" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
@@ -275,7 +295,7 @@ export default async function DashboardLayout({
           )}
 
           {/* Parent Billing Link */}
-          {(profile?.role === 'System Admin' || profile?.role === 'Parent') && (
+          {profile?.role === 'Parent' && (
             <>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Parent Portal
@@ -296,7 +316,7 @@ export default async function DashboardLayout({
           )}
 
           {/* Dean Operations Links */}
-          {(profile?.role === 'System Admin' || profile?.role === 'Dean') && (
+          {profile?.role === 'Dean' && (
             <>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Dean Operations
@@ -311,10 +331,10 @@ export default async function DashboardLayout({
           )}
 
           {/* Director Finance & Review Links */}
-          {(profile?.role === 'System Admin' || profile?.role === 'Director') && (
+          {profile?.role === 'Director' && (
             <>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
-                Director Finance
+                Director Operations
               </div>
               <Link href="/dashboard/director/finance" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
@@ -322,17 +342,29 @@ export default async function DashboardLayout({
               }}>
                 Finance Overview
               </Link>
+              <Link href="/dashboard/director/attendance" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Staff & Student Attendance
+              </Link>
               <Link href="/dashboard/director/leave-requests" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
               }}>
-                Principal Leave Requests
+                Staff Leave Requests
               </Link>
               <Link href="/dashboard/director/advance-requests" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
               }}>
-                Principal Advance Requests
+                Staff Advance Requests
+              </Link>
+              <Link href="/dashboard/director/payrolls" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Payroll Approvals
               </Link>
               <Link href="/dashboard/director/reports" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
@@ -349,8 +381,8 @@ export default async function DashboardLayout({
             </>
           )}
 
-          {/* Staff Self-Service Links (Visible to all staff members) */}
-          {(profile?.role === 'System Admin' || ['Director', 'Principal', 'Accountant', 'Teacher', 'Dean', 'Head of Section', 'Clinic', 'Transport'].includes(profile?.role || '')) && (
+          {/* Staff Self-Service Links (Visible to all staff members except Director) */}
+          {(profile?.role === 'System Admin' || ['Principal', 'Accountant', 'Teacher', 'Dean', 'Head of Section', 'Clinic', 'Transport'].includes(profile?.role || '')) && (
             <>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Staff Self-Service

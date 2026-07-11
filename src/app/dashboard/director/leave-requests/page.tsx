@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { reviewLeaveAction } from '../../staff/actions'
+import { formatDate } from '@/utils/date'
 import Link from 'next/link'
 
 export default async function DirectorLeaveRequestsPage() {
@@ -32,10 +33,9 @@ export default async function DirectorLeaveRequestsPage() {
     `)
     .eq('status', 'Pending')
 
-  // Filter only Principal's requests
-  const principalPending = pending?.filter((p: any) => p.employee?.role === 'Principal') || []
+  const staffPending = pending || []
 
-  // Fetch all reviewed leave applications of Principal
+  // Fetch all reviewed leave applications of Staff
   const { data: reviewed } = await supabase
     .from('leave_applications')
     .select(`
@@ -45,7 +45,7 @@ export default async function DirectorLeaveRequestsPage() {
     `)
     .neq('status', 'Pending')
 
-  const principalReviewed = reviewed?.filter((r: any) => r.employee?.role === 'Principal') || []
+  const staffReviewed = reviewed || []
 
   // Action handlers
   async function handleApprove(formData: FormData) {
@@ -69,23 +69,23 @@ export default async function DirectorLeaveRequestsPage() {
   return (
     <div>
       <h1 style={{ fontSize: '1.75rem', marginBottom: '1.5rem', color: 'var(--color-primary)' }}>
-        Principal's Leave Requests Review
+        Staff Leave Requests Review
       </h1>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '2rem', alignItems: 'start' }}>
         {/* Pending Requests */}
         <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
           <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)', backgroundColor: 'rgba(0,0,0,0.02)', fontWeight: 600 }}>
-            Pending Requests ({principalPending.length})
+            Pending Requests ({staffPending.length})
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '1.5rem' }}>
-            {principalPending.map((req: any) => (
+            {staffPending.map((req: any) => (
               <div key={req.id} style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
                   <div>
                     <h3 style={{ fontSize: '1.1rem', margin: 0 }}>
-                      {req.employee?.first_name} {req.employee?.last_name} (Principal)
+                      {req.employee?.first_name} {req.employee?.last_name} ({req.employee?.role || 'Staff'})
                     </h3>
                   </div>
                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-secondary)' }}>
@@ -94,7 +94,7 @@ export default async function DirectorLeaveRequestsPage() {
                 </div>
 
                 <div style={{ fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--color-text)' }}>
-                  <strong>Duration:</strong> {new Date(req.start_date).toLocaleDateString()} to {new Date(req.end_date).toLocaleDateString()}<br />
+                  <strong>Duration:</strong> {formatDate(req.start_date)} to {formatDate(req.end_date)}<br />
                   <strong>Reason:</strong> "{req.reason}"<br />
                   <strong>Duty Cover:</strong> {req.actingStaff ? `${req.actingStaff.first_name} ${req.actingStaff.last_name}` : 'None'}
                 </div>
@@ -114,9 +114,9 @@ export default async function DirectorLeaveRequestsPage() {
               </div>
             ))}
 
-            {principalPending.length === 0 && (
+            {staffPending.length === 0 && (
               <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '1rem' }}>
-                No pending leave requests from the Principal.
+                No pending leave requests.
               </p>
             )}
           </div>
@@ -129,10 +129,10 @@ export default async function DirectorLeaveRequestsPage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem' }}>
-            {principalReviewed.map((req: any) => (
+            {staffReviewed.map((req: any) => (
               <div key={req.id} style={{ padding: '1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span style={{ fontWeight: 600 }}>{req.employee?.first_name} {req.employee?.last_name}</span>
+                  <span style={{ fontWeight: 600 }}>{req.employee?.first_name} {req.employee?.last_name} ({req.employee?.role || 'Staff'})</span>
                   <span style={{
                     padding: '0.1rem 0.4rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600,
                     backgroundColor: req.status === 'Approved' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
@@ -142,15 +142,15 @@ export default async function DirectorLeaveRequestsPage() {
                   </span>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                  {req.leave_type} ({req.days} days) • {new Date(req.start_date).toLocaleDateString()}
+                  {req.leave_type} ({req.days} days) • {formatDate(req.start_date)}
                   {req.reviewer_notes && <div style={{ marginTop: '0.25rem', color: 'var(--color-text)' }}>Remarks: "{req.reviewer_notes}"</div>}
                 </div>
               </div>
             ))}
 
-            {principalReviewed.length === 0 && (
+            {staffReviewed.length === 0 && (
               <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '1rem' }}>
-                No reviewed Principal leave history.
+                No reviewed leave history.
               </p>
             )}
           </div>

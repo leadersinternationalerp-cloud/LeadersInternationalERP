@@ -24,6 +24,13 @@ CREATE TABLE IF NOT EXISTS public.student_parents (
 -- Enable RLS on student_parents
 ALTER TABLE public.student_parents ENABLE ROW LEVEL SECURITY;
 
+-- Drop conflicting empty tables to align schema columns
+DROP TABLE IF EXISTS public.invoice_items CASCADE;
+DROP TABLE IF EXISTS public.payments CASCADE;
+DROP TABLE IF EXISTS public.invoices CASCADE;
+DROP TABLE IF EXISTS public.expenses CASCADE;
+DROP TABLE IF EXISTS public.fee_structures CASCADE;
+
 -- 3. Create fee_structures table
 CREATE TABLE IF NOT EXISTS public.fee_structures (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
