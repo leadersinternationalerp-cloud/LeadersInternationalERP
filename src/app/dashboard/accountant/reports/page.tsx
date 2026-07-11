@@ -1,17 +1,16 @@
 import styles from './page.module.css';
 import { getBillingReport, ReportFilters } from '@/lib/billing';
 import Filters from './filters';
-import { useSearchParams } from 'next/navigation';
 
-export default async function FinancialReportsPage() {
-  const searchParams = useSearchParams();
-  const query = searchParams?.toString() ?? '';
+export default async function FinancialReportsPage(props: { searchParams: Promise<Record<string, string | undefined>> }) {
+  const searchParams = await props.searchParams;
+  const query = new URLSearchParams(searchParams as Record<string, string>).toString();
   // Build filters from query params (simple parsing)
   const filters: ReportFilters = {};
-  if (searchParams?.get('startDate')) filters.startDate = searchParams.get('startDate')!;
-  if (searchParams?.get('endDate')) filters.endDate = searchParams.get('endDate')!;
-  if (searchParams?.get('studentId')) filters.studentId = searchParams.get('studentId')!;
-  if (searchParams?.get('status')) filters.status = searchParams.get('status') as any;
+  if (searchParams?.startDate) filters.startDate = searchParams.startDate;
+  if (searchParams?.endDate) filters.endDate = searchParams.endDate;
+  if (searchParams?.studentId) filters.studentId = searchParams.studentId;
+  if (searchParams?.status) filters.status = searchParams.status as any;
 
   const {
     totalBilled,

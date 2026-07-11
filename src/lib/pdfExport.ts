@@ -10,7 +10,7 @@ export async function generatePDF(report: any): Promise<Buffer> {
   const doc = new PDFDocument({ margin: 40, size: 'A4' });
   // Collect the PDF data into a buffer
   const buffers: Buffer[] = [];
-  doc.on('data', (chunk) => buffers.push(chunk));
+  doc.on('data', (chunk: any) => buffers.push(chunk));
 
   // Title
   doc.fontSize(20).text('Billing Report', { align: 'center' }).moveDown(1);
@@ -36,7 +36,7 @@ export async function generatePDF(report: any): Promise<Buffer> {
   // Payments by method
   doc.fontSize(14).text('Payments by Method', { underline: true }).moveDown(0.5);
   Object.entries(report.methodTotals ?? {}).forEach(([method, amount]) => {
-    doc.text(`${method}: ${formatCurrency(amount)}`);
+    doc.text(`${method}: ${formatCurrency(amount as number)}`);
   });
 
   doc.moveDown(1);
@@ -44,7 +44,7 @@ export async function generatePDF(report: any): Promise<Buffer> {
   // Expenses by category
   doc.fontSize(14).text('Expenses by Category', { underline: true }).moveDown(0.5);
   Object.entries(report.categoryTotals ?? {}).forEach(([cat, amount]) => {
-    doc.text(`${cat}: ${formatCurrency(amount)}`);
+    doc.text(`${cat}: ${formatCurrency(amount as number)}`);
   });
 
   doc.end();

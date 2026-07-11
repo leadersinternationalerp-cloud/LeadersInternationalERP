@@ -11,8 +11,12 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.2",
+    "@types/get-stream": "^3.0.1",
+    "@types/pdfkit": "^0.17.6",
+    "get-stream": "^9.0.1",
     "next": "16.2.10",
     "next-pwa": "^5.6.0",
+    "pdfkit": "^0.19.1",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },

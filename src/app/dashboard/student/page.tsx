@@ -12,6 +12,7 @@ export default async function StudentDashboardPage() {
     .select('*')
     .eq('id', user?.id)
     .single()
+    
   const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
     ? profile.roles
     : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
@@ -31,18 +32,16 @@ export default async function StudentDashboardPage() {
     .eq('id', user?.id)
     .single()
 
-  let classId = ''
   let homeworkCount = 0
+  let upcomingActivitiesCount = 0
   let attendanceRate = 100
-  let totalAtt = 0
-  let presentAtt = 0
-  let recentAttendance: any[] = []
-  let releasedMarks: any[] = []
+  let newResultsCount = 0
+  
   let activeHomework: any[] = []
+  let upcomingActivities: any[] = []
   let submissions: any[] = []
 
   if (studentRecord) {
-    // Find class matching grade level & section
     const { data: cls } = await supabase
       .from('classes')
       .select('id')
@@ -51,15 +50,12 @@ export default async function StudentDashboardPage() {
       .single()
 
     if (cls) {
-      classId = cls.id
+      const classId = cls.id
 
       // Fetch active homework
       const { data: homework } = await supabase
         .from('homework')
-        .select(`
-          *,
-          subjects(name)
-        `)
+        .select(`*, subjects(name)`)
         .eq('class_id', classId)
         .order('due_date', { ascending: true })
 
@@ -73,36 +69,40 @@ export default async function StudentDashboardPage() {
         .eq('student_id', user?.id)
       
       submissions = subs || []
+
+      // Fetch upcoming activities next 7 days
+      const now = new Date()
+      const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+      const { data: activities } = await supabase
+        .from('class_activities')
+        .select('*')
+        .eq('class_id', classId)
+        .gte('date', now.toISOString())
+        .lte('date', nextWeek.toISOString())
+        .order('date', { ascending: true })
+
+      upcomingActivities = activities || []
+      upcomingActivitiesCount = upcomingActivities.length
     }
 
-    // Fetch attendance
+    // Fetch attendance rate this term (simplified to all for now)
     const { data: attLogs } = await supabase
       .from('attendance')
       .select('*')
       .eq('student_id', user?.id)
-      .order('date', { ascending: false })
 
-    recentAttendance = attLogs || []
-    totalAtt = recentAttendance.length
-    presentAtt = recentAttendance.filter(r => r.status === 'Present' || r.status === 'Late').length
+    const totalAtt = attLogs ? attLogs.length : 0
+    const presentAtt = attLogs ? attLogs.filter((r: any) => r.status === 'Present' || r.status === 'Late').length : 0
     attendanceRate = totalAtt > 0 ? Math.round((presentAtt / totalAtt) * 100) : 100
 
-    // Fetch released marks
+    // Fetch new results count (released recently)
     const { data: marks } = await supabase
       .from('marks')
-      .select(`
-        *,
-        subjects(name)
-      `)
+      .select('id')
       .eq('student_id', user?.id)
       .eq('is_released', true)
-      .order('created_at', { ascending: false })
-
-    // Filter to only Kiswahili, Math, and Science
-    releasedMarks = (marks || []).filter(res => {
-      const subName = res.subjects?.name?.toLowerCase() || ''
-      return subName === 'kiswahili' || subName === 'mathematics' || subName === 'math' || subName === 'science'
-    })
+      
+    newResultsCount = marks ? marks.length : 0
   }
 
   return (
@@ -116,37 +116,68 @@ export default async function StudentDashboardPage() {
         </p>
       </div>
 
+      {/* 4 Summary Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+        <Link href="/dashboard/student/homework" style={{ textDecoration: 'none' }}>
+          <div className="glass-panel summary-card" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)', textAlign: 'center', transition: 'transform 0.2s', cursor: 'pointer' }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Pending Homework</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--color-primary)', marginTop: '0.5rem' }}>{homeworkCount}</div>
+          </div>
+        </Link>
+        <Link href="/dashboard/student/activities" style={{ textDecoration: 'none' }}>
+          <div className="glass-panel summary-card" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)', textAlign: 'center', transition: 'transform 0.2s', cursor: 'pointer' }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Upcoming Activities</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--color-secondary)', marginTop: '0.5rem' }}>{upcomingActivitiesCount}</div>
+          </div>
+        </Link>
+        <Link href="/dashboard/student/attendance" style={{ textDecoration: 'none' }}>
+          <div className="glass-panel summary-card" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)', textAlign: 'center', transition: 'transform 0.2s', cursor: 'pointer' }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Attendance Rate</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: attendanceRate >= 90 ? 'var(--color-success)' : 'var(--color-warning)', marginTop: '0.5rem' }}>{attendanceRate}%</div>
+          </div>
+        </Link>
+        <Link href="/dashboard/student/results" style={{ textDecoration: 'none' }}>
+          <div className="glass-panel summary-card" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)', textAlign: 'center', transition: 'transform 0.2s', cursor: 'pointer' }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>New Results</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--color-primary)', marginTop: '0.5rem' }}>{newResultsCount}</div>
+          </div>
+        </Link>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '2rem', alignItems: 'start' }}>
         
-        {/* Left Column: Homework & Results */}
+        {/* Left Column: Homework */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           
-          {/* Active Homework */}
           <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Active Homework Assignments</h3>
-              <Link href="/dashboard/student/homework" style={{ fontSize: '0.85rem', color: 'var(--color-secondary)', textDecoration: 'none' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>My Homework Widgets</h3>
+              <Link href="/dashboard/student/homework" style={{ fontSize: '0.85rem', color: 'var(--color-secondary)', textDecoration: 'none', fontWeight: 600 }}>
                 View All
               </Link>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {activeHomework.slice(0, 3).map(hw => {
+              {activeHomework.slice(0, 4).map(hw => {
                 const sub = submissions.find(s => s.homework_id === hw.id)
                 return (
-                  <div key={hw.id} style={{ padding: '1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--color-secondary)' }}>{hw.subjects?.name}</span>
+                  <div key={hw.id} style={{ padding: '1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--color-secondary)' }}>{hw.subjects?.name}</span>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Due: {formatDate(hw.due_date)}</span>
+                      </div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{hw.title}</div>
+                    </div>
+                    <div>
                       <span style={{ 
-                        fontSize: '0.8rem', 
-                        color: sub ? 'var(--color-success)' : 'var(--color-error)', 
-                        fontWeight: 500 
+                        padding: '0.3rem 0.6rem', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 600,
+                        backgroundColor: sub ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                        color: sub ? 'var(--color-success)' : 'var(--color-error)'
                       }}>
-                        {sub ? '✓ Submitted' : `Due: ${formatDate(hw.due_date)}`}
+                        {sub ? 'Submitted' : 'Pending'}
                       </span>
                     </div>
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.25rem' }}>{hw.title}</div>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: 0 }}>{hw.description.substring(0, 100)}...</p>
                   </div>
                 )
               })}
@@ -158,97 +189,34 @@ export default async function StudentDashboardPage() {
               )}
             </div>
           </div>
-
-          {/* Real Released Marks */}
-          <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-            <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)', backgroundColor: 'rgba(0,0,0,0.02)', fontWeight: 600 }}>
-              Official Academic Marks (Released)
-            </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ backgroundColor: 'rgba(0,0,0,0.01)', borderBottom: '2px solid var(--color-border)' }}>
-                  <th style={{ padding: '0.75rem 1rem' }}>Subject</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Assessment</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Score</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Grade</th>
-                </tr>
-              </thead>
-              <tbody>
-                {releasedMarks.map((res) => {
-                  const scoreVal = res.score
-                  let grade = 'F'
-                  if (scoreVal >= 80) grade = 'A'
-                  else if (scoreVal >= 70) grade = 'B'
-                  else if (scoreVal >= 60) grade = 'C'
-                  else if (scoreVal >= 50) grade = 'D'
-
-                  return (
-                    <tr key={res.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>{res.subjects?.name}</td>
-                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-                        {res.assessment_type} ({res.term})
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{res.score}%</td>
-                      <td style={{ padding: '0.75rem 1rem' }}>
-                        <span style={{
-                          padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
-                          backgroundColor: grade === 'A' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0,0,0,0.05)',
-                          color: grade === 'A' ? 'var(--color-success)' : 'var(--color-text)'
-                        }}>
-                          {grade}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-
-                {releasedMarks.length === 0 && (
-                  <tr>
-                    <td colSpan={4} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                      No academic marks released for this term yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
         </div>
 
-        {/* Right Column: Attendance & Recent Logs */}
+        {/* Right Column: Upcoming Activities */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           
-          {/* Attendance Overview */}
-          <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
-            <h3 style={{ fontSize: '1.05rem', marginBottom: '1rem', fontWeight: 600 }}>My Attendance Rate</h3>
-            <div style={{
-              fontSize: '3rem', fontWeight: 800, color: attendanceRate >= 90 ? 'var(--color-success)' : 'var(--color-warning)',
-              margin: '1.5rem 0'
-            }}>
-              {attendanceRate}%
+          <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Upcoming Activities</h3>
+              <Link href="/dashboard/student/activities" style={{ fontSize: '0.85rem', color: 'var(--color-secondary)', textDecoration: 'none', fontWeight: 600 }}>
+                View All
+              </Link>
             </div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-              Total Logs: {totalAtt} Days • Present/Late: {presentAtt} Days
-            </div>
-          </div>
-
-          {/* Recent Logs list */}
-          <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-            <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)', backgroundColor: 'rgba(0,0,0,0.02)', fontWeight: 600 }}>
-              Recent Attendance History
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '1rem' }}>
-              {recentAttendance.slice(0, 5).map(rec => (
-                <div key={rec.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--color-border)' }}>
-                  <span style={{ fontSize: '0.85rem' }}>{formatDate(rec.date)}</span>
-                  <span style={{
-                    fontSize: '0.75rem', fontWeight: 600,
-                    color: rec.status === 'Present' ? 'var(--color-success)' : 'var(--color-error)'
-                  }}>{rec.status}</span>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {upcomingActivities.map(act => (
+                <div key={act.id} style={{ display: 'flex', flexDirection: 'column', padding: '0.75rem 0', borderBottom: '1px solid var(--color-border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{act.title}</span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--color-primary)' }}>{act.subject}</span>
+                  </div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                    {new Date(act.date).toLocaleDateString()}
+                  </span>
                 </div>
               ))}
-              {recentAttendance.length === 0 && (
+              {upcomingActivities.length === 0 && (
                 <p style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', textAlign: 'center', padding: '1rem' }}>
-                  No attendance logs found in database.
+                  No upcoming class activities for the next 7 days.
                 </p>
               )}
             </div>

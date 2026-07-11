@@ -250,6 +250,24 @@ export default async function DashboardLayout({
               }}>
                 Student Dashboard
               </Link>
+              <Link href="/dashboard/student/attendance" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Attendance Records
+              </Link>
+              <Link href="/dashboard/student/activities" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Class Activities
+              </Link>
+              <Link href="/dashboard/student/results" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Academic Results
+              </Link>
               <Link href="/dashboard/student/homework" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
@@ -401,6 +419,24 @@ export default async function DashboardLayout({
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
               }}>
                 Discipline Logs
+              </Link>
+              <Link href="/dashboard/parent/attendance" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Attendance Records
+              </Link>
+              <Link href="/dashboard/parent/academic-reports" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Academic Reports
+              </Link>
+              <Link href="/dashboard/parent/activities" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                School Activities
               </Link>
             </>
           )}

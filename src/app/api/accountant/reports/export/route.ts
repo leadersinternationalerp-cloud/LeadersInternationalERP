@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     }
     if (format === 'pdf') {
       const pdfBuffer = await generatePDF(report);
-      return new NextResponse(pdfBuffer, {
+      return new NextResponse(pdfBuffer as any, {
         status: 200,
         headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="billing_report.pdf"' },
       });
