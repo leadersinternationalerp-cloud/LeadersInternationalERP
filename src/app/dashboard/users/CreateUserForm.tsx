@@ -71,18 +71,14 @@ export function CreateUserForm() {
               <div className="form-group">
                 <label className="form-label">Role</label>
                 <select name="role" className="input-field" required>
-                  <option value="Student">Student</option>
-                  <option value="Parent">Parent</option>
-                  <option value="Teacher">Teacher</option>
-                  <option value="System Admin">System Admin</option>
+                  <option value="System Admin">Admin</option>
                   <option value="Director">Director</option>
                   <option value="Principal">Principal</option>
-                  <option value="Head of Section">Head of Section</option>
-                  <option value="Dean">Dean</option>
                   <option value="Accountant">Accountant</option>
-                  <option value="Clinic">Clinic</option>
-                  <option value="Transport">Transport</option>
-                  <option value="Cashier">Cashier</option>
+                  <option value="Teacher">Teacher</option>
+                  <option value="Parent">Parent</option>
+                  <option value="Dean">Dean</option>
+                  <option value="Head of Section">Head of Section</option>
                 </select>
               </div>
 
