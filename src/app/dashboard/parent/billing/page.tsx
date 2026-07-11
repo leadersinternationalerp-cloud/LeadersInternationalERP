@@ -13,11 +13,14 @@ export default async function ParentBillingHistoryPage({
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, roles')
     .eq('id', user?.id)
     .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
 
-  if (!user || (profile?.role !== 'Parent' && profile?.role !== 'System Admin')) {
+  if (!user || (!userRoles.includes('Parent') && !userRoles.includes('System Admin'))) {
     return (
       <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
         <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>
@@ -56,10 +59,17 @@ export default async function ParentBillingHistoryPage({
     .eq('id', childId)
     .single()
 
-  // Fetch student invoices
+  // Fetch student invoices with items
   const { data: invoices } = await supabase
     .from('invoices')
-    .select('*')
+    .select(`
+      *,
+      invoice_items (
+        id,
+        amount,
+        description
+      )
+    `)
     .eq('student_id', childId)
     .order('created_at', { ascending: false })
 
@@ -137,8 +147,20 @@ export default async function ParentBillingHistoryPage({
                 {(invoices || []).map(inv => {
                   const balance = Number(inv.net_amount) - Number(inv.paid_amount)
                   return (
-                    <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <td style={{ padding: '1rem', fontWeight: 600 }}>{inv.invoice_number}</td>
+                     <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                       <td style={{ padding: '1rem' }}>
+                         <div style={{ fontWeight: 600 }}>{inv.invoice_number}</div>
+                         {(inv as any).invoice_items && (inv as any).invoice_items.length > 0 && (
+                           <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+                             {(inv as any).invoice_items.map((item: any) => (
+                               <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', maxWidth: '220px', padding: '1px 0' }}>
+                                 <span>• {item.description}</span>
+                                 <span style={{ fontWeight: 500 }}>{formatTZS(Number(item.amount))}</span>
+                               </div>
+                             ))}
+                           </div>
+                         )}
+                       </td>
                       <td style={{ padding: '1rem', fontSize: '0.85rem' }}>
                         <div>{inv.term}</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Due: {formatDate(inv.due_date)}</div>

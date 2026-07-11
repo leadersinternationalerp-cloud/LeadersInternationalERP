@@ -15,11 +15,14 @@ export async function saveSystemSettingsAction(key: string, value: any) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, roles')
     .eq('id', user.id)
     .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
 
-  const isAdmin = profile?.role === 'System Admin' || profile?.role === 'Director'
+  const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
   if (!isAdmin) {
     return { error: 'Forbidden: You do not have permission to manage system settings.' }
   }
@@ -55,11 +58,14 @@ export async function saveAcademicYearAction(name: string, term_details: any[], 
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, roles')
     .eq('id', user.id)
     .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
 
-  const isAdmin = profile?.role === 'System Admin' || profile?.role === 'Director'
+  const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
   if (!isAdmin) {
     return { error: 'Forbidden: You do not have permission to manage academic years.' }
   }

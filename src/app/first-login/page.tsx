@@ -31,8 +31,30 @@ export default async function FirstLoginPage() {
       return
     }
 
-    if (password.length < 6) {
-      return
+    // Get user and profile details
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    const roles = profile?.roles || (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+    const isSystemAdmin = roles.includes('System Admin')
+
+    if (!isSystemAdmin) {
+      const pinRegex = /^[0-9]{6,10}$/
+      if (!pinRegex.test(password)) {
+        console.error('PIN must be a numeric code between 6 and 10 digits')
+        return
+      }
+    } else {
+      if (password.length < 6) {
+        console.error('Password must be at least 6 characters long')
+        return
+      }
     }
 
     // 1. Update Auth password/PIN
@@ -45,7 +67,22 @@ export default async function FirstLoginPage() {
       return
     }
 
-    // 2. Clear first_login flag from user metadata
+    // 2. Hash PIN and update profiles table
+    let pinHash = null
+    if (!isSystemAdmin) {
+      const crypto = require('crypto')
+      pinHash = crypto.createHash('sha256').update(password).digest('hex')
+    }
+
+    await supabase
+      .from('profiles')
+      .update({
+        pin_hash: pinHash,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', user.id)
+
+    // 3. Clear first_login flag from user metadata
     const { error: metaError } = await supabase.auth.updateUser({
       data: { first_login: false }
     })

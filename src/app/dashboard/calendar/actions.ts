@@ -24,7 +24,7 @@ export async function saveCalendarEventAction(
     // 2. Fetch profile to check role
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, roles')
       .eq('id', user.id)
       .single()
 

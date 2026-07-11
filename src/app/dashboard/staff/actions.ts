@@ -1,7 +1,11 @@
-'use server'
-
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import {
+  triggerLeaveSubmitted,
+  triggerLeaveReviewed,
+  triggerSalaryAdvanceSubmitted,
+  triggerSalaryAdvanceDisbursed
+} from '@/utils/notifications'
 
 // Apply for Leave
 export async function applyLeaveAction(formData: FormData) {
@@ -28,7 +32,7 @@ export async function applyLeaveAction(formData: FormData) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { error } = await supabase.from('leave_applications').insert({
+  const { data: newLeave, error } = await supabase.from('leave_applications').insert({
     employee_id: user?.id,
     leave_type,
     start_date,
@@ -38,10 +42,14 @@ export async function applyLeaveAction(formData: FormData) {
     acting_staff_id: acting_staff_id || null,
     supporting_document_url: supporting_document_url || null,
     status: 'Pending'
-  })
+  }).select('id').single()
 
   if (error) {
     return { error: error.message }
+  }
+
+  if (newLeave) {
+    await triggerLeaveSubmitted(newLeave.id)
   }
 
   revalidatePath('/dashboard/staff/self-service/leave')
@@ -66,6 +74,8 @@ export async function reviewLeaveAction(id: string, status: 'Approved' | 'Declin
   if (error) {
     return { error: error.message }
   }
+
+  await triggerLeaveReviewed(id)
 
   revalidatePath('/dashboard/principal/leave-requests')
   revalidatePath('/dashboard/director/leave-requests')
@@ -99,17 +109,21 @@ export async function applySalaryAdvanceAction(formData: FormData) {
     return { error: 'You currently have an outstanding or pending salary advance. You cannot apply for a new one until it is fully repaid.' }
   }
 
-  const { error } = await supabase.from('salary_advances').insert({
+  const { data: newAdvance, error } = await supabase.from('salary_advances').insert({
     employee_id: user?.id,
     amount_requested,
     repayment_period_months,
     reason,
     supporting_document_url: supporting_document_url || null,
     status: 'Pending'
-  })
+  }).select('id').single()
 
   if (error) {
     return { error: error.message }
+  }
+
+  if (newAdvance) {
+    await triggerSalaryAdvanceSubmitted(newAdvance.id)
   }
 
   revalidatePath('/dashboard/staff/self-service/advances')
@@ -162,6 +176,8 @@ export async function disburseSalaryAdvanceAction(id: string) {
   if (error) {
     return { error: error.message }
   }
+
+  await triggerSalaryAdvanceDisbursed(id)
 
   revalidatePath('/dashboard/accountant/payments') // updates Accountant view
   return { success: true }

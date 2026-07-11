@@ -41,10 +41,12 @@ export default async function DashboardLayout({
     )
   }
 
-  // Parse comma-separated roles for dual-role capability
-  const userRoles = profile?.role 
-    ? profile.role.split(',').map((r: string) => r.trim()) 
-    : (user?.email === 'admin@leaders.ac.tz' ? ['System Admin'] : [])
+  // Parse roles from the new roles array or fall back to comma-separated role column
+  const userRoles: string[] = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role 
+        ? profile.role.split(',').map((r: string) => r.trim()) 
+        : (user?.email === 'admin@leaders.ac.tz' ? ['System Admin'] : []))
 
   // Fetch unread notifications count
   const { count: unreadCount } = await supabase
@@ -96,7 +98,7 @@ export default async function DashboardLayout({
               {profile?.first_name} {profile?.last_name}
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-              {profile?.role || 'System Admin'}
+              {userRoles.join(', ') || 'System Admin'}
             </div>
           </Link>
           <form action="/auth/signout" method="post">

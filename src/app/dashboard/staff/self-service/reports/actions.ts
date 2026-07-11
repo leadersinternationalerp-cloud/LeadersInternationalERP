@@ -58,7 +58,7 @@ export async function submitReportAction(formData: FormData) {
 
   const { data: reviewers } = await supabase
     .from('profiles')
-    .select('id, role')
+    .select('id, role, roles')
     .in('role', rolesToNotify)
 
   if (reviewers && reviewers.length > 0) {

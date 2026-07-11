@@ -2,6 +2,11 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import {
+  triggerPayrollProposed,
+  triggerPayrollReviewedPrincipal,
+  triggerPayrollReviewedDirector
+} from '@/utils/notifications'
 
 // Generate a new monthly payroll draft
 export async function generatePayrollAction(month: number, year: number, notes?: string) {
@@ -22,7 +27,7 @@ export async function generatePayrollAction(month: number, year: number, notes?:
   // 2. Fetch all active staff profiles to generate their payslips
   const { data: staffProfiles, error: profilesError } = await supabase
     .from('profiles')
-    .select('id, role')
+    .select('id, role, roles')
     .neq('role', 'Student')
     .neq('role', 'Parent')
 
@@ -121,6 +126,8 @@ export async function submitPayrollAction(payrollId: string) {
     return { error: `Failed to submit payroll: ${error.message}` }
   }
 
+  await triggerPayrollProposed(payrollId)
+
   revalidatePath('/dashboard/accountant/payroll')
   return { success: true }
 }
@@ -150,6 +157,8 @@ export async function principalReviewPayrollAction(payrollId: string, approve: b
   if (error) {
     return { error: `Failed to review payroll: ${error.message}` }
   }
+
+  await triggerPayrollReviewedPrincipal(payrollId, approve, notes || '')
 
   revalidatePath('/dashboard/principal/payrolls')
   return { success: true }
@@ -205,6 +214,8 @@ export async function directorReviewPayrollAction(payrollId: string, approve: bo
       console.error('Failed to update individual payslips to Paid:', payslipsError.message)
     }
   }
+
+  await triggerPayrollReviewedDirector(payrollId, approve, notes || '')
 
   revalidatePath('/dashboard/director/payrolls')
   return { success: true }

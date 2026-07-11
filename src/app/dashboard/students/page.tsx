@@ -8,12 +8,14 @@ export default async function StudentsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, roles')
     .eq('id', user?.id)
     .single()
-  const role = profile?.role
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
   
-  if (role !== 'System Admin' && role !== 'Director' && role !== 'Principal' && role !== 'Teacher') {
+  if (!userRoles.includes('System Admin') && !userRoles.includes('Director') && !userRoles.includes('Principal') && !userRoles.includes('Teacher')) {
     return (
       <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
         <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>
@@ -59,7 +61,7 @@ export default async function StudentsPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)' }}>Student Directory</h1>
-        {(role === 'System Admin' || role === 'Director' || role === 'Principal') && (
+        {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal')) && (
           <button className="btn btn-primary">+ Enroll Student</button>
         )}
       </div>

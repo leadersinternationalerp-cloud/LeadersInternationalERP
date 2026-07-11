@@ -13,11 +13,14 @@ export default async function PrincipalAcademicReportsPage({
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, roles')
     .eq('id', user?.id)
     .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
 
-  if (profile?.role !== 'Principal' && profile?.role !== 'System Admin' && profile?.role !== 'Dean') {
+  if (!userRoles.includes('Principal') && !userRoles.includes('System Admin') && !userRoles.includes('Dean')) {
     return (
       <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
         <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>
@@ -41,17 +44,45 @@ export default async function PrincipalAcademicReportsPage({
     selectedStudent = students.find(s => s.id === selectedStudentId) || null
   }
 
-  // Mock generated report card data
-  const subjectsReport = [
-    { subject: 'Mathematics', score: 88, grade: 'A', remarks: 'Excellent performance.' },
-    { subject: 'English Language', score: 76, grade: 'B', remarks: 'Good vocabulary and reading skills.' },
-    { subject: 'Science', score: 92, grade: 'A', remarks: 'Outstanding work in practical experiments.' },
-    { subject: 'Social Studies', score: 65, grade: 'C', remarks: 'Capable of higher achievement.' },
-    { subject: 'Kiswahili', score: 84, grade: 'A', remarks: 'Very strong grammar and expression.' }
-  ]
+  // Fetch real released marks for student
+  let realMarks: any[] = []
+  if (selectedStudentId) {
+    const { data: marks } = await supabase
+      .from('marks')
+      .select(`
+        *,
+        subjects (name)
+      `)
+      .eq('student_id', selectedStudentId)
+      .eq('is_released', true)
+      .order('created_at', { ascending: false })
+    realMarks = marks || []
+  }
+
+  const subjectsReport = realMarks.map(m => {
+    const scoreVal = Number(m.score)
+    let grade = 'F'
+    if (scoreVal >= 80) grade = 'A'
+    else if (scoreVal >= 70) grade = 'B'
+    else if (scoreVal >= 60) grade = 'C'
+    else if (scoreVal >= 50) grade = 'D'
+
+    return {
+      subject: m.subjects?.name || 'Unknown',
+      score: scoreVal,
+      grade,
+      remarks: m.remarks || 'No remarks provided.'
+    }
+  })
 
   const totalScore = subjectsReport.reduce((acc, curr) => acc + curr.score, 0)
-  const averageScore = totalScore / subjectsReport.length
+  const averageScore = subjectsReport.length > 0 ? totalScore / subjectsReport.length : 0
+
+  let overallGrade = 'F'
+  if (averageScore >= 80) overallGrade = 'A'
+  else if (averageScore >= 70) overallGrade = 'B'
+  else if (averageScore >= 60) overallGrade = 'C'
+  else if (averageScore >= 50) overallGrade = 'D'
 
   return (
     <div>
@@ -99,19 +130,24 @@ export default async function PrincipalAcademicReportsPage({
           <>
             <style dangerouslySetInnerHTML={{ __html: `
               @media print {
-                header, aside, .btn, .no-print {
+                header, aside, footer, nav, button, .btn, .no-print {
                   display: none !important;
                 }
                 body {
                   background: white !important;
                   color: black !important;
                 }
-                .glass-panel {
+                body, main, #printable-report-card {
+                  margin: 0 !important;
+                  padding: 0 !important;
                   border: none !important;
                   box-shadow: none !important;
                   background: transparent !important;
-                  padding: 0 !important;
+                  width: 100% !important;
                   max-width: 100% !important;
+                }
+                h2, h3, span, div, td, th, strong {
+                  color: black !important;
                 }
               }
             ` }} />
@@ -120,7 +156,7 @@ export default async function PrincipalAcademicReportsPage({
               <PrintButton label="Print Report Card 🖨️" className="btn btn-primary" />
             </div>
 
-            <div className="glass-panel" style={{ padding: '2.5rem', borderRadius: 'var(--radius-lg)', border: '2px solid rgba(0,0,0,0.05)' }}>
+            <div className="glass-panel" id="printable-report-card" style={{ padding: '2.5rem', borderRadius: 'var(--radius-lg)', border: '2px solid rgba(0,0,0,0.05)', backgroundColor: '#fff', color: '#000' }}>
             
             {/* Report Header */}
             <div style={{ textAlign: 'center', borderBottom: '2px solid var(--color-primary)', paddingBottom: '1.5rem', marginBottom: '2rem' }}>
@@ -153,52 +189,59 @@ export default async function PrincipalAcademicReportsPage({
                 <strong>Date of Report:</strong> {new Date().toLocaleDateString('en-TZ')}
               </div>
             </div>
+                       {subjectsReport.length > 0 ? (
+              <>
+                {/* Subjects Table */}
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '2rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: 'rgba(0,0,0,0.03)', borderBottom: '2px solid var(--color-border)' }}>
+                      <th style={{ padding: '0.75rem' }}>Subject Name</th>
+                      <th style={{ padding: '0.75rem' }}>Score (%)</th>
+                      <th style={{ padding: '0.75rem' }}>Grade</th>
+                      <th style={{ padding: '0.75rem' }}>Teacher's Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {subjectsReport.map(sub => (
+                      <tr key={sub.subject} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <td style={{ padding: '0.75rem', fontWeight: 500 }}>{sub.subject}</td>
+                        <td style={{ padding: '0.75rem', fontWeight: 600 }}>{sub.score}%</td>
+                        <td style={{ padding: '0.75rem' }}>
+                          <span style={{
+                            padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
+                            backgroundColor: sub.grade === 'A' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0,0,0,0.05)',
+                            color: sub.grade === 'A' ? 'var(--color-success)' : 'var(--color-text)'
+                          }}>
+                            {sub.grade}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                          "{sub.remarks}"
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
 
-            {/* Subjects Table */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '2rem' }}>
-              <thead>
-                <tr style={{ backgroundColor: 'rgba(0,0,0,0.03)', borderBottom: '2px solid var(--color-border)' }}>
-                  <th style={{ padding: '0.75rem' }}>Subject Name</th>
-                  <th style={{ padding: '0.75rem' }}>Score (%)</th>
-                  <th style={{ padding: '0.75rem' }}>Grade</th>
-                  <th style={{ padding: '0.75rem' }}>Teacher's Remarks</th>
-                </tr>
-              </thead>
-              <tbody>
-                {subjectsReport.map(sub => (
-                  <tr key={sub.subject} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: '0.75rem', fontWeight: 500 }}>{sub.subject}</td>
-                    <td style={{ padding: '0.75rem', fontWeight: 600 }}>{sub.score}%</td>
-                    <td style={{ padding: '0.75rem' }}>
-                      <span style={{
-                        padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
-                        backgroundColor: sub.grade === 'A' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0,0,0,0.05)',
-                        color: sub.grade === 'A' ? 'var(--color-success)' : 'var(--color-text)'
-                      }}>
-                        {sub.grade}
-                      </span>
-                    </td>
-                    <td style={{ padding: '0.75rem', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-                      "{sub.remarks}"
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* Performance Summary */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '2rem' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Average Score</div>
-                <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--color-primary)' }}>
-                  {averageScore.toFixed(1)}%
+                {/* Performance Summary */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '2rem' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Average Score</div>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--color-primary)' }}>
+                      {averageScore.toFixed(1)}%
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Overall Grade</div>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--color-secondary)' }}>{overallGrade}</div>
+                  </div>
                 </div>
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)', border: '1px dashed var(--color-border)', borderRadius: 'var(--radius-md)', marginBottom: '2rem' }}>
+                No official academic marks have been released for this student in the current term.
               </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Overall Grade</div>
-                <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--color-secondary)' }}>A</div>
-              </div>
-            </div>
+            )}
 
             {/* Signatures */}
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2rem', borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', fontSize: '0.85rem' }}>

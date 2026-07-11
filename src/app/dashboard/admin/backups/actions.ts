@@ -15,11 +15,19 @@ export async function triggerBackupAction() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, first_name, last_name')
+    .select('role, roles, first_name, last_name')
     .eq('id', user.id)
     .single()
 
-  const isAdmin = profile?.role === 'System Admin' || profile?.role === 'Director'
+  if (!profile) {
+    return { error: 'Forbidden: Profile not found.' }
+  }
+
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+
+  const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
   if (!isAdmin) {
     return { error: 'Forbidden: You do not have permission to trigger database backups.' }
   }
@@ -136,11 +144,19 @@ export async function getBackupDownloadUrlAction(fileName: string) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, roles')
     .eq('id', user.id)
     .single()
 
-  const isAdmin = profile?.role === 'System Admin' || profile?.role === 'Director'
+  if (!profile) {
+    return { error: 'Forbidden: Profile not found.' }
+  }
+
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+
+  const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
   if (!isAdmin) {
     return { error: 'Forbidden: You do not have permission to download backups.' }
   }

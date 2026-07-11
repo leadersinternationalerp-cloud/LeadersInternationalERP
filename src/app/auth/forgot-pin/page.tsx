@@ -44,11 +44,11 @@ export default function ForgotPinPage() {
           )}
 
           <div className="form-group">
-            <label className="form-label" style={{ fontSize: '0.85rem' }}>Email Address</label>
+            <label className="form-label" style={{ fontSize: '0.85rem' }}>Username / Email Address</label>
             <input 
-              type="email" 
-              name="email" 
-              placeholder="e.g. user@leaders.ac.tz" 
+              type="text" 
+              name="usernameOrEmail" 
+              placeholder="e.g. parent1 or parent1@leaders.ac.tz" 
               className="input-field" 
               required 
             />

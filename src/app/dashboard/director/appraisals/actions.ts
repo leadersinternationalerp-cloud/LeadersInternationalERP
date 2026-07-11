@@ -12,11 +12,14 @@ export async function saveAppraisalCycleAction(formData: FormData) {
   // Verify access
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, roles')
     .eq('id', user.id)
     .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
 
-  if (profile?.role !== 'Director' && profile?.role !== 'System Admin') {
+  if (!userRoles.includes('Director') && !userRoles.includes('System Admin')) {
     return { error: 'Unauthorized' }
   }
 
@@ -125,11 +128,14 @@ export async function saveReviewerEvaluationAction(formData: FormData) {
   // Verify access
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, roles')
     .eq('id', user.id)
     .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
 
-  if (profile?.role !== 'Director' && profile?.role !== 'System Admin' && profile?.role !== 'Principal') {
+  if (!userRoles.includes('Director') && !userRoles.includes('System Admin') && !userRoles.includes('Principal')) {
     return { error: 'Unauthorized' }
   }
 

@@ -1,8 +1,33 @@
 import { createClient } from '@/utils/supabase/server'
 import { recordPaymentAction } from '../actions'
+import Link from 'next/link'
+import PrintButton from '@/components/PrintButton'
 
-export default async function PaymentsPage() {
+export default async function PaymentsPage({
+  searchParams
+}: {
+  searchParams: Promise<{ print_id?: string }>
+}) {
   const supabase = await createClient()
+  const params = await searchParams
+  const printId = params.print_id
+
+  let printPayment: any = null
+  if (printId) {
+    const { data } = await supabase
+      .from('payments')
+      .select(`
+        *,
+        invoices (term, academic_year, invoice_number),
+        students (
+          student_id,
+          profiles (first_name, last_name)
+        )
+      `)
+      .eq('id', printId)
+      .single()
+    printPayment = data
+  }
 
   // Fetch pending/partially paid invoices for selection
   const { data: pendingInvoices } = await supabase
@@ -47,6 +72,118 @@ export default async function PaymentsPage() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(amount)
+  }
+
+  if (printPayment) {
+    const studentName = `${printPayment.students?.profiles?.first_name} ${printPayment.students?.profiles?.last_name}`
+    const invoiceNum = printPayment.invoices?.invoice_number || 'N/A'
+    const invoicePeriod = `${printPayment.invoices?.term} (${printPayment.invoices?.academic_year})`
+
+    return (
+      <div>
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media print {
+            body {
+              background: white !important;
+              color: black !important;
+            }
+            header, aside, footer, nav, button, .btn, .no-print {
+              display: none !important;
+            }
+            body, main, #printable-receipt {
+              margin: 0 !important;
+              padding: 0 !important;
+              border: none !important;
+              box-shadow: none !important;
+              background: transparent !important;
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            h2, h3, span, div, td, th, strong {
+              color: black !important;
+            }
+          }
+        ` }} />
+        <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+          <Link href="/dashboard/accountant/payments" className="btn" style={{ background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}>
+            ← Back to Payments
+          </Link>
+          <PrintButton label="Print Receipt 🖨️" className="btn btn-primary" />
+        </div>
+
+        <div className="glass-panel" id="printable-receipt" style={{ padding: '3rem', borderRadius: 'var(--radius-lg)', maxWidth: '700px', margin: '0 auto', border: '1px solid var(--color-border)', backgroundColor: '#fff', color: '#000' }}>
+          {/* Header */}
+          <div style={{ textAlign: 'center', borderBottom: '2px solid var(--color-primary)', paddingBottom: '1.5rem', marginBottom: '2rem' }}>
+            <h2 style={{ fontSize: '1.5rem', margin: 0, color: 'var(--color-primary)' }}>LEADERS INTERNATIONAL SCHOOL</h2>
+            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>Official Payment Receipt Voucher</div>
+          </div>
+
+          {/* Details Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem', fontSize: '0.95rem' }}>
+            <div>
+              <span style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>Student Name:</span>
+              <div style={{ fontWeight: 600, fontSize: '1.1rem', marginTop: '0.25rem' }}>{studentName}</div>
+            </div>
+            <div>
+              <span style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>Student ID:</span>
+              <div style={{ fontWeight: 600, fontSize: '1.1rem', marginTop: '0.25rem' }}>{printPayment.students?.student_id}</div>
+            </div>
+            <div>
+              <span style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>Receipt Number:</span>
+              <div style={{ fontWeight: 600, marginTop: '0.25rem' }}>{printPayment.receipt_number}</div>
+            </div>
+            <div>
+              <span style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>Invoice Number:</span>
+              <div style={{ fontWeight: 600, marginTop: '0.25rem' }}>{invoiceNum}</div>
+            </div>
+            <div>
+              <span style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>Payment Date:</span>
+              <div style={{ fontWeight: 600, marginTop: '0.25rem' }}>{new Date(printPayment.payment_date).toLocaleString('en-TZ')}</div>
+            </div>
+            <div>
+              <span style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>Invoice Period:</span>
+              <div style={{ fontWeight: 600, marginTop: '0.25rem' }}>{invoicePeriod}</div>
+            </div>
+          </div>
+
+          {/* Payment Summary */}
+          <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '1.5rem', marginBottom: '2.5rem', backgroundColor: 'rgba(0,0,0,0.01)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', fontSize: '0.95rem' }}>
+              <span>Payment Method:</span>
+              <strong style={{ textTransform: 'uppercase' }}>{printPayment.payment_method}</strong>
+            </div>
+            {printPayment.reference_number && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', fontSize: '0.95rem' }}>
+                <span>Reference Number:</span>
+                <strong>{printPayment.reference_number}</strong>
+              </div>
+            )}
+            {printPayment.notes && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', fontSize: '0.95rem' }}>
+                <span>Memo/Notes:</span>
+                <span style={{ color: 'var(--color-text-muted)' }}>{printPayment.notes}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--color-border)', paddingTop: '0.75rem', marginTop: '0.75rem', fontSize: '1.1rem', fontWeight: 700 }}>
+              <span>Total Amount Paid:</span>
+              <span style={{ color: 'var(--color-success)' }}>{formatTZS(Number(printPayment.amount))}</span>
+            </div>
+          </div>
+
+          {/* Signatures */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginTop: '4rem', fontSize: '0.85rem' }}>
+            <div>
+              <div style={{ borderBottom: '1px dashed var(--color-text-muted)', height: '30px', width: '150px', marginBottom: '0.5rem' }}></div>
+              <strong>Received By (Cashier)</strong>
+            </div>
+            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+              <div style={{ borderBottom: '1px dashed var(--color-text-muted)', height: '30px', width: '150px', marginBottom: '0.5rem' }}></div>
+              <strong>Payer Signature</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -123,6 +260,7 @@ export default async function PaymentsPage() {
                 <th style={{ padding: '1rem' }}>Method</th>
                 <th style={{ padding: '1rem' }}>Amount Paid</th>
                 <th style={{ padding: '1rem' }}>Date</th>
+                <th style={{ padding: '1rem' }}>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -142,12 +280,17 @@ export default async function PaymentsPage() {
                   <td style={{ padding: '1rem', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
                     {new Date(pay.payment_date).toLocaleDateString()}
                   </td>
+                  <td style={{ padding: '1rem' }}>
+                    <Link href={`/dashboard/accountant/payments?print_id=${pay.id}`} className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', textDecoration: 'none' }}>
+                      🖨️ Receipt
+                    </Link>
+                  </td>
                 </tr>
               ))}
 
               {(!payments || payments.length === 0) && (
                 <tr>
-                  <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                  <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                     No payments recorded yet.
                   </td>
                 </tr>

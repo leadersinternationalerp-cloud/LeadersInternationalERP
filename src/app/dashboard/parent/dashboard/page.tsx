@@ -13,11 +13,14 @@ export default async function ParentDashboardPage({
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, roles')
     .eq('id', user?.id)
     .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
 
-  if (profile?.role !== 'Parent' && profile?.role !== 'System Admin') {
+  if (!userRoles.includes('Parent') && !userRoles.includes('System Admin')) {
     return (
       <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
         <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>
@@ -60,6 +63,7 @@ export default async function ParentDashboardPage({
         .from('invoices')
         .select('*')
         .eq('student_id', selectedChildId)
+        .neq('status', 'Paid')
         .order('created_at', { ascending: false })
       childInvoices = invoices || []
 
@@ -268,7 +272,7 @@ export default async function ParentDashboardPage({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {childDiscipline.slice(0, 2).map(disc => (
                   <div key={disc.id} style={{ padding: '0.75rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)' }}>
-                    <div style={{ display: 'flex', justifyBetween: 'space-between', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-error)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-error)' }}>
                       <span>{disc.category}</span>
                       <span style={{ color: 'var(--color-text-muted)' }}>{formatDate(disc.incident_date)}</span>
                     </div>

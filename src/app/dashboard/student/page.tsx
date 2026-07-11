@@ -12,8 +12,11 @@ export default async function StudentDashboardPage() {
     .select('*')
     .eq('id', user?.id)
     .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
 
-  if (profile?.role !== 'Student' && profile?.role !== 'System Admin') {
+  if (!userRoles.includes('Student') && !userRoles.includes('System Admin')) {
     return (
       <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
         <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>
@@ -36,6 +39,7 @@ export default async function StudentDashboardPage() {
   let recentAttendance: any[] = []
   let releasedMarks: any[] = []
   let activeHomework: any[] = []
+  let submissions: any[] = []
 
   if (studentRecord) {
     // Find class matching grade level & section
@@ -61,6 +65,14 @@ export default async function StudentDashboardPage() {
 
       activeHomework = homework || []
       homeworkCount = activeHomework.length
+
+      // Fetch student's submissions
+      const { data: subs } = await supabase
+        .from('homework_submissions')
+        .select('*')
+        .eq('student_id', user?.id)
+      
+      submissions = subs || []
     }
 
     // Fetch attendance
@@ -86,7 +98,11 @@ export default async function StudentDashboardPage() {
       .eq('is_released', true)
       .order('created_at', { ascending: false })
 
-    releasedMarks = marks || []
+    // Filter to only Kiswahili, Math, and Science
+    releasedMarks = (marks || []).filter(res => {
+      const subName = res.subjects?.name?.toLowerCase() || ''
+      return subName === 'kiswahili' || subName === 'mathematics' || subName === 'math' || subName === 'science'
+    })
   }
 
   return (
@@ -115,18 +131,25 @@ export default async function StudentDashboardPage() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {activeHomework.slice(0, 3).map(hw => (
-                <div key={hw.id} style={{ padding: '1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--color-secondary)' }}>{hw.subjects?.name}</span>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--color-error)', fontWeight: 500 }}>
-                      Due: {formatDate(hw.due_date)}
-                    </span>
+              {activeHomework.slice(0, 3).map(hw => {
+                const sub = submissions.find(s => s.homework_id === hw.id)
+                return (
+                  <div key={hw.id} style={{ padding: '1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--color-secondary)' }}>{hw.subjects?.name}</span>
+                      <span style={{ 
+                        fontSize: '0.8rem', 
+                        color: sub ? 'var(--color-success)' : 'var(--color-error)', 
+                        fontWeight: 500 
+                      }}>
+                        {sub ? '✓ Submitted' : `Due: ${formatDate(hw.due_date)}`}
+                      </span>
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.25rem' }}>{hw.title}</div>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: 0 }}>{hw.description.substring(0, 100)}...</p>
                   </div>
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.25rem' }}>{hw.title}</div>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: 0 }}>{hw.description.substring(0, 100)}...</p>
-                </div>
-              ))}
+                )
+              })}
 
               {activeHomework.length === 0 && (
                 <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>

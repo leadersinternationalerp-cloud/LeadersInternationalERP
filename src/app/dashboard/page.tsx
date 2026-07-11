@@ -11,8 +11,9 @@ export default async function DashboardPage() {
     .select('*')
     .eq('id', user?.id)
     .single()
-
-  const userRoles = profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : []
+  const userRoles: string[] = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
 
   // Role-based redirections for pure student/parent users
   if (userRoles.includes('Student') && userRoles.length === 1) {
@@ -67,7 +68,7 @@ export default async function DashboardPage() {
             Welcome back, {profile?.first_name}!
           </h1>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '0.95rem', marginTop: '0.25rem' }}>
-            Role: <strong>{profile?.role}</strong> • Academic Year: <strong>2025-2026</strong>
+            Role: <strong>{userRoles.join(', ')}</strong> • Academic Year: <strong>2025-2026</strong>
           </p>
         </div>
         <Link href="/dashboard/profile" className="btn btn-secondary" style={{ textDecoration: 'none' }}>

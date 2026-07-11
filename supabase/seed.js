@@ -228,7 +228,9 @@ async function seed() {
       first_name: acc.fn,
       last_name: acc.ln,
       email: acc.email,
+      username: acc.email.split('@')[0],
       role: acc.role,
+      roles: [acc.role],
       is_active: true
     }).select().single();
     

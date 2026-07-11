@@ -13,11 +13,14 @@ export default async function ParentDisciplinePage({
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, roles')
     .eq('id', user?.id)
     .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
 
-  if (profile?.role !== 'Parent' && profile?.role !== 'System Admin') {
+  if (!user || (!userRoles.includes('Parent') && !userRoles.includes('System Admin'))) {
     return (
       <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
         <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>
@@ -94,8 +97,8 @@ export default async function ParentDisciplinePage({
                   position: 'absolute', left: '-48px', top: '4px',
                   width: '16px', height: '16px', borderRadius: '50%',
                   backgroundColor: 
-                    log.category === 'Behavioral Incident' ? 'var(--color-error)' : 
-                    log.category === 'Dress Code' ? 'var(--color-warning)' : 'var(--color-secondary)',
+                    log.category === 'Academic Dishonesty' || log.category === 'Bullying' || log.category === 'Misconduct' ? 'var(--color-error)' : 
+                    log.category === 'Absenteeism' ? 'var(--color-warning)' : 'var(--color-secondary)',
                   border: '3px solid var(--color-surface)', boxShadow: '0 0 0 2px var(--color-border)'
                 }} />
 

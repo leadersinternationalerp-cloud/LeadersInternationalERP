@@ -59,7 +59,30 @@ export default async function PayslipsPage({ searchParams }: { searchParams: Pro
 
     return (
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media print {
+            body {
+              background: white !important;
+              color: black !important;
+            }
+            header, aside, footer, nav, button, .btn, .no-print {
+              display: none !important;
+            }
+            body, main, #printable-payslip {
+              margin: 0 !important;
+              padding: 0 !important;
+              border: none !important;
+              box-shadow: none !important;
+              background: transparent !important;
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            h2, h3, span, div, td, th, strong {
+              color: black !important;
+            }
+          }
+        ` }} />
+        <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <Link href="/dashboard/staff/self-service/payslips" className="btn" style={{ background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}>
             ← Back to List
           </Link>

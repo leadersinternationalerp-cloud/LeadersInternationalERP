@@ -26,11 +26,14 @@ export async function saveDisciplineRecordAction(data: DisciplineRecordInput) {
   // 2. Verify user is Dean or System Admin
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, roles')
     .eq('id', user.id)
     .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
 
-  if (profile?.role !== 'Dean' && profile?.role !== 'System Admin') {
+  if (!userRoles.includes('Dean') && !userRoles.includes('System Admin')) {
     return { error: 'Access Denied. Only Deans or Admins can log discipline records.' }
   }
 

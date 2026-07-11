@@ -21,13 +21,13 @@ export function LoginForm() {
       {state.error && <div className="auth-error">{state.error}</div>}
       
       <div className="form-group">
-        <label htmlFor="email" className="form-label">Email ID</label>
+        <label htmlFor="username" className="form-label">Username / Email</label>
         <input 
-          type="email" 
-          id="email" 
-          name="email" 
+          type="text" 
+          id="username" 
+          name="username" 
           className="input-field" 
-          placeholder="Enter your email" 
+          placeholder="Enter your username or email" 
           required 
         />
       </div>
@@ -44,7 +44,7 @@ export function LoginForm() {
           id="password" 
           name="password" 
           className="input-field" 
-          placeholder="Enter your password or PIN" 
+          placeholder="Enter password or 6-10 digit PIN" 
           required 
         />
       </div>

@@ -8,11 +8,14 @@ export default async function BackupsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, roles')
     .eq('id', user?.id)
     .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
 
-  const isAdmin = profile?.role === 'System Admin' || profile?.role === 'Director'
+  const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
 
   if (!isAdmin) {
     return (

@@ -5,10 +5,12 @@ export default async function StaffPage() {
 
   // Verify Admin access
   const { data: { user } } = await supabase.auth.getUser()
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single()
-  const role = profile?.role
+  const { data: profile } = await supabase.from('profiles').select('role, roles').eq('id', user?.id).single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
   
-  if (role !== 'System Admin' && role !== 'Director' && role !== 'Principal') {
+  if (!userRoles.includes('System Admin') && !userRoles.includes('Director') && !userRoles.includes('Principal')) {
     return (
       <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
         <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>

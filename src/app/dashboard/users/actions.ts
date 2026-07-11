@@ -45,11 +45,14 @@ export async function createUserAction(prevState: FormState, formData: FormData)
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, roles')
       .eq('id', currentUser.id)
       .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
 
-    const isAdmin = profile?.role === 'System Admin' || profile?.role === 'Director'
+    const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
     if (!isAdmin) {
       throw new Error('Access denied: Insufficient permissions')
     }
@@ -78,6 +81,7 @@ export async function createUserAction(prevState: FormState, formData: FormData)
         last_name,
         email,
         role,
+        roles: role.split(',').map((r: string) => r.trim()),
         is_active: true
       })
 
@@ -118,11 +122,15 @@ export async function updateUserAction(
   
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, roles')
     .eq('id', currentUser.id)
     .single()
 
-  const isAdmin = profile?.role === 'System Admin' || profile?.role === 'Director'
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+
+  const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
   if (!isAdmin) {
     return { success: false, error: 'Access denied: Insufficient permissions' }
   }
@@ -164,6 +172,7 @@ export async function updateUserAction(
         first_name,
         last_name,
         role,
+        roles: role.split(',').map((r: string) => r.trim()),
         email
       })
       .eq('id', userId)
@@ -198,11 +207,15 @@ export async function toggleUserStatusAction(
   
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, roles')
     .eq('id', currentUser.id)
     .single()
 
-  const isAdmin = profile?.role === 'System Admin' || profile?.role === 'Director'
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+
+  const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
   if (!isAdmin) {
     return { success: false, error: 'Access denied: Insufficient permissions' }
   }
@@ -267,11 +280,15 @@ export async function resetUserPasswordAction(
   
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, roles')
     .eq('id', currentUser.id)
     .single()
 
-  const isAdmin = profile?.role === 'System Admin' || profile?.role === 'Director'
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+
+  const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
   if (!isAdmin) {
     return { success: false, error: 'Access denied: Insufficient permissions' }
   }

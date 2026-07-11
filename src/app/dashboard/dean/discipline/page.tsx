@@ -10,11 +10,14 @@ export default async function DeanDisciplinePage() {
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, roles')
     .eq('id', user?.id)
     .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
 
-  if (profile?.role !== 'Dean' && profile?.role !== 'System Admin') {
+  if (!userRoles.includes('Dean') && !userRoles.includes('System Admin')) {
     return (
       <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
         <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>
@@ -41,7 +44,7 @@ export default async function DeanDisciplinePage() {
         student_id,
         profiles:id (first_name, last_name)
       ),
-      recorder:recorded_by (first_name, last_name)
+      recorder:created_by (first_name, last_name)
     `)
     .order('incident_date', { ascending: false })
 
@@ -71,7 +74,7 @@ export default async function DeanDisciplinePage() {
         category,
         description,
         action_taken: actionTaken,
-        recorded_by: user.id
+        created_by: user.id
       })
 
     if (error) {
@@ -144,10 +147,11 @@ export default async function DeanDisciplinePage() {
             <div className="form-group">
               <label className="form-label">Category</label>
               <select name="category" className="input-field" required>
-                <option value="Behavioral Incident">Behavioral Incident</option>
-                <option value="Dress Code">Dress Code</option>
+                <option value="Misconduct">Misconduct</option>
+                <option value="Absenteeism">Absenteeism</option>
                 <option value="Academic Dishonesty">Academic Dishonesty</option>
-                <option value="Tardiness">Tardiness</option>
+                <option value="Bullying">Bullying</option>
+                <option value="Other">Other</option>
               </select>
             </div>
 

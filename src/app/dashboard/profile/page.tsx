@@ -31,6 +31,10 @@ export default async function ProfilePage() {
 
   const uniqueId = student?.student_id || staff?.employee_id || 'N/A'
 
+  const userRoles: string[] = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+
   // Server Action to update profile information
   async function handleUpdateProfile(formData: FormData) {
     'use server'
@@ -59,10 +63,31 @@ export default async function ProfilePage() {
     // 2. Update PIN / Password (via admin SDK to bypass token limits if needed or standard Auth)
     if (newPin) {
       if (newPin !== confirmPin) {
+        console.error('PINs do not match')
         return
       }
-      if (newPin.length < 6) {
-        return
+
+      // Fetch user profile to verify role
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+      const roles = profile?.roles || (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+      const isSystemAdmin = roles.includes('System Admin')
+
+      if (!isSystemAdmin) {
+        const pinRegex = /^[0-9]{6,10}$/
+        if (!pinRegex.test(newPin)) {
+          console.error('PIN must be a numeric code between 6 and 10 digits')
+          return
+        }
+      } else {
+        if (newPin.length < 6) {
+          console.error('Password must be at least 6 characters long')
+          return
+        }
       }
 
       const { error: authError } = await serviceClient.auth.admin.updateUserById(user.id, {
@@ -72,7 +97,23 @@ export default async function ProfilePage() {
 
       if (authError) {
         console.error('Error updating auth password/PIN:', authError.message)
+        return
       }
+
+      // Save pin_hash in profiles table
+      let pinHash = null
+      if (!isSystemAdmin) {
+        const crypto = require('crypto')
+        pinHash = crypto.createHash('sha256').update(newPin).digest('hex')
+      }
+
+      await supabase
+        .from('profiles')
+        .update({
+          pin_hash: pinHash,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
     }
 
     revalidatePath('/dashboard/profile')
@@ -104,7 +145,7 @@ export default async function ProfilePage() {
           </p>
 
           <div style={{ display: 'inline-block', padding: '0.25rem 0.75rem', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(59, 179, 195, 0.1)', color: 'var(--color-secondary)', fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '1.5rem' }}>
-            {profile?.role}
+            {userRoles.join(', ')}
           </div>
 
           <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.9rem' }}>
