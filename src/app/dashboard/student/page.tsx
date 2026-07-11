@@ -21,38 +21,73 @@ export default async function StudentDashboardPage() {
     )
   }
 
-  // Fetch student specific record
+  // 1. Fetch student details
   const { data: studentRecord } = await supabase
     .from('students')
     .select('*')
     .eq('id', user?.id)
     .single()
 
-  // Fetch student's attendance records
-  const { data: attendance } = await supabase
-    .from('attendance')
-    .select('*')
-    .eq('student_id', user?.id)
-    .order('date', { ascending: false })
+  let classId = ''
+  let homeworkCount = 0
+  let attendanceRate = 100
+  let totalAtt = 0
+  let presentAtt = 0
+  let recentAttendance: any[] = []
+  let releasedMarks: any[] = []
+  let activeHomework: any[] = []
 
-  const attRecords = attendance || []
-  const totalAtt = attRecords.length
-  const presentAtt = attRecords.filter(r => r.status === 'Present' || r.status === 'Late').length
-  const attendanceRate = totalAtt > 0 ? Math.round((presentAtt / totalAtt) * 100) : 100
+  if (studentRecord) {
+    // Find class matching grade level & section
+    const { data: cls } = await supabase
+      .from('classes')
+      .select('id')
+      .eq('name', studentRecord.grade_level)
+      .eq('section', studentRecord.section)
+      .single()
 
-  // Mock student homework list
-  const homeworkList = [
-    { id: '1', subject: 'Mathematics', topic: 'Fractions Calculation', dueDate: '2026-07-15', instructions: 'Solve exercises 4 to 8 on Page 45 of the primary workbook.' },
-    { id: '2', subject: 'Kiswahili', topic: 'Swahili Methali Composition', dueDate: '2026-07-18', instructions: 'Write a composition illustrating the methali: Haraka haraka haina baraka.' }
-  ]
+    if (cls) {
+      classId = cls.id
 
-  // Mock term results
-  const termResults = [
-    { subject: 'Mathematics', score: 88, grade: 'A', status: 'Passed' },
-    { subject: 'English Language', score: 76, grade: 'B', status: 'Passed' },
-    { subject: 'Science', score: 92, grade: 'A', status: 'Passed' },
-    { subject: 'Kiswahili', score: 84, grade: 'A', status: 'Passed' }
-  ]
+      // Fetch active homework
+      const { data: homework } = await supabase
+        .from('homework')
+        .select(`
+          *,
+          subjects(name)
+        `)
+        .eq('class_id', classId)
+        .order('due_date', { ascending: true })
+
+      activeHomework = homework || []
+      homeworkCount = activeHomework.length
+    }
+
+    // Fetch attendance
+    const { data: attLogs } = await supabase
+      .from('attendance')
+      .select('*')
+      .eq('student_id', user?.id)
+      .order('date', { ascending: false })
+
+    recentAttendance = attLogs || []
+    totalAtt = recentAttendance.length
+    presentAtt = recentAttendance.filter(r => r.status === 'Present' || r.status === 'Late').length
+    attendanceRate = totalAtt > 0 ? Math.round((presentAtt / totalAtt) * 100) : 100
+
+    // Fetch released marks
+    const { data: marks } = await supabase
+      .from('marks')
+      .select(`
+        *,
+        subjects(name)
+      `)
+      .eq('student_id', user?.id)
+      .eq('is_released', true)
+      .order('created_at', { ascending: false })
+
+    releasedMarks = marks || []
+  }
 
   return (
     <div>
@@ -72,60 +107,91 @@ export default async function StudentDashboardPage() {
           
           {/* Active Homework */}
           <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
-            <h3 style={{ fontSize: '1.1rem', marginBottom: '1.25rem', fontWeight: 600 }}>Active Homework Assignments</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Active Homework Assignments</h3>
+              <Link href="/dashboard/student/homework" style={{ fontSize: '0.85rem', color: 'var(--color-secondary)', textDecoration: 'none' }}>
+                View All
+              </Link>
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {homeworkList.map(hw => (
+              {activeHomework.slice(0, 3).map(hw => (
                 <div key={hw.id} style={{ padding: '1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--color-secondary)' }}>{hw.subject}</span>
+                    <span style={{ fontWeight: 600, color: 'var(--color-secondary)' }}>{hw.subjects?.name}</span>
                     <span style={{ fontSize: '0.8rem', color: 'var(--color-error)', fontWeight: 500 }}>
-                      Due: {formatDate(hw.dueDate)}
+                      Due: {formatDate(hw.due_date)}
                     </span>
                   </div>
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.25rem' }}>{hw.topic}</div>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: 0 }}>{hw.instructions}</p>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.25rem' }}>{hw.title}</div>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: 0 }}>{hw.description.substring(0, 100)}...</p>
                 </div>
               ))}
+
+              {activeHomework.length === 0 && (
+                <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>
+                  No active homework assignments assigned.
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Term Results */}
+          {/* Real Released Marks */}
           <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
             <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)', backgroundColor: 'rgba(0,0,0,0.02)', fontWeight: 600 }}>
-              Term 1 Academic Results
+              Official Academic Marks (Released)
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ backgroundColor: 'rgba(0,0,0,0.01)', borderBottom: '2px solid var(--color-border)' }}>
                   <th style={{ padding: '0.75rem 1rem' }}>Subject</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>Assessment</th>
                   <th style={{ padding: '0.75rem 1rem' }}>Score</th>
                   <th style={{ padding: '0.75rem 1rem' }}>Grade</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {termResults.map(res => (
-                  <tr key={res.subject} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>{res.subject}</td>
-                    <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{res.score}%</td>
-                    <td style={{ padding: '0.75rem 1rem' }}>
-                      <span style={{
-                        padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
-                        backgroundColor: res.grade === 'A' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0,0,0,0.05)',
-                        color: res.grade === 'A' ? 'var(--color-success)' : 'var(--color-text)'
-                      }}>
-                        {res.grade}
-                      </span>
+                {releasedMarks.map((res) => {
+                  const scoreVal = res.score
+                  let grade = 'F'
+                  if (scoreVal >= 80) grade = 'A'
+                  else if (scoreVal >= 70) grade = 'B'
+                  else if (scoreVal >= 60) grade = 'C'
+                  else if (scoreVal >= 50) grade = 'D'
+
+                  return (
+                    <tr key={res.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>{res.subjects?.name}</td>
+                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                        {res.assessment_type} ({res.term})
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{res.score}%</td>
+                      <td style={{ padding: '0.75rem 1rem' }}>
+                        <span style={{
+                          padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
+                          backgroundColor: grade === 'A' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0,0,0,0.05)',
+                          color: grade === 'A' ? 'var(--color-success)' : 'var(--color-text)'
+                        }}>
+                          {grade}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+
+                {releasedMarks.length === 0 && (
+                  <tr>
+                    <td colSpan={4} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                      No academic marks released for this term yet.
                     </td>
-                    <td style={{ padding: '0.75rem 1rem', color: 'var(--color-success)', fontSize: '0.85rem' }}>{res.status}</td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* Right Column: Attendance & Calendar Summary */}
+        {/* Right Column: Attendance & Recent Logs */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           
           {/* Attendance Overview */}
@@ -142,13 +208,13 @@ export default async function StudentDashboardPage() {
             </div>
           </div>
 
-          {/* Personal Log Summary Table */}
+          {/* Recent Logs list */}
           <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
             <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)', backgroundColor: 'rgba(0,0,0,0.02)', fontWeight: 600 }}>
               Recent Attendance History
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '1rem' }}>
-              {attRecords.slice(0, 5).map(rec => (
+              {recentAttendance.slice(0, 5).map(rec => (
                 <div key={rec.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--color-border)' }}>
                   <span style={{ fontSize: '0.85rem' }}>{formatDate(rec.date)}</span>
                   <span style={{
@@ -157,8 +223,10 @@ export default async function StudentDashboardPage() {
                   }}>{rec.status}</span>
                 </div>
               ))}
-              {attRecords.length === 0 && (
-                <p style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', textAlign: 'center' }}>No attendance logs.</p>
+              {recentAttendance.length === 0 && (
+                <p style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', textAlign: 'center', padding: '1rem' }}>
+                  No attendance logs found in database.
+                </p>
               )}
             </div>
           </div>

@@ -1,19 +1,43 @@
 import { createClient } from '@/utils/supabase/server'
 
-// Simulates sending an SMS via Africa's Talking API
+// Modular SMS Sender - supports Africa's Talking API and easily swappable for Tanzanian systems (e.g. Beem/NextSMS)
 export async function sendSMS(phone: string, message: string) {
-  console.log(`[SMS SENDER] Sending to ${phone}: "${message}"`)
-  // In production, integrate with Africa's Talking SDK:
-  // const credentials = { apiKey: process.env.AT_API_KEY, username: process.env.AT_USERNAME };
-  // const AT = require('africastalking')(credentials);
-  // await AT.SMS.send({ to: [phone], message });
-  return { success: true }
+  const apiKey = process.env.AT_API_KEY
+  const username = process.env.AT_USERNAME || 'sandbox'
+
+  if (apiKey) {
+    console.log(`[SMS SENDER] Dispatching real API SMS to ${phone} via Africa's Talking...`)
+    try {
+      const response = await fetch('https://api.africastalking.com/version1/messaging', {
+        method: 'POST',
+        headers: {
+          'ApiKey': apiKey,
+          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          username: username,
+          to: phone,
+          message: message
+        })
+      })
+      const data = await response.json()
+      console.log('[SMS SENDER] API Response:', data)
+      return { success: true, data }
+    } catch (e: any) {
+      console.error('[SMS SENDER] API Request failed:', e.message)
+      return { success: false, error: e.message }
+    }
+  } else {
+    // Fallback log for local dev / sandbox simulation
+    console.log(`[SMS SIMULATOR] Outbox to ${phone}: "${message}"`)
+    return { success: true }
+  }
 }
 
 // Simulates sending a WhatsApp message
 export async function sendWhatsApp(phone: string, message: string, mediaUrl?: string) {
-  console.log(`[WHATSAPP SENDER] Sending to ${phone}: "${message}"${mediaUrl ? ` | Attachment: ${mediaUrl}` : ''}`)
-  // In production, integrate with WhatsApp Business Cloud API / Twilio WhatsApp API
+  console.log(`[WHATSAPP SENDER] Outbox to ${phone}: "${message}"${mediaUrl ? ` | Attachment: ${mediaUrl}` : ''}`)
   return { success: true }
 }
 
@@ -21,7 +45,6 @@ export async function sendWhatsApp(phone: string, message: string, mediaUrl?: st
 export async function triggerPaymentRecorded(paymentId: string) {
   const supabase = await createClient()
 
-  // 1. Fetch payment details, student, and linked parents
   const { data: payment, error } = await supabase
     .from('payments')
     .select(`
@@ -50,7 +73,7 @@ export async function triggerPaymentRecorded(paymentId: string) {
 
   const message = `Payment of ${formattedAmount} received for ${studentName} (${termInfo}). Receipt: ${payment.receipt_number}.`
 
-  // 2. Fetch parents linked to this student to get their phone numbers / emails
+  // Fetch parents linked to this student
   const { data: parentLinks } = await supabase
     .from('student_parents')
     .select(`
@@ -82,7 +105,7 @@ export async function triggerPaymentRecorded(paymentId: string) {
       const pdfReceiptUrl = `${supabaseUrl}/storage/v1/object/public/receipts/${payment.receipt_number}.pdf`
 
       // C. Send SMS Notification
-      const parentPhone = parentProfile.phone || '+255770000000' // fallback Zanzibar country code
+      const parentPhone = parentProfile.phone || '+255770000000'
       const smsMessage = `Dear Parent, a payment of ${formattedAmount} has been recorded for ${studentName}. Receipt No: ${payment.receipt_number}. Thank you.`
       await sendSMS(parentPhone, smsMessage)
 

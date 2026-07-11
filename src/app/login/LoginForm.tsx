@@ -3,6 +3,8 @@
 import { useActionState } from 'react'
 import { loginAction } from './actions'
 
+import Link from 'next/link'
+
 export type FormState = {
   error: string | null;
 }
@@ -31,7 +33,12 @@ export function LoginForm() {
       </div>
       
       <div className="form-group">
-        <label htmlFor="password" className="form-label">Password / PIN</label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <label htmlFor="password" className="form-label" style={{ margin: 0 }}>Password / PIN</label>
+          <Link href="/auth/forgot-pin" style={{ fontSize: '0.8rem', color: 'var(--color-secondary)', textDecoration: 'none' }}>
+            Forgot PIN?
+          </Link>
+        </div>
         <input 
           type="password" 
           id="password" 

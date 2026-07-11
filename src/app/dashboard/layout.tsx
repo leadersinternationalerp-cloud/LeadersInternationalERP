@@ -91,14 +91,14 @@ export default async function DashboardLayout({
             )}
           </Link>
 
-          <div style={{ textAlign: 'right' }}>
+          <Link href="/dashboard/profile" style={{ textDecoration: 'none', color: 'inherit', textAlign: 'right', display: 'block' }}>
             <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>
               {profile?.first_name} {profile?.last_name}
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
               {profile?.role || 'System Admin'}
             </div>
-          </div>
+          </Link>
           <form action="/auth/signout" method="post">
             <button type="submit" className="btn" style={{ padding: '0.5rem', fontSize: '0.8rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}>
               Logout
@@ -215,6 +215,24 @@ export default async function DashboardLayout({
               }}>
                 Class Activities
               </Link>
+              <Link href="/dashboard/teacher/attendance" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Mark Attendance
+              </Link>
+              <Link href="/dashboard/teacher/marks" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Enter Marks & Grades
+              </Link>
+              <Link href="/dashboard/teacher/homework" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Homework Assignments
+              </Link>
             </>
           )}
 
@@ -229,6 +247,12 @@ export default async function DashboardLayout({
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
               }}>
                 Student Dashboard
+              </Link>
+              <Link href="/dashboard/student/homework" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                My Homework
               </Link>
             </>
           )}
@@ -285,6 +309,12 @@ export default async function DashboardLayout({
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
               }}>
                 Financial Reports
+              </Link>
+              <Link href="/dashboard/accountant/fee-reminders" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Fee Outstanding Reminders
               </Link>
             </>
           )}
@@ -385,6 +415,12 @@ export default async function DashboardLayout({
               }}>
                 Discipline Management
               </Link>
+              <Link href="/dashboard/dean/marks" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Grades Release Control
+              </Link>
             </>
           )}
 
@@ -399,6 +435,18 @@ export default async function DashboardLayout({
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
               }}>
                 Section Dashboard
+              </Link>
+              <Link href="/dashboard/hos/students" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Section Students
+              </Link>
+              <Link href="/dashboard/hos/lesson-plans" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Review Lesson Plans
               </Link>
             </>
           )}

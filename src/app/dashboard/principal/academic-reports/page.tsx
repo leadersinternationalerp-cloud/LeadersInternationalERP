@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
+import PrintButton from '@/components/PrintButton'
 
 export default async function PrincipalAcademicReportsPage({
   searchParams
@@ -95,7 +96,31 @@ export default async function PrincipalAcademicReportsPage({
 
         {/* Generated Report Card View */}
         {selectedStudent ? (
-          <div className="glass-panel" style={{ padding: '2.5rem', borderRadius: 'var(--radius-lg)', border: '2px solid rgba(0,0,0,0.05)' }}>
+          <>
+            <style dangerouslySetInnerHTML={{ __html: `
+              @media print {
+                header, aside, .btn, .no-print {
+                  display: none !important;
+                }
+                body {
+                  background: white !important;
+                  color: black !important;
+                }
+                .glass-panel {
+                  border: none !important;
+                  box-shadow: none !important;
+                  background: transparent !important;
+                  padding: 0 !important;
+                  max-width: 100% !important;
+                }
+              }
+            ` }} />
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }} className="no-print">
+              <PrintButton label="Print Report Card 🖨️" className="btn btn-primary" />
+            </div>
+
+            <div className="glass-panel" style={{ padding: '2.5rem', borderRadius: 'var(--radius-lg)', border: '2px solid rgba(0,0,0,0.05)' }}>
             
             {/* Report Header */}
             <div style={{ textAlign: 'center', borderBottom: '2px solid var(--color-primary)', paddingBottom: '1.5rem', marginBottom: '2rem' }}>
@@ -190,7 +215,8 @@ export default async function PrincipalAcademicReportsPage({
               </div>
             </div>
 
-          </div>
+            </div>
+          </>
         ) : (
           <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
             Select a student to view their generated report card.

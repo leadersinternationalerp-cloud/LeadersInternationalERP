@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
+import PrintButton from '@/components/PrintButton'
 
 export default async function PayslipsPage({ searchParams }: { searchParams: Promise<{ id?: string }> }) {
   const supabase = await createClient()
@@ -62,9 +63,7 @@ export default async function PayslipsPage({ searchParams }: { searchParams: Pro
           <Link href="/dashboard/staff/self-service/payslips" className="btn" style={{ background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}>
             ← Back to List
           </Link>
-          <button onClick={() => typeof window !== 'undefined' && window.print()} className="btn btn-primary">
-            Print Payslip 🖨️
-          </button>
+          <PrintButton label="Print Payslip 🖨️" className="btn btn-primary" />
         </div>
 
         {/* Detailed Payslip Box */}

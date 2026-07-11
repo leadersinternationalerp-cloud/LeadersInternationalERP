@@ -50,6 +50,7 @@ export default async function ParentDashboardPage({
   let childInvoices: any[] = []
   let childAttendance: any[] = []
   let childDiscipline: any[] = []
+  let childMarks: any[] = []
 
   if (selectedChildId) {
     selectedChild = children.find(c => c.id === selectedChildId) || null
@@ -77,6 +78,18 @@ export default async function ParentDashboardPage({
         .eq('student_id', selectedChildId)
         .order('incident_date', { ascending: false })
       childDiscipline = discipline || []
+
+      // Fetch released marks
+      const { data: marks } = await supabase
+        .from('marks')
+        .select(`
+          *,
+          subjects(name)
+        `)
+        .eq('student_id', selectedChildId)
+        .eq('is_released', true)
+        .order('created_at', { ascending: false })
+      childMarks = marks || []
     }
   }
 
@@ -103,7 +116,7 @@ export default async function ParentDashboardPage({
             Parent Portal Dashboard
           </h1>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-            Monitor and track your children's school progress, attendance, and billing.
+            Monitor child progress, review statements, check attendance timeline, and view report cards.
           </p>
         </div>
 
@@ -131,14 +144,19 @@ export default async function ParentDashboardPage({
       </div>
 
       {selectedChild ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2rem', alignItems: 'start' }}>
           
-          {/* Left Column: Billing & Discipline */}
+          {/* Left Column: Billing & Released report cards */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             
             {/* Child Billing Summary */}
             <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
-              <h3 style={{ fontSize: '1.05rem', marginBottom: '1.25rem', fontWeight: 600 }}>Billing & Fees Summary</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 600, margin: 0 }}>Billing & Fees Summary</h3>
+                <Link href={`/dashboard/parent/billing?child_id=${selectedChildId}`} style={{ fontSize: '0.85rem', color: 'var(--color-secondary)', textDecoration: 'none' }}>
+                  Billing History
+                </Link>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {childInvoices.slice(0, 3).map(inv => (
                   <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
@@ -165,34 +183,63 @@ export default async function ParentDashboardPage({
               </div>
             </div>
 
-            {/* Child Discipline Logs */}
-            <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
-              <h3 style={{ fontSize: '1.05rem', marginBottom: '1.25rem', fontWeight: 600 }}>Discipline Incidents History</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {childDiscipline.map(disc => (
-                  <div key={disc.id} style={{ padding: '1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--color-error)' }}>{disc.category}</span>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>{formatDate(disc.incident_date)}</span>
-                    </div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text)', marginBottom: '0.5rem' }}>
-                      <strong>Description:</strong> "{disc.description}"
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                      <strong>Action Taken:</strong> {disc.action_taken}
-                    </div>
-                  </div>
-                ))}
-
-                {childDiscipline.length === 0 && (
-                  <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>No discipline incidents recorded.</p>
-                )}
+            {/* Child Academic Report Cards */}
+            <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+              <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)', backgroundColor: 'rgba(0,0,0,0.02)', fontWeight: 600 }}>
+                Released Academic Report Cards
               </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ backgroundColor: 'rgba(0,0,0,0.01)', borderBottom: '2px solid var(--color-border)' }}>
+                    <th style={{ padding: '0.75rem 1rem' }}>Subject</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Assessment</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Score</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Grade</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {childMarks.map((res) => {
+                    const scoreVal = res.score
+                    let grade = 'F'
+                    if (scoreVal >= 80) grade = 'A'
+                    else if (scoreVal >= 70) grade = 'B'
+                    else if (scoreVal >= 60) grade = 'C'
+                    else if (scoreVal >= 50) grade = 'D'
+
+                    return (
+                      <tr key={res.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>{res.subjects?.name}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                          {res.assessment_type} ({res.term})
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{res.score}%</td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <span style={{
+                            padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
+                            backgroundColor: grade === 'A' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0,0,0,0.05)',
+                            color: grade === 'A' ? 'var(--color-success)' : 'var(--color-text)'
+                          }}>
+                            {grade}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+
+                  {childMarks.length === 0 && (
+                    <tr>
+                      <td colSpan={4} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                        No academic marks released for this child yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
 
           </div>
 
-          {/* Right Column: Attendance */}
+          {/* Right Column: Attendance & Discipline summary links */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             
             {/* Child Attendance Rate */}
@@ -209,24 +256,28 @@ export default async function ParentDashboardPage({
               </div>
             </div>
 
-            {/* Attendance Logs */}
-            <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-              <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)', backgroundColor: 'rgba(0,0,0,0.02)', fontWeight: 600 }}>
-                Recent Attendance Logs
+            {/* Child Discipline summary */}
+            <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 600, margin: 0 }}>Discipline Incidents</h3>
+                <Link href={`/dashboard/parent/discipline?child_id=${selectedChildId}`} style={{ fontSize: '0.85rem', color: 'var(--color-secondary)', textDecoration: 'none' }}>
+                  Timeline View
+                </Link>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', padding: '1rem' }}>
-                {childAttendance.slice(0, 5).map(rec => (
-                  <div key={rec.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--color-border)' }}>
-                    <span style={{ fontSize: '0.85rem' }}>{formatDate(rec.date)}</span>
-                    <span style={{
-                      fontSize: '0.75rem', fontWeight: 600,
-                      color: rec.status === 'Present' ? 'var(--color-success)' : 'var(--color-error)'
-                    }}>{rec.status}</span>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {childDiscipline.slice(0, 2).map(disc => (
+                  <div key={disc.id} style={{ padding: '0.75rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ display: 'flex', justifyBetween: 'space-between', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-error)' }}>
+                      <span>{disc.category}</span>
+                      <span style={{ color: 'var(--color-text-muted)' }}>{formatDate(disc.incident_date)}</span>
+                    </div>
+                    <p style={{ fontSize: '0.8rem', margin: '0.25rem 0 0 0', color: 'var(--color-text-muted)' }}>"{disc.description}"</p>
                   </div>
                 ))}
 
-                {childAttendance.length === 0 && (
-                  <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>No attendance logs.</p>
+                {childDiscipline.length === 0 && (
+                  <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>No discipline incidents recorded.</p>
                 )}
               </div>
             </div>
