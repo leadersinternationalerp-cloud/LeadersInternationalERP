@@ -200,6 +200,52 @@ export default async function DashboardLayout({
             </>
           )}
 
+          {(userRoles.includes('System Admin') || userRoles.includes('Dean')) && (
+            <>
+              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
+                Dean Operations
+              </div>
+              <Link href="/dashboard/dean" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Dashboard Overview
+              </Link>
+              <Link href="/dashboard/dean/students" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Student Enrollment
+              </Link>
+              <Link href="/dashboard/dean/marks-overview" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Marks Overview
+              </Link>
+              <Link href="/dashboard/dean/submissions" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Submissions Review
+              </Link>
+            </>
+          )}
+
+          {(userRoles.includes('System Admin') || userRoles.includes('HOS')) && (
+            <>
+              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
+                Section Operations
+              </div>
+              <Link href="/dashboard/hos/marks" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Section Marks Overview
+              </Link>
+            </>
+          )}
+
           {userRoles.includes('Teacher') && (
             <>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
