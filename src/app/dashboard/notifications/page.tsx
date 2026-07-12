@@ -1,55 +1,68 @@
 import { createClient } from '@/utils/supabase/server'
-import { markNotificationsReadAction } from '../staff/actions'
-import NotificationsClient from './NotificationsClient'
+import { revalidatePath } from 'next/cache'
 
 export default async function NotificationsPage() {
   const supabase = await createClient()
 
-  // Fetch notifications for the user
   const { data: { user } } = await supabase.auth.getUser()
+
   const { data: notifications } = await supabase
     .from('notifications')
     .select('*')
     .eq('user_id', user?.id)
     .order('created_at', { ascending: false })
 
-  const unreadCount = notifications?.filter(n => !n.is_read).length || 0
-
-  async function handleMarkAllRead() {
+  async function markReadAction(formData: FormData) {
     'use server'
-    await markNotificationsReadAction()
-  }
+    const supabase = await createClient()
+    const id = formData.get('id') as string
 
-  async function handleMarkRead(id: string) {
-    'use server'
     if (id) {
-      await markNotificationsReadAction(id)
+      await supabase.from('notifications').update({ is_read: true }).eq('id', id)
+      revalidatePath('/dashboard/notifications')
     }
   }
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <div>
-          <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)' }}>My Notifications</h1>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
-            You have {unreadCount} unread notifications.
-          </p>
-        </div>
-        
-        {unreadCount > 0 && (
-          <form action={handleMarkAllRead}>
-            <button type="submit" className="btn" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}>
-              Mark All as Read
-            </button>
-          </form>
-        )}
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)' }}>My Notifications</h1>
       </div>
 
-      <NotificationsClient 
-        initialNotifications={notifications || []} 
-        markReadAction={handleMarkRead} 
-      />
+      <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ backgroundColor: 'rgba(0,0,0,0.02)', borderBottom: '1px solid var(--color-border)' }}>
+              <th style={{ textAlign: 'left', padding: '1rem', fontWeight: 600 }}>Date</th>
+              <th style={{ textAlign: 'left', padding: '1rem', fontWeight: 600 }}>Message</th>
+              <th style={{ textAlign: 'center', padding: '1rem', fontWeight: 600 }}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(notifications || []).map((notif: any) => (
+              <tr key={notif.id} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: notif.is_read ? 'transparent' : 'rgba(59, 130, 246, 0.05)' }}>
+                <td style={{ padding: '1rem', fontWeight: 600 }}>{new Date(notif.created_at).toLocaleString()}</td>
+                <td style={{ padding: '1rem' }}>{notif.message}</td>
+                <td style={{ padding: '1rem', textAlign: 'center' }}>
+                  {!notif.is_read && (
+                    <form action={markReadAction}>
+                      <input type="hidden" name="id" value={notif.id} />
+                      <button type="submit" className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>Mark Read</button>
+                    </form>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {(!notifications || notifications.length === 0) && (
+              <tr>
+                <td colSpan={3} style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                  You're all caught up! No new notifications.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

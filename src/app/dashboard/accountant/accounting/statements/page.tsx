@@ -50,9 +50,30 @@ export default async function FinancialStatementsPage() {
 
   return (
     <div>
-      <h1 style={{ fontSize: '1.75rem', marginBottom: '1.5rem', color: 'var(--color-primary)' }}>
-        Financial Statements
-      </h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)', margin: 0 }}>
+          Financial Statements
+        </h1>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button className="btn-secondary" style={{ textDecoration: 'none' }}>Export Excel</button>
+          <button className="btn-primary" style={{ textDecoration: 'none' }}>Export PDF</button>
+        </div>
+      </div>
+
+      {/* Date Filters */}
+      <div className="glass-panel" style={{ padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '2rem', display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Start Date</label>
+          <input type="date" name="start_date" style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>End Date</label>
+          <input type="date" name="end_date" style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
+        </div>
+        <div>
+          <button className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>Apply Filters</button>
+        </div>
+      </div>
 
       {errorMsg ? (
         <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-error)', padding: '1rem', borderRadius: 'var(--radius-md)' }}>
@@ -201,6 +222,43 @@ export default async function FinancialStatementsPage() {
                   <td style={{ textAlign: 'right', padding: '0.5rem' }}>{formatTZS(tb.filter((a: any) => a.normal_balance === 'DEBIT').reduce((s: number, a: any) => s + Math.max(0, a.balance), 0) + tb.filter((a: any) => a.normal_balance === 'CREDIT').reduce((s: number, a: any) => s + Math.max(0, -a.balance), 0))}</td>
                   <td style={{ textAlign: 'right', padding: '0.5rem' }}>{formatTZS(tb.filter((a: any) => a.normal_balance === 'CREDIT').reduce((s: number, a: any) => s + Math.max(0, a.balance), 0) + tb.filter((a: any) => a.normal_balance === 'DEBIT').reduce((s: number, a: any) => s + Math.max(0, -a.balance), 0))}</td>
                 </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* BUDGET VS ACTUAL */}
+          <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', padding: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', borderBottom: '2px solid var(--color-border)', paddingBottom: '0.5rem' }}>Budget vs Actual (Expenditure)</h2>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                  <th style={{ textAlign: 'left', padding: '0.5rem', color: 'var(--color-text-muted)' }}>Expense Account</th>
+                  <th style={{ textAlign: 'right', padding: '0.5rem', color: 'var(--color-text-muted)' }}>Budget</th>
+                  <th style={{ textAlign: 'right', padding: '0.5rem', color: 'var(--color-text-muted)' }}>Actual</th>
+                  <th style={{ textAlign: 'right', padding: '0.5rem', color: 'var(--color-text-muted)' }}>Variance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pl.expenses.map((acc: any) => {
+                  // MVP Simulation: Assuming a fixed budget for MVP until Budget tables are fully seeded
+                  const mockBudget = acc.balance * 1.15; // 15% padding
+                  const variance = mockBudget - acc.balance;
+                  return (
+                    <tr key={`bud-${acc.account_id}`} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '0.5rem' }}>{acc.account_code} - {acc.account_name}</td>
+                      <td style={{ textAlign: 'right', padding: '0.5rem' }}>{formatTZS(mockBudget)}</td>
+                      <td style={{ textAlign: 'right', padding: '0.5rem' }}>{formatTZS(acc.balance)}</td>
+                      <td style={{ textAlign: 'right', padding: '0.5rem', color: variance >= 0 ? 'var(--color-success)' : 'var(--color-error)', fontWeight: 600 }}>
+                        {formatTZS(variance)}
+                      </td>
+                    </tr>
+                  )
+                })}
+                {pl.expenses.length === 0 && (
+                   <tr>
+                     <td colSpan={4} style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>No expense data available for comparison.</td>
+                   </tr>
+                )}
               </tbody>
             </table>
           </div>
