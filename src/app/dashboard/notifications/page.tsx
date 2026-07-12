@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { markNotificationsReadAction } from '../staff/actions'
-import Link from 'next/link'
+import NotificationsClient from './NotificationsClient'
 
 export default async function NotificationsPage() {
   const supabase = await createClient()
@@ -20,9 +20,8 @@ export default async function NotificationsPage() {
     await markNotificationsReadAction()
   }
 
-  async function handleMarkRead(formData: FormData) {
+  async function handleMarkRead(id: string) {
     'use server'
-    const id = formData.get('id') as string
     if (id) {
       await markNotificationsReadAction(id)
     }
@@ -47,63 +46,10 @@ export default async function NotificationsPage() {
         )}
       </div>
 
-      <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {notifications?.map((notif: any) => (
-            <div
-              key={notif.id}
-              style={{
-                padding: '1.25rem 1.5rem',
-                borderBottom: '1px solid var(--color-border)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: notif.is_read ? 'transparent' : 'rgba(59, 179, 195, 0.05)',
-                transition: 'background-color 200ms'
-              }}
-            >
-              <div style={{ flex: 1, paddingRight: '2rem' }}>
-                <div style={{
-                  fontWeight: notif.is_read ? 400 : 600,
-                  color: notif.is_read ? 'var(--color-text)' : 'var(--color-primary)'
-                }}>
-                  {notif.message}
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-                  {new Date(notif.created_at).toLocaleString()}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                {notif.link_url && (
-                  <Link href={notif.link_url} className="btn" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', backgroundColor: 'var(--color-primary)', color: '#fff' }}>
-                    View details
-                  </Link>
-                )}
-
-                {!notif.is_read && (
-                  <form action={handleMarkRead}>
-                    <input type="hidden" name="id" value={notif.id} />
-                    <button type="submit" style={{
-                      background: 'transparent', border: 'none', color: 'var(--color-secondary)',
-                      fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer'
-                    }}>
-                      Mark read
-                    </button>
-                  </form>
-                )}
-              </div>
-            </div>
-          ))}
-
-          {(!notifications || notifications.length === 0) && (
-            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-              <h3>No Notifications</h3>
-              <p style={{ marginTop: '0.5rem' }}>You are all caught up!</p>
-            </div>
-          )}
-        </div>
-      </div>
+      <NotificationsClient 
+        initialNotifications={notifications || []} 
+        markReadAction={handleMarkRead} 
+      />
     </div>
   )
 }

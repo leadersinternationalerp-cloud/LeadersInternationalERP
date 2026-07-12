@@ -1,38 +1,40 @@
 import { createClient } from '@/utils/supabase/server'
 import { formatDate } from '@/utils/date'
 
-// Centralized Email Sender - supports SendGrid API with easily swappable fallback log simulator
-export async function sendEmail(to: string, subject: string, htmlContent: string) {
-  const apiKey = process.env.SENDGRID_API_KEY
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@leaders.ac.tz'
+import nodemailer from 'nodemailer'
 
-  if (apiKey) {
-    console.log(`[EMAIL SENDER] Dispatching real email to ${to} via SendGrid...`)
+// Centralized Email Sender - uses Nodemailer with SMTP, fallback to simulator
+export async function sendEmail(to: string, subject: string, htmlContent: string) {
+  const smtpHost = process.env.SMTP_HOST
+  const smtpPort = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587
+  const smtpUser = process.env.SMTP_USER
+  const smtpPass = process.env.SMTP_PASS
+  const fromEmail = process.env.SMTP_FROM_EMAIL || 'noreply@leaders.ac.tz'
+
+  if (smtpHost && smtpUser && smtpPass) {
+    console.log(`[EMAIL SENDER] Dispatching real email to ${to} via SMTP...`)
     try {
-      const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465, // true for 465, false for other ports
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
         },
-        body: JSON.stringify({
-          personalizations: [{ to: [{ email: to }] }],
-          from: { email: fromEmail, name: 'Leaders International ERP' },
-          subject: subject,
-          content: [{ type: 'text/html', value: htmlContent }]
-        })
       })
 
-      if (response.ok) {
-        console.log('[EMAIL SENDER] SendGrid email sent successfully.')
-        return { success: true }
-      } else {
-        const errText = await response.text()
-        console.error('[EMAIL SENDER] SendGrid API failed:', errText)
-        return { success: false, error: errText }
-      }
+      const info = await transporter.sendMail({
+        from: `"Leaders International ERP" <${fromEmail}>`,
+        to: to,
+        subject: subject,
+        html: htmlContent,
+      })
+
+      console.log('[EMAIL SENDER] SMTP email sent successfully:', info.messageId)
+      return { success: true }
     } catch (e: any) {
-      console.error('[EMAIL SENDER] Request failed:', e.message)
+      console.error('[EMAIL SENDER] SMTP request failed:', e.message)
       return { success: false, error: e.message }
     }
   } else {
@@ -41,25 +43,30 @@ export async function sendEmail(to: string, subject: string, htmlContent: string
   }
 }
 
-// Modular SMS Sender - supports Africa's Talking API and easily swappable for Tanzanian systems (e.g. Beem/NextSMS)
+// Modular SMS Sender - supports generic local Tanzanian providers (e.g. Beem, NextSMS, or Africa's Talking)
 export async function sendSMS(phone: string, message: string) {
-  const apiKey = process.env.AT_API_KEY
-  const username = process.env.AT_USERNAME || 'sandbox'
+  const apiKey = process.env.SMS_API_KEY
+  const senderId = process.env.SMS_SENDER_ID || 'LEADERS'
+  const apiSecret = process.env.SMS_API_SECRET // some providers need an api secret too
 
   if (apiKey) {
-    console.log(`[SMS SENDER] Dispatching real API SMS to ${phone} via Africa's Talking...`)
+    console.log(`[SMS SENDER] Dispatching real API SMS to ${phone}...`)
     try {
-      const response = await fetch('https://api.africastalking.com/version1/messaging', {
+      // TODO: Replace URL and payload structure with the chosen Tanzanian local provider (e.g., Beem, NextSMS)
+      // Example payload structure for generic local SMS Gateway:
+      const response = await fetch('https://api.example-tanzanian-sms-gateway.com/v1/send', {
         method: 'POST',
         headers: {
-          'ApiKey': apiKey,
-          'Accept': 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Authorization': `Basic ${Buffer.from(apiKey + ':' + (apiSecret || '')).toString('base64')}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
-        body: new URLSearchParams({
-          username: username,
-          to: phone,
-          message: message
+        body: JSON.stringify({
+          source_addr: senderId,
+          schedule_time: '',
+          encoding: 0,
+          message: message,
+          recipients: [{ recipient_id: 1, dest_addr: phone }]
         })
       })
       const data = await response.json()

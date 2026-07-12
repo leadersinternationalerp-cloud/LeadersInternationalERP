@@ -19,7 +19,7 @@ export default async function ProfilePage() {
   // 3. Fetch optional Student or Staff IDs
   const { data: student } = await supabase
     .from('students')
-    .select('student_id')
+    .select('student_id, dob, gender')
     .eq('id', user.id)
     .single()
 
@@ -47,6 +47,22 @@ export default async function ProfilePage() {
     const phone = formData.get('phone') as string
     const newPin = formData.get('newPin') as string
     const confirmPin = formData.get('confirmPin') as string
+    const photo = formData.get('photo') as File | null
+
+    // 0. Upload Profile Photo
+    if (photo && photo.size > 0) {
+      const fileExt = photo.name.split('.').pop()
+      const fileName = `avatar_${user.id}_${Date.now()}.${fileExt}`
+      const { error: uploadError } = await supabase.storage.from('logos').upload(fileName, photo)
+      if (!uploadError) {
+        const { data: { publicUrl } } = supabase.storage.from('logos').getPublicUrl(fileName)
+        await serviceClient.auth.admin.updateUserById(user.id, {
+          user_metadata: { ...user.user_metadata, avatar_url: publicUrl }
+        })
+      } else {
+        console.error('Failed to upload photo:', uploadError.message)
+      }
+    }
 
     // 1. Update phone number
     if (phone) {
@@ -129,13 +145,21 @@ export default async function ProfilePage() {
         
         {/* Profile Card Summary */}
         <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
-          <div style={{
-            width: '96px', height: '96px', borderRadius: '50%', backgroundColor: 'var(--color-primary)',
-            color: '#fff', fontSize: '2.5rem', fontWeight: 700, display: 'flex',
-            alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto'
-          }}>
-            {profile?.first_name?.charAt(0)}{profile?.last_name?.charAt(0)}
-          </div>
+          {user.user_metadata?.avatar_url ? (
+            <img 
+              src={user.user_metadata.avatar_url} 
+              alt="Profile" 
+              style={{ width: '96px', height: '96px', borderRadius: '50%', objectFit: 'cover', margin: '0 auto 1.5rem auto', display: 'block', border: '3px solid var(--color-primary)' }} 
+            />
+          ) : (
+            <div style={{
+              width: '96px', height: '96px', borderRadius: '50%', backgroundColor: 'var(--color-primary)',
+              color: '#fff', fontSize: '2.5rem', fontWeight: 700, display: 'flex',
+              alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto'
+            }}>
+              {profile?.first_name?.charAt(0)}{profile?.last_name?.charAt(0)}
+            </div>
+          )}
           
           <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0 0 0.25rem 0' }}>
             {profile?.first_name} {profile?.last_name}
@@ -152,6 +176,22 @@ export default async function ProfilePage() {
             <div>
               <span style={{ color: 'var(--color-text-muted)' }}>School ID:</span>
               <strong style={{ float: 'right' }}>{uniqueId}</strong>
+            </div>
+            {student && student.dob && (
+              <div>
+                <span style={{ color: 'var(--color-text-muted)' }}>Date of Birth:</span>
+                <strong style={{ float: 'right' }}>{new Date(student.dob).toLocaleDateString()}</strong>
+              </div>
+            )}
+            {student && student.gender && (
+              <div>
+                <span style={{ color: 'var(--color-text-muted)' }}>Gender:</span>
+                <strong style={{ float: 'right' }}>{student.gender}</strong>
+              </div>
+            )}
+            <div>
+              <span style={{ color: 'var(--color-text-muted)' }}>Member Since:</span>
+              <strong style={{ float: 'right' }}>{new Date(profile?.created_at).toLocaleDateString()}</strong>
             </div>
             <div>
               <span style={{ color: 'var(--color-text-muted)' }}>Phone:</span>
@@ -175,6 +215,16 @@ export default async function ProfilePage() {
           <h3 style={{ fontSize: '1.15rem', marginBottom: '1.5rem', fontWeight: 600 }}>Update Settings</h3>
           
           <form action={handleUpdateProfile} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div className="form-group">
+              <label className="form-label">Profile Photo</label>
+              <input 
+                type="file" 
+                name="photo" 
+                accept="image/*"
+                className="input-field" 
+              />
+            </div>
+
             <div className="form-group">
               <label className="form-label">Phone Number</label>
               <input 

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { logAuditAction } from '@/utils/audit'
 import {
   triggerPayrollProposed,
   triggerPayrollReviewedPrincipal,
@@ -58,12 +59,25 @@ export async function generatePayrollAction(month: number, year: number, notes?:
     return { error: `Failed to create payroll summary: ${payrollError?.message}` }
   }
 
-  // 5. Fetch custom salary settings
-  const { data: salarySettings } = await supabase
-    .from('salary_settings')
-    .select('*')
+  // 5. Fetch custom salary settings and active salary advances
+  const [{ data: salarySettings }, { data: activeAdvances }] = await Promise.all([
+    supabase.from('salary_settings').select('*'),
+    supabase.from('salary_advances').select('*').eq('status', 'Disbursed')
+  ])
 
   const settingsMap = new Map((salarySettings || []).map(s => [s.employee_id, s]))
+  
+  // Create a map for active advances: employee_id -> advance
+  // Assuming 1 active advance per employee for simplicity, or we can sum them
+  const advancesMap = new Map()
+  if (activeAdvances) {
+    for (const adv of activeAdvances) {
+      if (!advancesMap.has(adv.employee_id)) {
+        advancesMap.set(adv.employee_id, [])
+      }
+      advancesMap.get(adv.employee_id).push(adv)
+    }
+  }
 
   // 6. Generate matching payslips for all active employees using custom settings
   const payslipsToInsert = staffProfiles.map(staff => {
@@ -80,6 +94,19 @@ export async function generatePayrollAction(month: number, year: number, notes?:
       if (staff.role === 'Teacher') basicPay = 1200000
     }
 
+    let advanceDeduction = 0
+    const staffAdvances = advancesMap.get(staff.id) || []
+    const advanceDetails: any[] = []
+
+    staffAdvances.forEach((adv: any) => {
+      // Calculate monthly repayment
+      // We assume amount_approved is what they owe, and repayment_period_months is the term
+      const monthly = Math.round(Number(adv.amount_approved) / Number(adv.repayment_period_months))
+      advanceDeduction += monthly
+      advanceDetails.push({ advance_id: adv.id, amount: monthly })
+    })
+
+    deductions += advanceDeduction
     const netSalary = basicPay + allowances - deductions
 
     return {
@@ -91,7 +118,10 @@ export async function generatePayrollAction(month: number, year: number, notes?:
       total_deductions: deductions,
       net_salary: netSalary,
       status: 'Pending',
-      details: JSON.stringify({ role: staff.role })
+      details: JSON.stringify({ 
+        role: staff.role, 
+        advance_deductions: advanceDetails.length > 0 ? advanceDetails : undefined 
+      })
     }
   })
 
@@ -127,6 +157,7 @@ export async function submitPayrollAction(payrollId: string) {
   }
 
   await triggerPayrollProposed(payrollId)
+  await logAuditAction('Payroll Submitted', 'payrolls', { payroll_id: payrollId })
 
   revalidatePath('/dashboard/accountant/payroll')
   return { success: true }
@@ -159,6 +190,7 @@ export async function principalReviewPayrollAction(payrollId: string, approve: b
   }
 
   await triggerPayrollReviewedPrincipal(payrollId, approve, notes || '')
+  await logAuditAction(approve ? 'Payroll Principal Approved' : 'Payroll Principal Declined', 'payrolls', { payroll_id: payrollId, notes })
 
   revalidatePath('/dashboard/principal/payrolls')
   return { success: true }
@@ -202,20 +234,58 @@ export async function directorReviewPayrollAction(payrollId: string, approve: bo
     return { error: `Failed to update payroll status: ${error.message}` }
   }
 
-  // If approved, update all matching payslips to "Paid"
+  // If approved, update all matching payslips to "Paid" and process advance deductions
   if (approve) {
-    const { error: payslipsError } = await supabase
+    const { data: payslips, error: payslipsError } = await supabase
       .from('payslips')
       .update({ status: 'Paid' })
       .eq('month', payroll.month)
       .eq('year', payroll.year)
+      .select('details')
 
     if (payslipsError) {
       console.error('Failed to update individual payslips to Paid:', payslipsError.message)
+    } else if (payslips) {
+      // Process advance deductions
+      for (const slip of payslips) {
+        const details = typeof slip.details === 'string' ? JSON.parse(slip.details) : slip.details
+        if (details && details.advance_deductions && Array.isArray(details.advance_deductions)) {
+          for (const deduction of details.advance_deductions) {
+            // Record the repayment
+            await supabase.from('advance_repayments').insert({
+              advance_id: deduction.advance_id,
+              amount: deduction.amount,
+              deducted_via_payroll: true
+            })
+
+            // Check if fully repaid
+            const { data: repayments } = await supabase
+              .from('advance_repayments')
+              .select('amount')
+              .eq('advance_id', deduction.advance_id)
+            
+            const totalRepaid = (repayments || []).reduce((sum, r) => sum + Number(r.amount), 0)
+            
+            const { data: advanceInfo } = await supabase
+              .from('salary_advances')
+              .select('amount_approved')
+              .eq('id', deduction.advance_id)
+              .single()
+
+            if (advanceInfo && totalRepaid >= Number(advanceInfo.amount_approved)) {
+              await supabase
+                .from('salary_advances')
+                .update({ status: 'Fully Repaid' })
+                .eq('id', deduction.advance_id)
+            }
+          }
+        }
+      }
     }
   }
 
   await triggerPayrollReviewedDirector(payrollId, approve, notes || '')
+  await logAuditAction(approve ? 'Payroll Director Approved' : 'Payroll Director Declined', 'payrolls', { payroll_id: payrollId, notes })
 
   revalidatePath('/dashboard/director/payrolls')
   return { success: true }

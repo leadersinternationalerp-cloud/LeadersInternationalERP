@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { logAuditAction } from '@/utils/audit'
 import {
   triggerLeaveSubmitted,
   triggerLeaveReviewed,
@@ -76,6 +77,7 @@ export async function reviewLeaveAction(id: string, status: 'Approved' | 'Declin
   }
 
   await triggerLeaveReviewed(id)
+  await logAuditAction(`Leave ${status}`, 'leave_applications', { leave_id: id, notes })
 
   revalidatePath('/dashboard/principal/leave-requests')
   revalidatePath('/dashboard/director/leave-requests')
@@ -155,6 +157,8 @@ export async function reviewSalaryAdvanceAction(id: string, status: 'Approved' |
     return { error: error.message }
   }
 
+  await logAuditAction(`Salary Advance ${status}`, 'salary_advances', { advance_id: id, amount_approved, notes })
+
   revalidatePath('/dashboard/principal/advance-requests')
   revalidatePath('/dashboard/director/advance-requests')
   return { success: true }
@@ -178,6 +182,7 @@ export async function disburseSalaryAdvanceAction(id: string) {
   }
 
   await triggerSalaryAdvanceDisbursed(id)
+  await logAuditAction('Salary Advance Disbursed', 'salary_advances', { advance_id: id })
 
   revalidatePath('/dashboard/accountant/payments') // updates Accountant view
   return { success: true }

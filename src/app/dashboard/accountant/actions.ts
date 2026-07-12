@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { logAuditAction } from '@/utils/audit'
 
 // Save Fee Structure
 export async function saveFeeStructureAction(formData: FormData) {
@@ -225,6 +226,7 @@ export async function recordPaymentAction(formData: FormData) {
   try {
     const { triggerPaymentRecorded } = await import('@/utils/notifications')
     await triggerPaymentRecorded(newPayment.id)
+    await logAuditAction('Payment Recorded', 'payments', { receipt_number, amount, invoice_id })
   } catch (err) {
     console.error('Failed to trigger payment notifications:', err)
   }
@@ -254,13 +256,15 @@ export async function saveExpenseAction(formData: FormData) {
     amount,
     description,
     date,
-    receipt_url,
-    approved_by: user?.id
+    receipt_url: receipt_url || null,
+    recorded_by: user?.id
   })
 
   if (error) {
     return { error: error.message }
   }
+
+  await logAuditAction('Expense Recorded', 'expenses', { category, amount, date })
 
   revalidatePath('/dashboard/accountant/expenses')
   return { success: true }

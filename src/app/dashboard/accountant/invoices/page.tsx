@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { generateInvoicesAction } from '../actions'
+import InvoicesClient from './InvoicesClient'
 
 export default async function InvoicesPage() {
   const supabase = await createClient()
@@ -103,64 +104,7 @@ export default async function InvoicesPage() {
         </div>
 
         {/* Invoices List */}
-        <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ backgroundColor: 'rgba(0,0,0,0.05)', borderBottom: '1px solid var(--color-border)' }}>
-                <th style={{ padding: '1rem' }}>Student Name</th>
-                <th style={{ padding: '1rem' }}>Class / Grade</th>
-                <th style={{ padding: '1rem' }}>Term</th>
-                <th style={{ padding: '1rem' }}>Amount Billed</th>
-                <th style={{ padding: '1rem' }}>Status</th>
-                <th style={{ padding: '1rem' }}>Due Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices?.map((inv: any) => (
-                <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                  <td style={{ padding: '1rem' }}>
-                    <div style={{ fontWeight: 600 }}>{inv.students?.profiles?.first_name} {inv.students?.profiles?.last_name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>ID: {inv.students?.student_id}</div>
-                  </td>
-                  <td style={{ padding: '1rem' }}>{inv.students?.grade_level}</td>
-                  <td style={{ padding: '1rem' }}>{inv.term}</td>
-                  <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--color-primary)' }}>
-                    {formatTZS(inv.net_amount)}
-                  </td>
-                  <td style={{ padding: '1rem' }}>
-                    <span style={{
-                      padding: '0.25rem 0.6rem',
-                      borderRadius: '999px',
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      backgroundColor: 
-                        inv.status === 'Paid' ? 'rgba(16, 185, 129, 0.1)' : 
-                        inv.status === 'Partially Paid' ? 'rgba(247, 178, 57, 0.1)' : 
-                        'rgba(239, 68, 68, 0.1)',
-                      color: 
-                        inv.status === 'Paid' ? 'var(--color-success)' : 
-                        inv.status === 'Partially Paid' ? 'var(--color-accent)' : 
-                        'var(--color-error)'
-                    }}>
-                      {inv.status}
-                    </span>
-                  </td>
-                  <td style={{ padding: '1rem', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
-                    {new Date(inv.due_date).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
-
-              {(!invoices || invoices.length === 0) && (
-                <tr>
-                  <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                    No invoices generated yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <InvoicesClient initialInvoices={invoices || []} />
       </div>
     </div>
   )
