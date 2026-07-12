@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { logAuditAction } from '@/utils/audit'
+import { AccountingService } from '@/lib/accounting/AccountingService'
 import {
   triggerPayrollProposed,
   triggerPayrollReviewedPrincipal,
@@ -241,7 +242,7 @@ export async function directorReviewPayrollAction(payrollId: string, approve: bo
       .update({ status: 'Paid' })
       .eq('month', payroll.month)
       .eq('year', payroll.year)
-      .select('details')
+      .select('net_pay, details')
 
     if (payslipsError) {
       console.error('Failed to update individual payslips to Paid:', payslipsError.message)
@@ -280,6 +281,35 @@ export async function directorReviewPayrollAction(payrollId: string, approve: bo
             }
           }
         }
+      }
+      }
+
+      // Record Accounting Journal for Payroll
+      try {
+        let totalNet = 0
+        let totalPaye = 0
+        let totalZssf = 0
+
+        for (const slip of payslips) {
+          totalNet += Number(slip.net_pay || 0)
+          const details = typeof slip.details === 'string' ? JSON.parse(slip.details) : slip.details
+          if (details?.deductions) {
+            const paye = details.deductions.find((d: any) => d.name === 'PAYE')
+            if (paye) totalPaye += Number(paye.amount || 0)
+            const zssf = details.deductions.find((d: any) => d.name === 'ZSSF' || d.name === 'NSSF')
+            if (zssf) totalZssf += Number(zssf.amount || 0)
+          }
+        }
+
+        await AccountingService.recordPayroll(
+          payrollId,
+          totalNet,
+          totalPaye,
+          totalZssf,
+          new Date().toISOString()
+        )
+      } catch (accErr) {
+        console.error('Failed to record payroll accounting journal:', accErr)
       }
     }
   }

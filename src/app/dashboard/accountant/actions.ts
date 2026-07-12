@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { logAuditAction } from '@/utils/audit'
+import { AccountingService } from '@/lib/accounting/AccountingService'
 
 // Save Fee Structure
 export async function saveFeeStructureAction(formData: FormData) {
@@ -222,11 +223,34 @@ export async function recordPaymentAction(formData: FormData) {
     return { error: error.message }
   }
 
+  // Record Accounting Journal
+  try {
+    await AccountingService.recordFeePayment(
+      newPayment.id,
+      amount,
+      receipt_number,
+      new Date().toISOString()
+    )
+  } catch (accErr) {
+    console.error('Failed to post payment journal entry:', accErr)
+  }
+
   // Trigger SMS/WhatsApp notifications & WhatsApp receipt PDF delivery
   try {
     const { triggerPaymentRecorded } = await import('@/utils/notifications')
     await triggerPaymentRecorded(newPayment.id)
     await logAuditAction('Payment Recorded', 'payments', { receipt_number, amount, invoice_id })
+
+    // Generate WhatsApp PDF Receipt
+    const { WhatsAppService } = await import('@/lib/whatsapp/WhatsAppService')
+    const { data: student } = await supabase.from('profiles').select('first_name, last_name, phone').eq('id', student_id).single()
+    const studentName = student ? `${student.first_name} ${student.last_name}` : 'Student'
+    const parentPhone = student?.phone || '+255000000000'
+
+    const pdfBytes = await WhatsAppService.generateReceiptPDF(newPayment.id, receipt_number, amount, studentName, new Date().toLocaleString())
+    const pdfUrl = await WhatsAppService.uploadReceipt(receipt_number, pdfBytes)
+    await WhatsAppService.sendReceipt(parentPhone, receipt_number, pdfUrl)
+
   } catch (err) {
     console.error('Failed to trigger payment notifications:', err)
   }
@@ -251,17 +275,30 @@ export async function saveExpenseAction(formData: FormData) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { error } = await supabase.from('expenses').insert({
+  const { data: newExpense, error } = await supabase.from('expenses').insert({
     category,
     amount,
     description,
     date,
     receipt_url: receipt_url || null,
     recorded_by: user?.id
-  })
+  }).select('id').single()
 
-  if (error) {
-    return { error: error.message }
+  if (error || !newExpense) {
+    return { error: error?.message || 'Failed to record expense' }
+  }
+
+  // Record Accounting Journal
+  try {
+    await AccountingService.recordExpense(
+      newExpense.id,
+      amount,
+      description,
+      date,
+      category
+    )
+  } catch (accErr) {
+    console.error('Failed to post expense journal entry:', accErr)
   }
 
   await logAuditAction('Expense Recorded', 'expenses', { category, amount, date })
