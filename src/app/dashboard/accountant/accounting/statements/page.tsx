@@ -27,14 +27,25 @@ export default async function FinancialStatementsPage() {
 
   // Ensure tables exist or fail gracefully
   let tb: any[] = []
-  let pl = { revenue: [], expenses: [], totalRevenue: 0, totalExpenses: 0, netIncome: 0 }
-  let bs = { assets: [], liabilities: [], equity: [], totalAssets: 0, totalLiabilities: 0, totalEquity: 0 }
+  let pl: any = { revenue: [], expenses: [], totalRevenue: 0, totalExpenses: 0, netIncome: 0 }
+  let bs: any = { assets: [], liabilities: [], equity: [], totalAssets: 0, totalLiabilities: 0, totalEquity: 0 }
+  let budgetsMap: Record<string, number> = {}
   let errorMsg = null
 
   try {
     tb = await TrialBalanceService.getTrialBalance()
     pl = await TrialBalanceService.getProfitAndLoss()
     bs = await TrialBalanceService.getBalanceSheet()
+
+    const { data: bLines } = await supabase
+      .from('budget_lines')
+      .select('account_id, allocated_amount')
+    
+    if (bLines) {
+      bLines.forEach((b: any) => {
+        budgetsMap[b.account_id] = Number(b.allocated_amount)
+      })
+    }
   } catch (err: any) {
     errorMsg = err.message
   }
@@ -240,14 +251,14 @@ export default async function FinancialStatementsPage() {
               </thead>
               <tbody>
                 {pl.expenses.map((acc: any) => {
-                  // MVP Simulation: Assuming a fixed budget for MVP until Budget tables are fully seeded
-                  const mockBudget = acc.balance * 1.15; // 15% padding
-                  const variance = mockBudget - acc.balance;
+                  const actual = acc.balance;
+                  const mockBudget = budgetsMap[acc.account_id] || 0;
+                  const variance = mockBudget - actual;
                   return (
                     <tr key={`bud-${acc.account_id}`} style={{ borderBottom: '1px solid var(--color-border)' }}>
                       <td style={{ padding: '0.5rem' }}>{acc.account_code} - {acc.account_name}</td>
                       <td style={{ textAlign: 'right', padding: '0.5rem' }}>{formatTZS(mockBudget)}</td>
-                      <td style={{ textAlign: 'right', padding: '0.5rem' }}>{formatTZS(acc.balance)}</td>
+                      <td style={{ textAlign: 'right', padding: '0.5rem' }}>{formatTZS(actual)}</td>
                       <td style={{ textAlign: 'right', padding: '0.5rem', color: variance >= 0 ? 'var(--color-success)' : 'var(--color-error)', fontWeight: 600 }}>
                         {formatTZS(variance)}
                       </td>

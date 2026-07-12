@@ -1,5 +1,12 @@
 /* src/app/dashboard/accountant/reports/page.module.css */
-:root {
+/* Global dark mode container */
+.dashboardContainer {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  min-height: 100vh;
+  padding: 2rem;
+  color: var(--color-text);
+
+  /* Local theme variables */
   --color-primary: #0d6efd; /* vibrant blue */
   --color-success: #28a745;
   --color-error: #dc3545;
@@ -11,14 +18,6 @@
   --radius-lg: 1rem;
   --radius-md: 0.5rem;
   --radius-sm: 0.25rem;
-}
-
-/* Global dark mode container */
-.dashboardContainer {
-  background: linear-gradient(135deg, #1a1a2e, #16213e);
-  min-height: 100vh;
-  padding: 2rem;
-  color: var(--color-text);
 }
 
 .title {

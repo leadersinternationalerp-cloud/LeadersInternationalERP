@@ -107,7 +107,7 @@ export default async function TeacherAssignmentsPage() {
               </tr>
             </thead>
             <tbody>
-              {(allocations || []).map((alloc) => (
+              {(allocations || []).map((alloc: any) => (
                 <tr key={alloc.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                   <td style={{ padding: '1rem', fontWeight: 600 }}>{alloc.teacher?.first_name} {alloc.teacher?.last_name}</td>
                   <td style={{ padding: '1rem' }}>{alloc.class?.class_name}</td>

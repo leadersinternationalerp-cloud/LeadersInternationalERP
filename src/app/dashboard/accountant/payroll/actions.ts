@@ -282,7 +282,6 @@ export async function directorReviewPayrollAction(payrollId: string, approve: bo
           }
         }
       }
-      }
 
       // Record Accounting Journal for Payroll
       try {

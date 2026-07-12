@@ -113,7 +113,7 @@ export async function triggerBackupAction() {
     if (updateError) throw updateError
 
     // 7. Log audit log
-    await logAuditAction(user.id, 'Trigger Backup', 'backups', { fileName, fileSizeKb, status: 'Completed' })
+    await logAuditAction('Trigger Backup', 'backups', { fileName, fileSizeKb, status: 'Completed' })
 
     revalidatePath('/admin/backups')
     return { success: true, fileName }
@@ -126,7 +126,7 @@ export async function triggerBackupAction() {
       .update({ status: 'Failed' })
       .eq('id', backupId)
 
-    await logAuditAction(user.id, 'Trigger Backup (Failed)', 'backups', { fileName, error: err.message, status: 'Failed' })
+    await logAuditAction('Trigger Backup (Failed)', 'backups', { fileName, error: err.message, status: 'Failed' })
     
     revalidatePath('/admin/backups')
     return { error: `Backup failed: ${err.message}` }

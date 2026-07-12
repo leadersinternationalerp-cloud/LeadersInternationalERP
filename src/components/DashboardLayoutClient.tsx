@@ -231,6 +231,12 @@ export default function DashboardLayoutClient({
             </Link>
           )}
 
+          {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal') || userRoles.includes('Accountant')) && (
+            <Link href="/dashboard/accountant/fee-balances" style={linkStyle('/dashboard/accountant/fee-balances')} onClick={() => setSidebarOpen(false)}>
+              Fee Balances
+            </Link>
+          )}
+
           {userRoles.includes('System Admin') && (
             <>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
@@ -247,6 +253,41 @@ export default function DashboardLayoutClient({
               </Link>
               <Link href="/dashboard/admin/audit-logs" style={linkStyle('/dashboard/admin/audit-logs')} onClick={() => setSidebarOpen(false)}>
                 Security Audit Logs
+              </Link>
+              <Link href="/dashboard/admin/integrations" style={linkStyle('/dashboard/admin/integrations')} onClick={() => setSidebarOpen(false)}>
+                Integrations
+              </Link>
+              <Link href="/dashboard/admin/syllabus" style={linkStyle('/dashboard/admin/syllabus')} onClick={() => setSidebarOpen(false)}>
+                Syllabus Setup
+              </Link>
+              <Link href="/dashboard/admin/subjects" style={linkStyle('/dashboard/admin/subjects')} onClick={() => setSidebarOpen(false)}>
+                Subjects Setup
+              </Link>
+              <Link href="/dashboard/admin/teacher-assignments" style={linkStyle('/dashboard/admin/teacher-assignments')} onClick={() => setSidebarOpen(false)}>
+                Teacher Assignments
+              </Link>
+              <Link href="/dashboard/admin/biometric/devices" style={linkStyle('/dashboard/admin/biometric/devices')} onClick={() => setSidebarOpen(false)}>
+                Biometric Devices
+              </Link>
+              <Link href="/dashboard/admin/biometric/exceptions" style={linkStyle('/dashboard/admin/biometric/exceptions')} onClick={() => setSidebarOpen(false)}>
+                Biometric Exceptions
+              </Link>
+              <Link href="/dashboard/admin/kitchen-content" style={linkStyle('/dashboard/admin/kitchen-content')} onClick={() => setSidebarOpen(false)}>
+                Kitchen Content
+              </Link>
+            </>
+          )}
+
+          {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
+            <>
+              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
+                Director Operations
+              </div>
+              <Link href="/dashboard/director/inventory" style={linkStyle('/dashboard/director/inventory')} onClick={() => setSidebarOpen(false)}>
+                Inventory
+              </Link>
+              <Link href="/dashboard/director/transport" style={linkStyle('/dashboard/director/transport')} onClick={() => setSidebarOpen(false)}>
+                Transport
               </Link>
             </>
           )}
@@ -302,6 +343,18 @@ export default function DashboardLayoutClient({
               <Link href="/dashboard/teacher/lesson-plans" style={linkStyle('/dashboard/teacher/lesson-plans')} onClick={() => setSidebarOpen(false)}>
                 Lesson Plans
               </Link>
+              <Link href="/dashboard/teacher/early-years" style={linkStyle('/dashboard/teacher/early-years')} onClick={() => setSidebarOpen(false)}>
+                Early Years
+              </Link>
+              <Link href="/dashboard/teacher/class-activities" style={linkStyle('/dashboard/teacher/class-activities')} onClick={() => setSidebarOpen(false)}>
+                Class Activities
+              </Link>
+              <Link href="/dashboard/teacher/quizzes/bank" style={linkStyle('/dashboard/teacher/quizzes/bank')} onClick={() => setSidebarOpen(false)}>
+                Quiz Bank
+              </Link>
+              <Link href="/dashboard/teacher/quizzes/jobs" style={linkStyle('/dashboard/teacher/quizzes/jobs')} onClick={() => setSidebarOpen(false)}>
+                Quiz Print Jobs
+              </Link>
             </>
           )}
 
@@ -330,6 +383,30 @@ export default function DashboardLayoutClient({
               </Link>
               <Link href="/dashboard/accountant/leave-config" style={linkStyle('/dashboard/accountant/leave-config')} onClick={() => setSidebarOpen(false)}>
                 Leave Configuration
+              </Link>
+              <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '0.5rem', marginBottom: '0.5rem' }}>
+                Accounting Suite
+              </div>
+              <Link href="/dashboard/accountant/accounting/statements" style={linkStyle('/dashboard/accountant/accounting/statements')} onClick={() => setSidebarOpen(false)}>
+                Financial Statements
+              </Link>
+              <Link href="/dashboard/accountant/accounting/coa" style={linkStyle('/dashboard/accountant/accounting/coa')} onClick={() => setSidebarOpen(false)}>
+                Chart of Accounts
+              </Link>
+              <Link href="/dashboard/accountant/accounting/journals" style={linkStyle('/dashboard/accountant/accounting/journals')} onClick={() => setSidebarOpen(false)}>
+                Journals
+              </Link>
+              <Link href="/dashboard/accountant/accounting/reconciliation" style={linkStyle('/dashboard/accountant/accounting/reconciliation')} onClick={() => setSidebarOpen(false)}>
+                Reconciliation
+              </Link>
+              <Link href="/dashboard/accountant/accounting/bills" style={linkStyle('/dashboard/accountant/accounting/bills')} onClick={() => setSidebarOpen(false)}>
+                Bills & Payables
+              </Link>
+              <Link href="/dashboard/accountant/accounting/deposits" style={linkStyle('/dashboard/accountant/accounting/deposits')} onClick={() => setSidebarOpen(false)}>
+                Bank Deposits
+              </Link>
+              <Link href="/dashboard/accountant/accounting/assets" style={linkStyle('/dashboard/accountant/accounting/assets')} onClick={() => setSidebarOpen(false)}>
+                Fixed Assets
               </Link>
             </>
           )}

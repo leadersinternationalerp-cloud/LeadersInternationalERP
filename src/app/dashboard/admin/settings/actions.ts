@@ -41,7 +41,7 @@ export async function saveSystemSettingsAction(key: string, value: any) {
   }
 
   // 3. Log audit action
-  await logAuditAction(user.id, `Update Setting: ${key}`, 'system_settings', { key, value })
+  await logAuditAction(`Update Setting: ${key}`, 'system_settings', { key, value })
 
   revalidatePath('/admin/settings')
   return { success: true }
@@ -99,7 +99,7 @@ export async function saveAcademicYearAction(name: string, term_details: any[], 
   }
 
   // 4. Log audit action
-  await logAuditAction(user.id, `Save Academic Year: ${name}`, 'academic_years', { name, term_details, is_active })
+  await logAuditAction(`Save Academic Year: ${name}`, 'academic_years', { name, term_details, is_active })
 
   revalidatePath('/admin/settings')
   return { success: true }

@@ -79,31 +79,54 @@ export class WhatsAppService {
 
     try {
       if (config?.api_url && config?.api_key) {
-        // Example structure for a real provider (e.g. Twilio or InfoBip)
         console.log(`[WHATSAPP] Dispatching real HTTP request to ${providerName} at ${config.api_url}`)
-        /*
+        
+        // Setup payload. Default to standard generic JSON if provider is unknown.
+        let payload: any = {
+          to: phone,
+          type: 'document',
+          document: {
+            link: pdfUrl,
+            filename: `Receipt-${receiptNumber}.pdf`
+          }
+        }
+
+        // Adjust payload for specific providers
+        const pNameLower = providerName.toLowerCase()
+        if (pNameLower.includes('meta') || pNameLower.includes('whatsapp cloud')) {
+          payload = {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: phone,
+            type: "document",
+            document: {
+              link: pdfUrl,
+              filename: `Receipt-${receiptNumber}.pdf`
+            }
+          }
+        } else if (pNameLower.includes('twilio')) {
+          // Twilio uses URL-encoded form data rather than JSON usually, 
+          // but for this generic integration, we attempt JSON with Twilio specific fields if mapped.
+          // In a real robust implementation, we'd use URLSearchParams for Twilio.
+          // This keeps it generic HTTP for now.
+        }
+
         const response = await fetch(config.api_url, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${config.api_key}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            to: phone,
-            type: 'document',
-            document: {
-              link: pdfUrl,
-              filename: `Receipt-${receiptNumber}.pdf`
-            }
-          })
+          body: JSON.stringify(payload)
         })
-        if (response.ok) dispatchStatus = 'SENT'
-        */
-        
-        // Simulating success if config is present
-        dispatchStatus = 'SENT'
+
+        if (response.ok) {
+          dispatchStatus = 'SENT'
+        } else {
+          console.error(`[WHATSAPP] Provider returned ${response.status}: ${await response.text()}`)
+          dispatchStatus = 'FAILED'
+        }
       } else {
-        // Fallback or missing config
         console.warn(`[WHATSAPP] Missing API URL/Key for ${providerName}. Logging stub.`)
         dispatchStatus = 'SENT_STUB'
       }

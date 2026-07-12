@@ -93,7 +93,6 @@ export async function createUserAction(prevState: FormState, formData: FormData)
 
     // 3. Log Audit
     await logAuditAction(
-      currentUser.id,
       'CREATE_USER',
       'profiles',
       { targetUserId: authData.user.id, email, first_name, last_name, role }
@@ -181,7 +180,6 @@ export async function updateUserAction(
 
     // 4. Log Audit
     await logAuditAction(
-      currentUser.id,
       'UPDATE_USER',
       'profiles',
       { targetUserId: userId, first_name, last_name, role, email }
@@ -254,7 +252,6 @@ export async function toggleUserStatusAction(
 
     // 4. Log Audit
     await logAuditAction(
-      currentUser.id,
       active ? 'ACTIVATE_USER' : 'SUSPEND_USER',
       'profiles',
       { targetUserId: userId, is_active: active }
@@ -319,7 +316,6 @@ export async function resetUserPasswordAction(
 
     // 3. Log Audit
     await logAuditAction(
-      currentUser.id,
       'RESET_USER_PASSWORD',
       'profiles',
       { targetUserId: userId }
