@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import PDFDocument from 'pdfkit'
-import getStream from 'get-stream'
+
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -37,7 +37,12 @@ export async function GET(request: Request) {
   const doc = new PDFDocument({ margin: 50 })
   
   // Create a buffer from the PDF stream
-  const pdfBufferPromise = getStream.buffer(doc)
+  const pdfBufferPromise = new Promise<Buffer>((resolve, reject) => {
+    const chunks: Buffer[] = []
+    doc.on('data', (chunk) => chunks.push(Buffer.from(chunk)))
+    doc.on('end', () => resolve(Buffer.concat(chunks)))
+    doc.on('error', reject)
+  })
 
   // -- Draw PDF Content --
   
