@@ -14,10 +14,39 @@ CREATE TABLE IF NOT EXISTS public.class_activities (
 
 ALTER TABLE public.class_activities ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view activities for their class" 
-    ON public.class_activities FOR SELECT 
-    USING (true); -- Implement stricter RLS in future if needed
-
 CREATE POLICY "Teachers can create activities" 
-    ON public.class_activities FOR ALL 
-    USING (true);
+    ON public.class_activities FOR INSERT TO authenticated
+    WITH CHECK (
+        public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Teacher', 'Head of Section', 'Dean')
+    );
+
+CREATE POLICY "Teachers can update activities" 
+    ON public.class_activities FOR UPDATE TO authenticated
+    USING (
+        public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Teacher', 'Head of Section', 'Dean')
+    );
+
+CREATE POLICY "Teachers can delete activities" 
+    ON public.class_activities FOR DELETE TO authenticated
+    USING (
+        public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Teacher', 'Head of Section', 'Dean')
+    );
+
+CREATE POLICY "Users can view activities" 
+    ON public.class_activities FOR SELECT TO authenticated
+    USING (
+        public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Teacher', 'Head of Section', 'Dean')
+        OR
+        EXISTS (
+            SELECT 1 FROM public.student_classes
+            WHERE student_classes.class_id = class_activities.class_id
+            AND student_classes.student_id = auth.uid()
+        )
+        OR
+        EXISTS (
+            SELECT 1 FROM public.student_parents
+            JOIN public.student_classes ON student_classes.student_id = student_parents.student_id
+            WHERE student_parents.parent_id = auth.uid()
+            AND student_classes.class_id = class_activities.class_id
+        )
+    );

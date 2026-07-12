@@ -65,7 +65,7 @@ export function getCambridgePrompt(subject: string, grade: string, topic: string
       subjectGuidelines = `
 - Focus on practical arithmetic, counting, weights, and measurements.
 - Use local Zanzibar context such as counting coconuts, mangoes, pineapples, calculations involving Tanzanian Shillings (TZS), or dhow boats.
-- Keep numbers age-appropriate: Grade 1 (within 20), Grade 2 (within 100), Grade 3 (within 1,000).`;
+- Keep numbers age-appropriate: Grade 1 (within 20), Grade 2 (within 100), Grade 3 (within 1,000), Grades 4-6 (within 1,000,000 and introduction of decimals/fractions).`;
       break;
 
     case "science":

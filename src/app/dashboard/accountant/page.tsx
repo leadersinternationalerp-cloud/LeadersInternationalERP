@@ -28,19 +28,18 @@ export default async function AccountantDashboardPage() {
   }
 
   // Fetch Summary Metrics
-  const { data: invoices } = await supabase.from('invoices').select('amount, status')
+  const { data: invoices } = await supabase.from('invoices').select('net_amount, total_paid, status')
   let feesBilled = 0
   let feesCollected = 0
   let feesOutstanding = 0
 
   invoices?.forEach(inv => {
-    feesBilled += Number(inv.amount)
-    if (inv.status === 'Paid') feesCollected += Number(inv.amount)
-    else if (inv.status === 'Partial') {
-      feesCollected += Number(inv.amount) / 2 // Simplified for mockup
-      feesOutstanding += Number(inv.amount) / 2
-    }
-    else feesOutstanding += Number(inv.amount)
+    const netAmount = Number(inv.net_amount || 0)
+    const paidAmount = Number(inv.total_paid || 0)
+    
+    feesBilled += netAmount
+    feesCollected += paidAmount
+    feesOutstanding += (netAmount - paidAmount)
   })
 
   // Pending Disbursements

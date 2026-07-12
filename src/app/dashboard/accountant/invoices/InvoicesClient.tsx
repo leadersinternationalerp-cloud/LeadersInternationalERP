@@ -2,19 +2,12 @@
 
 import { useState, useMemo } from 'react'
 
+import { formatCurrency } from '@/utils/formatters'
+
 export default function InvoicesClient({ initialInvoices }: { initialInvoices: any[] }) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [gradeFilter, setGradeFilter] = useState('All')
-
-  const formatTZS = (amount: number) => {
-    return new Intl.NumberFormat('en-TZ', {
-      style: 'currency',
-      currency: 'TZS',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount)
-  }
 
   const filteredInvoices = useMemo(() => {
     return initialInvoices.filter(inv => {
@@ -97,13 +90,13 @@ export default function InvoicesClient({ initialInvoices }: { initialInvoices: a
                 <td style={{ padding: '1rem' }}>{inv.students?.grade_level}</td>
                 <td style={{ padding: '1rem' }}>{inv.term}</td>
                 <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--color-primary)' }}>
-                  {formatTZS(inv.net_amount)}
+                  {formatCurrency(inv.net_amount)}
                 </td>
                 <td style={{ padding: '1rem', color: 'var(--color-success)' }}>
-                  {formatTZS(inv.total_paid || 0)}
+                  {formatCurrency(inv.total_paid || 0)}
                 </td>
                 <td style={{ padding: '1rem', fontWeight: 600 }}>
-                  {formatTZS(balance)}
+                  {formatCurrency(balance)}
                 </td>
                 <td style={{ padding: '1rem' }}>
                   <span style={{

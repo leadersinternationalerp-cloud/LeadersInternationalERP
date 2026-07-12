@@ -30,6 +30,7 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
   const [topic, setTopic] = useState('');
   const [numQuestions, setNumQuestions] = useState(5);
   const [timeLimit, setTimeLimit] = useState(15);
+  const [maxAttempts, setMaxAttempts] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
   const [sourceBadge, setSourceBadge] = useState<'gemini' | 'fallback' | null>(null);
   const [generatedModel, setGeneratedModel] = useState<string | null>(null);
@@ -114,6 +115,44 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
     setQuestions(updated);
   };
 
+  const handleShuffleOptions = () => {
+    const shuffled = questions.map(q => {
+      const optionsWithIndex = q.options.map((opt, i) => ({ opt, isCorrect: i === q.correctIndex }));
+      // Fisher-Yates shuffle
+      for (let i = optionsWithIndex.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [optionsWithIndex[i], optionsWithIndex[j]] = [optionsWithIndex[j], optionsWithIndex[i]];
+      }
+      return {
+        ...q,
+        options: optionsWithIndex.map(o => o.opt),
+        correctIndex: optionsWithIndex.findIndex(o => o.isCorrect)
+      };
+    });
+    setQuestions(shuffled);
+  };
+
+  const handleExportPDF = () => {
+    alert('Exporting to PDF... (Integration pending)');
+  };
+
+  const handleExportCSV = () => {
+    const header = ['Question', 'Option A', 'Option B', 'Option C', 'Option D', 'Correct Index', 'Explanation'];
+    const rows = questions.map(q => [
+      `"${q.question.replace(/"/g, '""')}"`,
+      ...q.options.map(opt => `"${opt.replace(/"/g, '""')}"`),
+      q.correctIndex,
+      `"${q.explanation.replace(/"/g, '""')}"`
+    ]);
+    const csvContent = [header, ...rows].map(e => e.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${quizTitle || 'Quiz'}.csv`;
+    link.click();
+  };
+
   // Publish final quiz to backend
   const handlePublish = async () => {
     if (!quizTitle || questions.length === 0) {
@@ -135,7 +174,7 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
           description: quizDescription + ` [Cambridge Objective: ${cambridgeObjective}]`,
           questions,
           time_limit_minutes: timeLimit,
-          max_attempts: 1 // default one attempt
+          max_attempts: maxAttempts
         })
       });
 
@@ -200,6 +239,22 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
               <option value="Grade 1">Grade 1</option>
               <option value="Grade 2">Grade 2</option>
               <option value="Grade 3">Grade 3</option>
+              <option value="Grade 4">Grade 4</option>
+              <option value="Grade 5">Grade 5</option>
+              <option value="Grade 6">Grade 6</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Max Attempts</label>
+            <select 
+              value={maxAttempts} 
+              onChange={e => setMaxAttempts(Number(e.target.value))} 
+              className="input-field"
+            >
+              <option value={1}>1 (Exam)</option>
+              <option value={3}>3 (Practice)</option>
+              <option value={999}>Unlimited</option>
             </select>
           </div>
 
@@ -323,7 +378,12 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
             </div>
           </div>
 
-          <h4 style={{ fontSize: '1.05rem', margin: '0 0 1rem 0', fontWeight: 600 }}>Questions List</h4>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h4 style={{ fontSize: '1.05rem', margin: 0, fontWeight: 600 }}>Questions List</h4>
+            <button type="button" onClick={handleShuffleOptions} className="btn btn-secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}>
+              🔀 Shuffle Options
+            </button>
+          </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             {questions.map((q, qIdx) => (
@@ -377,13 +437,23 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
             ))}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem', borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
-            <button type="button" onClick={onCancel} className="btn btn-secondary">
-              Discard
-            </button>
-            <button type="button" onClick={handlePublish} className="btn btn-primary" style={{ padding: '0.5rem 2rem' }}>
-              Publish Quiz to Class
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem', borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type="button" onClick={handleExportPDF} className="btn" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+                📄 Export PDF
+              </button>
+              <button type="button" onClick={handleExportCSV} className="btn" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+                📊 Export CSV
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button type="button" onClick={onCancel} className="btn btn-secondary">
+                Discard
+              </button>
+              <button type="button" onClick={handlePublish} className="btn btn-primary" style={{ padding: '0.5rem 2rem' }}>
+                🚀 Publish Quiz to Class
+              </button>
+            </div>
           </div>
         </div>
       )}

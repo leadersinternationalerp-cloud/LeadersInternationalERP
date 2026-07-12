@@ -34,16 +34,14 @@ export default async function DirectorDashboardPage() {
   ])
 
   // Simplified Fee logic for display
-  const { data: invoices } = await supabase.from('invoices').select('amount, status')
+  const { data: invoices } = await supabase.from('invoices').select('net_amount, total_paid, status')
   let feesCollected = 0
   let feesOutstanding = 0
   invoices?.forEach(inv => {
-    if (inv.status === 'Paid') feesCollected += Number(inv.amount)
-    else if (inv.status === 'Partial') {
-      feesCollected += Number(inv.amount) / 2 // Simplified
-      feesOutstanding += Number(inv.amount) / 2
-    }
-    else feesOutstanding += Number(inv.amount)
+    const netAmount = Number(inv.net_amount || 0)
+    const paidAmount = Number(inv.total_paid || 0)
+    feesCollected += paidAmount
+    feesOutstanding += (netAmount - paidAmount)
   })
 
   // Pending Items

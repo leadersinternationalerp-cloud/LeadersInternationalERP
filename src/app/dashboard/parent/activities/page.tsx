@@ -72,7 +72,23 @@ export default async function ParentActivitiesPage({
         .eq('class_id', cls.id)
         .order('date', { ascending: true })
 
-      activities = acts as ClassActivity[] || []
+      const { data: attempts } = await supabase
+        .from('activity_attempts')
+        .select('activity_id, score, max_score, percentage, submitted_at')
+        .eq('student_id', selectedChild.id)
+
+      activities = (acts || []).map((act: any) => {
+        const attempt = attempts?.find(a => a.activity_id === act.id)
+        return {
+          ...act,
+          attempt: attempt ? {
+            score: attempt.score,
+            maxScore: attempt.max_score,
+            percentage: attempt.percentage,
+            submittedAt: attempt.submitted_at
+          } : null
+        }
+      })
     }
   }
 
