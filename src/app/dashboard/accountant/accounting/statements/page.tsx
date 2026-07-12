@@ -1,7 +1,11 @@
 import { createClient } from '@/utils/supabase/server'
 import { TrialBalanceService } from '@/lib/accounting/TrialBalanceService'
+import { StatementActions } from './StatementActions'
 
-export default async function FinancialStatementsPage() {
+export default async function FinancialStatementsPage({ searchParams }: { searchParams: Promise<{ start_date?: string, end_date?: string }> }) {
+  const params = await searchParams;
+  const start_date = params?.start_date;
+  const end_date = params?.end_date;
   const supabase = await createClient()
 
   // Verify Accountant/Director access
@@ -33,9 +37,9 @@ export default async function FinancialStatementsPage() {
   let errorMsg = null
 
   try {
-    tb = await TrialBalanceService.getTrialBalance()
-    pl = await TrialBalanceService.getProfitAndLoss()
-    bs = await TrialBalanceService.getBalanceSheet()
+    tb = await TrialBalanceService.getTrialBalance(end_date)
+    pl = await TrialBalanceService.getProfitAndLoss(start_date, end_date)
+    bs = await TrialBalanceService.getBalanceSheet(end_date)
 
     const { data: bLines } = await supabase
       .from('budget_lines')
@@ -65,26 +69,23 @@ export default async function FinancialStatementsPage() {
         <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)', margin: 0 }}>
           Financial Statements
         </h1>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button className="btn-secondary" style={{ textDecoration: 'none' }}>Export Excel</button>
-          <button className="btn-primary" style={{ textDecoration: 'none' }}>Export PDF</button>
-        </div>
+        <StatementActions />
       </div>
 
       {/* Date Filters */}
-      <div className="glass-panel" style={{ padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '2rem', display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
+      <form method="GET" className="glass-panel" style={{ padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '2rem', display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
         <div style={{ flex: 1 }}>
           <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Start Date</label>
-          <input type="date" name="start_date" style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
+          <input type="date" name="start_date" defaultValue={start_date || ''} style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
         </div>
         <div style={{ flex: 1 }}>
           <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>End Date</label>
-          <input type="date" name="end_date" style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
+          <input type="date" name="end_date" defaultValue={end_date || ''} style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
         </div>
         <div>
-          <button className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>Apply Filters</button>
+          <button type="submit" className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>Apply Filters</button>
         </div>
-      </div>
+      </form>
 
       {errorMsg ? (
         <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-error)', padding: '1rem', borderRadius: 'var(--radius-md)' }}>

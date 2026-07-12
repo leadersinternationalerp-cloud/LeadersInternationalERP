@@ -219,10 +219,22 @@ export default function DashboardLayoutClient({
             </Link>
           )}
 
-          {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal')) && (
-            <Link href="/dashboard/principal/lesson-plans" style={linkStyle('/dashboard/principal/lesson-plans')} onClick={() => setSidebarOpen(false)}>
-              Lesson Plan Reports
-            </Link>
+          {(userRoles.includes('System Admin') || userRoles.includes('Principal') || userRoles.includes('Dean') || userRoles.includes('HOS')) && (
+            <>
+              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
+                Academic Leadership
+              </div>
+              
+              {(userRoles.includes('System Admin') || userRoles.includes('Principal') || userRoles.includes('Director')) && (
+                <Link href="/dashboard/principal/lesson-plans" style={linkStyle('/dashboard/principal/lesson-plans')} onClick={() => setSidebarOpen(false)}>
+                  Lesson Plan Reports
+                </Link>
+              )}
+
+              <Link href="/dashboard/principal/report-cards" style={linkStyle('/dashboard/principal/report-cards')} onClick={() => setSidebarOpen(false)}>
+                Report Cards Generator
+              </Link>
+            </>
           )}
 
           {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (

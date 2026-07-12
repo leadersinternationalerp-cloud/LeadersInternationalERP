@@ -61,7 +61,7 @@ export default async function ReportCardsPage() {
         term: 'Term 1', // normally fetched from term_id
         academic_year: '2026-2027',
         status: 'RELEASED',
-        pdf_url: 'https://example.com/dummy-report-card.pdf', // Simulating the PDF generation
+        pdf_url: `/api/report-cards/download?student_id=${e.student_id}&term_id=${term_id}`,
         generated_at: new Date().toISOString()
       }))
       await supabase.from('report_cards').insert(inserts)
