@@ -179,6 +179,12 @@ export default async function DashboardLayout({
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Administration
               </div>
+              <Link href="/dashboard/director" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Executive Dashboard
+              </Link>
               <Link href="/dashboard/admin/settings" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
@@ -329,6 +335,12 @@ export default async function DashboardLayout({
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Finance Portal
               </div>
+              <Link href="/dashboard/accountant" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Accountant Dashboard
+              </Link>
               <Link href="/dashboard/accountant/fee-structures" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
@@ -391,6 +403,12 @@ export default async function DashboardLayout({
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Principal Operations
               </div>
+              <Link href="/dashboard/principal" style={{
+                display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
+              }}>
+                Principal Dashboard
+              </Link>
               <Link href="/dashboard/principal/quick-payment" style={{
                 display: 'block', padding: '0.75rem', borderRadius: 'var(--radius-md)',
                 textDecoration: 'none', color: 'var(--color-text)', fontWeight: 500,
