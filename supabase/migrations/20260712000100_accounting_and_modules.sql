@@ -181,7 +181,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_logs (
 -- Link operational tables to journals
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS journal_entry_id UUID REFERENCES journal_entries(id) ON DELETE SET NULL;
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS journal_entry_id UUID REFERENCES journal_entries(id) ON DELETE SET NULL;
-ALTER TABLE payroll ADD COLUMN IF NOT EXISTS journal_entry_id UUID REFERENCES journal_entries(id) ON DELETE SET NULL;
+ALTER TABLE payrolls ADD COLUMN IF NOT EXISTS journal_entry_id UUID REFERENCES journal_entries(id) ON DELETE SET NULL;
 
 -- SEED INTEGRATION CONFIG
 INSERT INTO integration_config (id, whatsapp_provider) VALUES (1, 'TWILIO') ON CONFLICT (id) DO NOTHING;
