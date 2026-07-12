@@ -10,8 +10,14 @@ const withPWA = require('next-pwa')({
 const nextConfig: NextConfig = {
   /* config options here */
   images: {
-    domains: ['zqcjnfcwxkeapwzhifsy.supabase.co'], // allow supabase storage images
-  }
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'zqcjnfcwxkeapwzhifsy.supabase.co',
+      },
+    ],
+  },
+  turbopack: {},
 };
 
 export default withPWA(nextConfig);
