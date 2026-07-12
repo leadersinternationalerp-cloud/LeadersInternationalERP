@@ -52,17 +52,22 @@ export default async function ReportCardsPage() {
     // We will simulate creating the report_cards rows so Students/Parents can download them.
 
     // 1. Get all students in the class
-    const { data: enrollments } = await supabase.from('student_enrollments').select('student_id').eq('class_id', class_id).eq('academic_year', '2026-2027')
+    const { data: targetClass } = await supabase.from('classes').select('*').eq('id', class_id).single()
+    let enrollments: any[] = []
+    if (targetClass) {
+      const { data } = await supabase.from('students').select('id, student_id').eq('grade_level', targetClass.name).eq('section', targetClass.section)
+      enrollments = data || []
+    }
     
     // 2. Insert into report_cards
     if (enrollments && enrollments.length > 0) {
       const inserts = enrollments.map(e => ({
-        student_id: e.student_id,
-        term: 'Term 1', // normally fetched from term_id
+        student_id: e.id,
+        term_id: term_id,
         academic_year: '2026-2027',
-        status: 'RELEASED',
-        pdf_url: `/api/report-cards/download?student_id=${e.student_id}&term_id=${term_id}`,
-        generated_at: new Date().toISOString()
+        grade_level: targetClass.name,
+        is_published: true,
+        pdf_url: `/api/report-cards/download?student_id=${e.id}&term_id=${term_id}`
       }))
       await supabase.from('report_cards').insert(inserts)
     }

@@ -16,7 +16,7 @@ export class TrialBalanceService {
   /**
    * Calculate Trial Balance up to a certain date.
    */
-  static async getTrialBalance(asOfDate?: string): Promise<AccountBalance[]> {
+  static async getTrialBalance(asOfDate?: string, startDate?: string): Promise<AccountBalance[]> {
     const supabase = await createClient();
 
     let query = supabase
@@ -32,6 +32,9 @@ export class TrialBalanceService {
 
     if (asOfDate) {
       query = query.lte('journal_entries.posting_date', asOfDate);
+    }
+    if (startDate) {
+      query = query.gte('journal_entries.posting_date', startDate);
     }
 
     const { data: lines, error } = await query;
@@ -75,7 +78,7 @@ export class TrialBalanceService {
    * Generates a basic P&L statement
    */
   static async getProfitAndLoss(startDate?: string, endDate?: string) {
-    const tb = await this.getTrialBalance(endDate);
+    const tb = await this.getTrialBalance(endDate, startDate);
     
     // In a real P&L, you would only sum up revenues and expenses within the period.
     // For simplicity, assuming the TB is for the period.

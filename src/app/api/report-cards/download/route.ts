@@ -20,6 +20,24 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  let isAuthorized = false
+  if (user.id === student_id) {
+    isAuthorized = true
+  } else {
+    const { data: prof } = await supabase.from('profiles').select('roles, role').eq('id', user.id).single()
+    const userRoles = prof?.roles || (prof?.role ? prof.role.split(',') : [])
+    if (userRoles.includes('System Admin') || userRoles.includes('Principal') || userRoles.includes('Teacher')) {
+      isAuthorized = true
+    } else {
+      const { data: rel } = await supabase.from('student_relationships').select('id').eq('parent_id', user.id).eq('student_id', student_id).single()
+      if (rel) isAuthorized = true
+    }
+  }
+
+  if (!isAuthorized) {
+    return NextResponse.json({ error: 'Unauthorized Access to Student Record' }, { status: 403 })
+  }
+
   // Fetch basic student info
   const { data: student } = await supabase
     .from('profiles')
@@ -32,6 +50,34 @@ export async function GET(request: Request) {
     .select('term_name')
     .eq('id', term_id)
     .single()
+
+  const termName = term?.term_name || 'Term 1'
+
+  // Fetch Marks
+  const { data: marksRecords } = await supabase
+    .from('marks')
+    .select(`
+      score,
+      remarks,
+      subject:subject_id (name)
+    `)
+    .eq('student_id', student_id)
+    .eq('term', termName)
+
+  // Fetch Grade Boundaries (assuming standard framework)
+  const { data: boundaries } = await supabase
+    .from('grade_boundaries')
+    .select('*')
+    .eq('framework_name', 'Tanzania National (NECTA)') // or a default one
+    .order('min_score', { ascending: false })
+
+  const getGrade = (score: number) => {
+    if (!boundaries || boundaries.length === 0) return 'N/A'
+    for (const b of boundaries) {
+      if (score >= b.min_score) return b.grade
+    }
+    return 'F'
+  }
 
   // Generate PDF
   const doc = new PDFDocument({ margin: 50 })
@@ -63,30 +109,51 @@ export async function GET(request: Request) {
   doc.text(`Date Generated: ${new Date().toLocaleDateString()}`)
   doc.moveDown(2)
 
-  // Placeholder for Grades
+  // Grades Section
   doc.fontSize(14).text('Academic Performance', { underline: true })
   doc.moveDown(1)
   
   doc.fontSize(11)
   doc.text('Subject', 50, doc.y, { continued: true })
-  doc.text('Grade', 250, doc.y, { continued: true })
-  doc.text('Comments', 350, doc.y)
+  doc.text('Score', 250, doc.y, { continued: true })
+  doc.text('Grade', 350, doc.y, { continued: true })
+  doc.text('Comments', 450, doc.y)
   doc.moveDown(0.5)
 
   doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke()
   doc.moveDown(0.5)
 
-  // Mocked grades for MVP
-  const subjects = ['Mathematics', 'English Language', 'Science', 'History', 'Geography']
-  const grades = ['A', 'B+', 'A-', 'A', 'B']
-  const comments = ['Excellent work', 'Good effort', 'Very consistent', 'Outstanding', 'Satisfactory']
+  let totalScore = 0
+  let subjectsCount = 0
 
-  for (let i = 0; i < subjects.length; i++) {
-    const y = doc.y
-    doc.text(subjects[i], 50, y)
-    doc.text(grades[i], 250, y)
-    doc.text(comments[i], 350, y)
-    doc.moveDown(0.5)
+  if (marksRecords && marksRecords.length > 0) {
+    for (const m of marksRecords) {
+      const subject: any = Array.isArray(m.subject) ? m.subject[0] : m.subject
+      const subjName = subject?.name || 'Unknown'
+      const grade = getGrade(m.score)
+      totalScore += m.score
+      subjectsCount++
+
+      const y = doc.y
+      doc.text(subjName, 50, y)
+      doc.text(m.score.toString(), 250, y)
+      doc.text(grade, 350, y)
+      doc.text(m.remarks || '', 450, y, { width: 100 })
+      doc.moveDown(1)
+    }
+  } else {
+    doc.text('No marks recorded for this term.', 50, doc.y)
+    doc.moveDown(1)
+  }
+
+  doc.moveDown(1)
+  doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke()
+  doc.moveDown(1)
+
+  if (subjectsCount > 0) {
+    const avg = (totalScore / subjectsCount).toFixed(1)
+    doc.fontSize(12).text(`Total Average: ${avg}%`, 50, doc.y)
+    doc.text(`Overall Grade: ${getGrade(parseFloat(avg))}`, 50, doc.y)
   }
 
   doc.moveDown(2)

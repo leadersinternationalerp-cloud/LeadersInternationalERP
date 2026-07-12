@@ -352,7 +352,7 @@ export default function DashboardLayoutClient({
               <Link href="/dashboard/teacher/marks" style={linkStyle('/dashboard/teacher/marks')} onClick={() => setSidebarOpen(false)}>
                 Academic Marks
               </Link>
-              <Link href="/dashboard/teacher/lesson-plans" style={linkStyle('/dashboard/teacher/lesson-plans')} onClick={() => setSidebarOpen(false)}>
+              <Link href="/dashboard/teacher/lesson-plans/new" style={linkStyle('/dashboard/teacher/lesson-plans')} onClick={() => setSidebarOpen(false)}>
                 Lesson Plans
               </Link>
               <Link href="/dashboard/teacher/early-years" style={linkStyle('/dashboard/teacher/early-years')} onClick={() => setSidebarOpen(false)}>
@@ -445,7 +445,7 @@ export default function DashboardLayoutClient({
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Parent Portal
               </div>
-              <Link href="/dashboard/parent" style={linkStyle('/dashboard/parent')} onClick={() => setSidebarOpen(false)}>
+              <Link href="/dashboard/parent/dashboard" style={linkStyle('/dashboard/parent')} onClick={() => setSidebarOpen(false)}>
                 Parent Dashboard
               </Link>
               <Link href="/dashboard/parent/students" style={linkStyle('/dashboard/parent/students')} onClick={() => setSidebarOpen(false)}>
@@ -462,7 +462,7 @@ export default function DashboardLayoutClient({
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Self Service
               </div>
-              <Link href="/dashboard/staff/self-service" style={linkStyle('/dashboard/staff/self-service')} onClick={() => setSidebarOpen(false)}>
+              <Link href="/dashboard/staff/self-service/leave" style={linkStyle('/dashboard/staff/self-service')} onClick={() => setSidebarOpen(false)}>
                 My HR Dashboard
               </Link>
               <Link href="/dashboard/staff/self-service/leave" style={linkStyle('/dashboard/staff/self-service/leave')} onClick={() => setSidebarOpen(false)}>

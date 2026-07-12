@@ -258,10 +258,10 @@ export default async function FinancialStatementsPage({ searchParams }: { search
                   return (
                     <tr key={`bud-${acc.account_id}`} style={{ borderBottom: '1px solid var(--color-border)' }}>
                       <td style={{ padding: '0.5rem' }}>{acc.account_code} - {acc.account_name}</td>
-                      <td style={{ textAlign: 'right', padding: '0.5rem' }}>{formatTZS(mockBudget)}</td>
+                      <td style={{ textAlign: 'right', padding: '0.5rem' }}>{budgetsMap[acc.account_id] !== undefined ? formatTZS(mockBudget) : <span style={{color: 'var(--color-text-muted)', fontStyle: 'italic', fontSize: '0.8rem'}}>No budget set</span>}</td>
                       <td style={{ textAlign: 'right', padding: '0.5rem' }}>{formatTZS(actual)}</td>
-                      <td style={{ textAlign: 'right', padding: '0.5rem', color: variance >= 0 ? 'var(--color-success)' : 'var(--color-error)', fontWeight: 600 }}>
-                        {formatTZS(variance)}
+                      <td style={{ textAlign: 'right', padding: '0.5rem', color: budgetsMap[acc.account_id] !== undefined ? (variance >= 0 ? 'var(--color-success)' : 'var(--color-error)') : 'var(--color-text-muted)', fontWeight: 600 }}>
+                        {budgetsMap[acc.account_id] !== undefined ? formatTZS(variance) : '-'}
                       </td>
                     </tr>
                   )
