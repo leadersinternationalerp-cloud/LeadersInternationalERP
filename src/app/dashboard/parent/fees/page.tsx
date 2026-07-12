@@ -71,10 +71,13 @@ export default async function ParentFeesPage() {
             </tr>
           </thead>
           <tbody>
-            {invoices.map((inv) => (
+            {invoices.map((inv) => {
+              const student: any = Array.isArray(inv.student) ? inv.student[0] : inv.student
+              const term: any = Array.isArray(inv.term) ? inv.term[0] : inv.term
+              return (
               <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                <td style={{ padding: '1rem', fontWeight: 600 }}>{inv.student?.first_name} {inv.student?.last_name}</td>
-                <td style={{ padding: '1rem' }}>{inv.academic_year} - {inv.term?.term_name || 'N/A'}</td>
+                <td style={{ padding: '1rem', fontWeight: 600 }}>{student?.first_name} {student?.last_name}</td>
+                <td style={{ padding: '1rem' }}>{inv.academic_year} - {term?.term_name || 'N/A'}</td>
                 <td style={{ padding: '1rem' }}>{new Date(inv.due_date).toLocaleDateString()}</td>
                 <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 600 }}>{formatTZS(inv.amount)}</td>
                 <td style={{ padding: '1rem', textAlign: 'center' }}>
@@ -89,7 +92,8 @@ export default async function ParentFeesPage() {
                   </span>
                 </td>
               </tr>
-            ))}
+              )
+            })}
             {invoices.length === 0 && (
               <tr>
                 <td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>

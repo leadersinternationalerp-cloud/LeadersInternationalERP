@@ -43,10 +43,12 @@ export default async function StudentFeesPage() {
             </tr>
           </thead>
           <tbody>
-            {(invoices || []).map((inv) => (
+            {(invoices || []).map((inv) => {
+              const term: any = Array.isArray(inv.term) ? inv.term[0] : inv.term
+              return (
               <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                 <td style={{ padding: '1rem', fontWeight: 600 }}>{inv.academic_year}</td>
-                <td style={{ padding: '1rem' }}>{inv.term?.term_name || 'N/A'}</td>
+                <td style={{ padding: '1rem' }}>{term?.term_name || 'N/A'}</td>
                 <td style={{ padding: '1rem' }}>{new Date(inv.due_date).toLocaleDateString()}</td>
                 <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 600 }}>{formatTZS(inv.amount)}</td>
                 <td style={{ padding: '1rem', textAlign: 'center' }}>
@@ -61,7 +63,8 @@ export default async function StudentFeesPage() {
                   </span>
                 </td>
               </tr>
-            ))}
+              )
+            })}
             {(!invoices || invoices.length === 0) && (
               <tr>
                 <td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>

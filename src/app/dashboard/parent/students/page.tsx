@@ -28,7 +28,7 @@ export default async function ParentStudentsPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
         {(relationships || []).map((rel) => {
-          const student = rel.student
+          const student: any = Array.isArray(rel.student) ? rel.student[0] : rel.student
           if (!student) return null
           
           return (
