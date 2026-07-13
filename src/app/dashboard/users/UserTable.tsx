@@ -144,118 +144,84 @@ export function UserTable({ users, currentUserId }: UserTableProps) {
 
   return (
     <>
-      <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px' }}>
-            <thead>
-              <tr style={{ backgroundColor: 'rgba(0,0,0,0.05)', borderBottom: '1px solid var(--color-border)' }}>
-                <th style={{ padding: '1rem' }}>Name</th>
-                <th style={{ padding: '1rem' }}>Username</th>
-                <th style={{ padding: '1rem' }}>Email</th>
-                <th style={{ padding: '1rem' }}>Role</th>
-                <th style={{ padding: '1rem' }}>Status</th>
-                <th style={{ padding: '1rem' }}>Joined</th>
-                <th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color var(--transition-fast)' }}>
-                  <td style={{ padding: '1rem', fontWeight: 500 }}>
-                    {u.first_name} {u.last_name}
-                  </td>
-                  <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{u.username || '-'}</td>
-                  <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{u.email}</td>
-                  <td style={{ padding: '1rem' }}>
+      <div className="table-wrapper">
+        <table style={{ width: '100%', minWidth: '800px' }}>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Joined</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((u) => (
+              <tr key={u.id}>
+                <td style={{ fontWeight: 500 }}>
+                  {u.first_name} {u.last_name}
+                </td>
+                <td>{u.username || '-'}</td>
+                <td>{u.email}</td>
+                <td>
+                  <span className={`badge ${u.role === 'System Admin' ? 'badge-accent' : 'badge-primary'}`}>
+                    {getRoleLabel(u.role)}
+                  </span>
+                </td>
+                <td>
+                  <span className={`badge ${u.is_active ? 'badge-success' : 'badge-error'}`}>
                     <span style={{
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '999px',
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      backgroundColor: u.role === 'System Admin' ? 'rgba(247, 178, 57, 0.15)' : 'rgba(59, 179, 195, 0.1)',
-                      color: u.role === 'System Admin' ? 'var(--color-accent)' : 'var(--color-secondary)'
-                    }}>
-                      {getRoleLabel(u.role)}
-                    </span>
-                  </td>
-                  <td style={{ padding: '1rem' }}>
-                    <span style={{ 
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.375rem',
-                      color: u.is_active ? 'var(--color-success)' : 'var(--color-error)', 
-                      fontWeight: 600 
-                    }}>
-                      <span style={{
-                        width: '6px',
-                        height: '6px',
-                        borderRadius: '50%',
-                        backgroundColor: u.is_active ? 'var(--color-success)' : 'var(--color-error)'
-                      }} />
-                      {u.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '1rem', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
-                    {formatDate(u.created_at)}
-                  </td>
-                  <td style={{ padding: '1rem', textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                      <button 
-                        onClick={() => openEditModal(u)}
-                        className="btn"
-                        style={{
-                          padding: '0.375rem 0.75rem',
-                          fontSize: '0.75rem',
-                          backgroundColor: 'rgba(59, 179, 195, 0.1)',
-                          color: 'var(--color-secondary)',
-                          border: '1px solid rgba(59, 179, 195, 0.2)'
-                        }}
-                      >
-                        Edit Details
-                      </button>
-                      <button 
-                        onClick={() => openResetPasswordModal(u)}
-                        className="btn"
-                        style={{
-                          padding: '0.375rem 0.75rem',
-                          fontSize: '0.75rem',
-                          backgroundColor: 'rgba(247, 178, 57, 0.1)',
-                          color: 'var(--color-accent)',
-                          border: '1px solid rgba(247, 178, 57, 0.2)'
-                        }}
-                      >
-                        Reset PW
-                      </button>
-                      <button 
-                        onClick={() => handleToggleStatus(u.id, u.is_active)}
-                        className="btn"
-                        disabled={isPending || u.id === currentUserId}
-                        style={{
-                          padding: '0.375rem 0.75rem',
-                          fontSize: '0.75rem',
-                          backgroundColor: u.is_active ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                          color: u.is_active ? 'var(--color-error)' : 'var(--color-success)',
-                          border: u.is_active ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
-                          opacity: u.id === currentUserId ? 0.5 : 1,
-                          cursor: u.id === currentUserId ? 'not-allowed' : 'pointer'
-                        }}
-                      >
-                        {isPending ? '...' : (u.is_active ? 'Suspend' : 'Reactivate')}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {users.length === 0 && (
-                <tr>
-                  <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                    No users found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      backgroundColor: 'currentColor'
+                    }} />
+                    {u.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </td>
+                <td style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+                  {formatDate(u.created_at)}
+                </td>
+                <td style={{ textAlign: 'right' }}>
+                  <div style={{ display: 'inline-flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                    <button 
+                      onClick={() => openEditModal(u)}
+                      className="btn btn-sm btn-outline-primary"
+                    >
+                      Edit Details
+                    </button>
+                    <button 
+                      onClick={() => openResetPasswordModal(u)}
+                      className="btn btn-sm btn-secondary"
+                    >
+                      Reset PIN
+                    </button>
+                    <button 
+                      onClick={() => handleToggleStatus(u.id, u.is_active)}
+                      className={`btn btn-sm ${u.is_active ? 'btn-danger' : 'btn-success'}`}
+                      disabled={isPending || u.id === currentUserId}
+                      style={{
+                        opacity: u.id === currentUserId ? 0.5 : 1,
+                        cursor: u.id === currentUserId ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {isPending ? '...' : (u.is_active ? 'Suspend' : 'Reactivate')}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {users.length === 0 && (
+              <tr>
+                <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                  No users found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* Edit Details Modal */}

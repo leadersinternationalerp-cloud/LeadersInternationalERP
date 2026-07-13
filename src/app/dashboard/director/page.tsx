@@ -72,77 +72,83 @@ export default async function DirectorDashboardPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      <div>
-        <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)', margin: 0 }}>Director Overview</h1>
-        <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-          Executive summary of school operations, finances, and administration.
-        </p>
+    <div className="animate-fade-up" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      
+      {/* Page Header */}
+      <div className="page-header">
+        <div>
+          <h1 style={{ fontSize: '1.85rem', color: 'var(--color-primary)', margin: 0 }}>Director Overview</h1>
+          <p className="page-subtitle">
+            Executive summary of school operations, finances, and administration.
+          </p>
+        </div>
       </div>
 
       {/* Summary Cards Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
-        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ padding: '1rem', backgroundColor: 'rgba(59, 179, 195, 0.1)', borderRadius: 'var(--radius-md)' }}>
-            <UsersRound size={28} color="var(--color-primary)" />
+      <div className="grid-auto stagger-children">
+        <div className="stat-card animate-fade-up">
+          <div className="stat-icon" style={{ backgroundColor: 'rgba(59, 179, 195, 0.1)' }}>
+            <UsersRound size={20} color="var(--color-secondary)" />
           </div>
-          <div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Total Students</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-text)' }}>{totalStudents || 0}</div>
-          </div>
+          <span className="stat-label">Total Students</span>
+          <span className="stat-value" style={{ color: 'var(--color-secondary)' }}>{totalStudents || 0}</span>
         </div>
 
-        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ padding: '1rem', backgroundColor: 'rgba(59, 179, 195, 0.1)', borderRadius: 'var(--radius-md)' }}>
-            <Users size={28} color="var(--color-primary)" />
+        <div className="stat-card animate-fade-up">
+          <div className="stat-icon" style={{ backgroundColor: 'rgba(0, 38, 75, 0.08)' }}>
+            <Users size={20} color="var(--color-primary)" />
           </div>
-          <div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Total Staff</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-text)' }}>{totalStaff || 0}</div>
-          </div>
+          <span className="stat-label">Total Staff</span>
+          <span className="stat-value" style={{ color: 'var(--color-primary)' }}>{totalStaff || 0}</span>
         </div>
 
-        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ padding: '1rem', backgroundColor: 'rgba(59, 179, 195, 0.1)', borderRadius: 'var(--radius-md)' }}>
-            <Wallet size={28} color="var(--color-primary)" />
+        <div className="stat-card animate-fade-up">
+          <div className="stat-icon" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)' }}>
+            <Wallet size={20} color="var(--color-success)" />
           </div>
-          <div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Fees Collected</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-text)' }}>{formatCurrency(feesCollected)}</div>
-          </div>
+          <span className="stat-label">Fees Collected</span>
+          <span className="stat-value" style={{ color: 'var(--color-success)' }}>{formatCurrency(feesCollected)}</span>
         </div>
 
-        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ padding: '1rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 'var(--radius-md)' }}>
-            <DollarSign size={28} color="var(--color-error)" />
+        <div className="stat-card animate-fade-up">
+          <div className="stat-icon" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)' }}>
+            <DollarSign size={20} color="var(--color-error)" />
           </div>
-          <div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Outstanding Fees</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-error)' }}>{formatCurrency(feesOutstanding)}</div>
-          </div>
+          <span className="stat-label">Outstanding Fees</span>
+          <span className="stat-value" style={{ color: 'var(--color-error)' }}>{formatCurrency(feesOutstanding)}</span>
         </div>
       </div>
 
       {/* Quick Action Links */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
-        <Link href="/dashboard/director/attendance" className="glass-panel" style={{ padding: '1rem', textAlign: 'center', textDecoration: 'none', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-          <CheckCircle size={24} color="var(--color-primary)" />
+      <div className="grid-auto" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+        <Link href="/dashboard/director/attendance" className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center', textDecoration: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', transition: 'all 0.2s' }}>
+          <div style={{ padding: '0.5rem', borderRadius: '50%', backgroundColor: 'rgba(59, 179, 195, 0.1)' }}>
+            <CheckCircle size={22} color="var(--color-secondary)" />
+          </div>
           <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text)' }}>Staff Attendance</span>
         </Link>
-        <Link href="/dashboard/director/finance" className="glass-panel" style={{ padding: '1rem', textAlign: 'center', textDecoration: 'none', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-          <LineChart size={24} color="var(--color-success)" />
+        <Link href="/dashboard/director/finance" className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center', textDecoration: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', transition: 'all 0.2s' }}>
+          <div style={{ padding: '0.5rem', borderRadius: '50%', backgroundColor: 'rgba(16, 185, 129, 0.1)' }}>
+            <LineChart size={22} color="var(--color-success)" />
+          </div>
           <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text)' }}>Financial Overview</span>
         </Link>
-        <Link href="/dashboard/director/payrolls" className="glass-panel" style={{ padding: '1rem', textAlign: 'center', textDecoration: 'none', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-          <Banknote size={24} color="var(--color-accent)" />
+        <Link href="/dashboard/director/payrolls" className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center', textDecoration: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', transition: 'all 0.2s' }}>
+          <div style={{ padding: '0.5rem', borderRadius: '50%', backgroundColor: 'rgba(247, 178, 57, 0.1)' }}>
+            <Banknote size={22} color="var(--color-accent)" />
+          </div>
           <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text)' }}>Manage Payrolls</span>
         </Link>
-        <Link href="/dashboard/director/applications" className="glass-panel" style={{ padding: '1rem', textAlign: 'center', textDecoration: 'none', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-          <FileText size={24} color="var(--color-warning)" />
+        <Link href="/dashboard/director/applications" className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center', textDecoration: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', transition: 'all 0.2s' }}>
+          <div style={{ padding: '0.5rem', borderRadius: '50%', backgroundColor: 'rgba(245, 158, 11, 0.1)' }}>
+            <FileText size={22} color="var(--color-warning)" />
+          </div>
           <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text)' }}>Self-Service Inbox</span>
         </Link>
-        <Link href="/dashboard/accountant/accounting/statements" className="glass-panel" style={{ padding: '1rem', textAlign: 'center', textDecoration: 'none', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-          <Wallet size={24} color="var(--color-primary)" />
+        <Link href="/dashboard/accountant/accounting/statements" className="glass-panel" style={{ padding: '1.25rem', textAlign: 'center', textDecoration: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', transition: 'all 0.2s' }}>
+          <div style={{ padding: '0.5rem', borderRadius: '50%', backgroundColor: 'rgba(0, 38, 75, 0.08)' }}>
+            <Wallet size={22} color="var(--color-primary)" />
+          </div>
           <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text)' }}>Financial Statements</span>
         </Link>
       </div>

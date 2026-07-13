@@ -46,10 +46,15 @@ export default async function UsersPage() {
   }))
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '1.75rem' }}>User Management</h1>
-        <CreateUserForm />
+    <div className="animate-fade-up">
+      <div className="page-header">
+        <div>
+          <h1 style={{ fontSize: '1.85rem', color: 'var(--color-primary)', margin: 0 }}>User Management</h1>
+          <p className="page-subtitle">Manage internal system access, credentials, system roles, and account status.</p>
+        </div>
+        <div className="page-actions">
+          <CreateUserForm />
+        </div>
       </div>
 
       <UserTable users={typedUsers} currentUserId={user?.id} />
