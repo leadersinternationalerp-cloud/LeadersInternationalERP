@@ -451,6 +451,9 @@ export default function DashboardLayoutClient({
               <Link href="/dashboard/parent/students" style={linkStyle('/dashboard/parent/students')} onClick={() => setSidebarOpen(false)}>
                 My Children
               </Link>
+              <Link href="/dashboard/parent/report-card" style={linkStyle('/dashboard/parent/report-card')} onClick={() => setSidebarOpen(false)}>
+                Academic Reports
+              </Link>
               <Link href="/dashboard/parent/fees" style={linkStyle('/dashboard/parent/fees')} onClick={() => setSidebarOpen(false)}>
                 Fee Invoices
               </Link>

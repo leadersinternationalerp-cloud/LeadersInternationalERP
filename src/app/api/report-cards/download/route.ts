@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     if (userRoles.includes('System Admin') || userRoles.includes('Principal') || userRoles.includes('Teacher')) {
       isAuthorized = true
     } else {
-      const { data: rel } = await supabase.from('student_relationships').select('id').eq('parent_id', user.id).eq('student_id', student_id).single()
+      const { data: rel } = await supabase.from('student_parents').select('id').eq('parent_id', user.id).eq('student_id', student_id).single()
       if (rel) isAuthorized = true
     }
   }
@@ -74,7 +74,7 @@ export async function GET(request: Request) {
   const getGrade = (score: number) => {
     if (!boundaries || boundaries.length === 0) return 'N/A'
     for (const b of boundaries) {
-      if (score >= b.min_score) return b.grade
+      if (score >= b.min_score) return b.grade_label
     }
     return 'F'
   }
