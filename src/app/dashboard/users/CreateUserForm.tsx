@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useActionState } from 'react'
+import { useState, useActionState, useEffect } from 'react'
 import { createUserAction } from './actions'
 
 export type FormState = {
@@ -16,12 +16,16 @@ const initialState: FormState = {
 export function CreateUserForm() {
   const [isOpen, setIsOpen] = useState(false)
   const [state, formAction, isPending] = useActionState(createUserAction, initialState)
+  const [selectedRole, setSelectedRole] = useState('Teacher')
 
   // Reset form when success
   if (state.success && isOpen) {
     setIsOpen(false)
     state.success = false
+    setSelectedRole('Teacher')
   }
+
+  const isSystemAdmin = selectedRole === 'System Admin'
 
   return (
     <>
@@ -64,14 +68,14 @@ export function CreateUserForm() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Password / PIN</label>
-                <input type="password" name="password" className="input-field" required minLength={6} />
+                <label className="form-label">Username</label>
+                <input type="text" name="username" className="input-field" required placeholder="e.g. tr.john" />
               </div>
 
               <div className="form-group">
                 <label className="form-label">Role</label>
-                <select name="role" className="input-field" required>
-                  <option value="System Admin">Admin</option>
+                <select name="role" className="input-field" required value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)}>
+                  <option value="System Admin">System Admin</option>
                   <option value="Director">Director</option>
                   <option value="Principal">Principal</option>
                   <option value="Accountant">Accountant</option>
@@ -80,6 +84,15 @@ export function CreateUserForm() {
                   <option value="Dean">Dean</option>
                   <option value="Head of Section">Head of Section</option>
                 </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">{isSystemAdmin ? 'Password' : 'PIN'}</label>
+                {isSystemAdmin ? (
+                  <input type="password" name="password" className="input-field" required minLength={6} placeholder="Enter a secure password" />
+                ) : (
+                  <input type="password" name="password" className="input-field" required pattern="\d{6,10}" title="PIN must be a 6 to 10 digit number" placeholder="6-10 digit PIN" />
+                )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>

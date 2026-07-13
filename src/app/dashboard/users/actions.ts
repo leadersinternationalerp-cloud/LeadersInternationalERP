@@ -26,12 +26,13 @@ export async function createUserAction(prevState: FormState, formData: FormData)
   )
 
   const email = formData.get('email') as string
+  const username = formData.get('username') as string
   const password = formData.get('password') as string
   const first_name = formData.get('first_name') as string
   const last_name = formData.get('last_name') as string
   const role = formData.get('role') as string
 
-  if (!email || !password || !first_name || !last_name || !role) {
+  if (!email || !username || !password || !first_name || !last_name || !role) {
     return { error: 'All fields are required' }
   }
 
@@ -57,6 +58,14 @@ export async function createUserAction(prevState: FormState, formData: FormData)
       throw new Error('Access denied: Insufficient permissions')
     }
 
+    // PIN Validation for non-System Admins
+    if (role !== 'System Admin') {
+      const pinRegex = /^\d{6,10}$/
+      if (!pinRegex.test(password)) {
+        throw new Error('PIN must be a numeric code between 6 and 10 digits')
+      }
+    }
+
     // 1. Create the user in Supabase Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -65,7 +74,8 @@ export async function createUserAction(prevState: FormState, formData: FormData)
       user_metadata: {
         first_name,
         last_name,
-        role
+        role,
+        username
       }
     })
 
@@ -80,6 +90,7 @@ export async function createUserAction(prevState: FormState, formData: FormData)
         first_name,
         last_name,
         email,
+        username,
         role,
         roles: role.split(',').map((r: string) => r.trim()),
         is_active: true
@@ -110,7 +121,8 @@ export async function updateUserAction(
   first_name: string,
   last_name: string,
   role: string,
-  email: string
+  email: string,
+  username?: string
 ): Promise<{ success: boolean; error: string | null }> {
   // 1. Authorize: Check if the caller is an Admin or Director
   const supabase = await createServerClient()
@@ -151,13 +163,14 @@ export async function updateUserAction(
   )
 
   try {
-    // 2. Update user in Supabase Auth (role / email changes need admin bypass)
+    // 2. Update user in Supabase Auth (role / email / username changes need admin bypass)
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
       email,
       user_metadata: {
         first_name,
         last_name,
-        role
+        role,
+        ...(username ? { username } : {})
       },
       email_confirm: true
     })
@@ -165,15 +178,21 @@ export async function updateUserAction(
     if (authError) throw authError
 
     // 3. Update profiles table
+    const updateData: any = {
+      first_name,
+      last_name,
+      role,
+      roles: role.split(',').map((r: string) => r.trim()),
+      email
+    }
+    
+    if (username) {
+      updateData.username = username
+    }
+
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .update({
-        first_name,
-        last_name,
-        role,
-        roles: role.split(',').map((r: string) => r.trim()),
-        email
-      })
+      .update(updateData)
       .eq('id', userId)
 
     if (profileError) throw profileError

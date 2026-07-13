@@ -32,6 +32,7 @@ export function UserTable({ users, currentUserId }: UserTableProps) {
   const [editFirstName, setEditFirstName] = useState('')
   const [editLastName, setEditLastName] = useState('')
   const [editEmail, setEditEmail] = useState('')
+  const [editUsername, setEditUsername] = useState('')
   const [editRole, setEditRole] = useState('')
   const [editError, setEditError] = useState<string | null>(null)
   const [isEditingPending, setIsEditingPending] = useState(false)
@@ -64,6 +65,7 @@ export function UserTable({ users, currentUserId }: UserTableProps) {
     setEditFirstName(user.first_name)
     setEditLastName(user.last_name)
     setEditEmail(user.email)
+    setEditUsername(user.username || '')
     setEditRole(user.role)
     setEditError(null)
   }
@@ -81,7 +83,8 @@ export function UserTable({ users, currentUserId }: UserTableProps) {
       editFirstName,
       editLastName,
       editRole,
-      editEmail
+      editEmail,
+      editUsername
     )
 
     setIsEditingPending(false)
@@ -304,15 +307,27 @@ export function UserTable({ users, currentUserId }: UserTableProps) {
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Email Address</label>
-                <input 
-                  type="email" 
-                  value={editEmail} 
-                  onChange={(e) => setEditEmail(e.target.value)} 
-                  className="input-field" 
-                  required 
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Email Address</label>
+                  <input 
+                    type="email" 
+                    value={editEmail} 
+                    onChange={(e) => setEditEmail(e.target.value)} 
+                    className="input-field" 
+                    required 
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Username</label>
+                  <input 
+                    type="text" 
+                    value={editUsername} 
+                    onChange={(e) => setEditUsername(e.target.value)} 
+                    className="input-field" 
+                    required 
+                  />
+                </div>
               </div>
 
               <div className="form-group">
