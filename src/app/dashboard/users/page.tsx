@@ -39,6 +39,7 @@ export default async function UsersPage() {
     first_name: u.first_name || '',
     last_name: u.last_name || '',
     email: u.email || '',
+    username: u.username || '',
     role: u.role || '',
     is_active: u.is_active ?? true,
     created_at: u.created_at

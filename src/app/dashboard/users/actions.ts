@@ -307,12 +307,40 @@ export async function resetUserPasswordAction(
   )
 
   try {
+    // Check target user's role to enforce PIN constraints
+    const { data: targetProfile } = await supabaseAdmin.from('profiles').select('roles, role').eq('id', userId).single()
+    const targetRoles = targetProfile?.roles && Array.isArray(targetProfile.roles) && targetProfile.roles.length > 0
+      ? targetProfile.roles
+      : (targetProfile?.role ? targetProfile.role.split(',').map((r: string) => r.trim()) : [])
+    
+    const isTargetSystemAdmin = targetRoles.includes('System Admin')
+
+    if (!isTargetSystemAdmin) {
+      const pinRegex = /^[0-9]{6,10}$/
+      if (!pinRegex.test(password)) {
+        throw new Error('PIN must be a numeric code between 6 and 10 digits')
+      }
+    } else {
+      if (password.length < 6) {
+        throw new Error('Password must be at least 6 characters long')
+      }
+    }
+
     // 2. Reset user password directly
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
       password
     })
 
     if (authError) throw authError
+
+    // Also update pin_hash
+    let pinHash = null
+    if (!isTargetSystemAdmin) {
+      const crypto = require('crypto')
+      pinHash = crypto.createHash('sha256').update(password).digest('hex')
+    }
+
+    await supabaseAdmin.from('profiles').update({ pin_hash: pinHash }).eq('id', userId)
 
     // 3. Log Audit
     await logAuditAction(

@@ -147,6 +147,7 @@ export function UserTable({ users, currentUserId }: UserTableProps) {
             <thead>
               <tr style={{ backgroundColor: 'rgba(0,0,0,0.05)', borderBottom: '1px solid var(--color-border)' }}>
                 <th style={{ padding: '1rem' }}>Name</th>
+                <th style={{ padding: '1rem' }}>Username</th>
                 <th style={{ padding: '1rem' }}>Email</th>
                 <th style={{ padding: '1rem' }}>Role</th>
                 <th style={{ padding: '1rem' }}>Status</th>
@@ -160,6 +161,7 @@ export function UserTable({ users, currentUserId }: UserTableProps) {
                   <td style={{ padding: '1rem', fontWeight: 500 }}>
                     {u.first_name} {u.last_name}
                   </td>
+                  <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{u.username || '-'}</td>
                   <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{u.email}</td>
                   <td style={{ padding: '1rem' }}>
                     <span style={{
@@ -406,7 +408,9 @@ export function UserTable({ users, currentUserId }: UserTableProps) {
                   className="input-field" 
                   required 
                   minLength={6}
-                  placeholder="At least 6 characters"
+                  placeholder={resetPasswordUser?.role !== 'System Admin' ? "6-10 digit PIN" : "At least 6 characters"}
+                  pattern={resetPasswordUser?.role !== 'System Admin' ? "\\d{6,10}" : undefined}
+                  title={resetPasswordUser?.role !== 'System Admin' ? "Must be 6-10 numeric digits" : undefined}
                 />
               </div>
 
@@ -419,7 +423,8 @@ export function UserTable({ users, currentUserId }: UserTableProps) {
                   className="input-field" 
                   required 
                   minLength={6}
-                  placeholder="Re-enter password"
+                  placeholder={resetPasswordUser?.role !== 'System Admin' ? "Re-enter PIN" : "Re-enter password"}
+                  pattern={resetPasswordUser?.role !== 'System Admin' ? "\\d{6,10}" : undefined}
                 />
               </div>
 
