@@ -242,7 +242,7 @@ export async function directorReviewPayrollAction(payrollId: string, approve: bo
       .update({ status: 'Paid' })
       .eq('month', payroll.month)
       .eq('year', payroll.year)
-      .select('net_pay, details')
+      .select('net_salary, details')
 
     if (payslipsError) {
       console.error('Failed to update individual payslips to Paid:', payslipsError.message)
@@ -290,7 +290,7 @@ export async function directorReviewPayrollAction(payrollId: string, approve: bo
         let totalZssf = 0
 
         for (const slip of payslips) {
-          totalNet += Number(slip.net_pay || 0)
+          totalNet += Number(slip.net_salary || 0)
           const details = typeof slip.details === 'string' ? JSON.parse(slip.details) : slip.details
           if (details?.deductions) {
             const paye = details.deductions.find((d: any) => d.name === 'PAYE')

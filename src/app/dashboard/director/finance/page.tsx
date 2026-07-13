@@ -138,6 +138,20 @@ export default async function DirectorFinancePage() {
         </div>
       </div>
 
+
+      {/* Accounting Suite Quick Links */}
+      <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)', marginBottom: '2.5rem' }}>
+        <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: 'var(--color-primary)' }}>Accounting Suite (View-Only)</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
+          <a href="/dashboard/accountant/expenses" className="btn" style={{ textAlign: 'center', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}>Expenses</a>
+          <a href="/dashboard/accountant/accounting/bills" className="btn" style={{ textAlign: 'center', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}>Bills</a>
+          <a href="/dashboard/accountant/accounting/coa" className="btn" style={{ textAlign: 'center', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}>Chart of Accounts</a>
+          <a href="/dashboard/accountant/accounting/journals" className="btn" style={{ textAlign: 'center', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}>Journals</a>
+          <a href="/dashboard/accountant/accounting/deposits" className="btn" style={{ textAlign: 'center', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}>Deposits</a>
+          <a href="/dashboard/accountant/accounting/statements" className="btn" style={{ textAlign: 'center', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}>Statements</a>
+        </div>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
         {/* Recent Collections */}
         <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>

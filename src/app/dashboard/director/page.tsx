@@ -123,6 +123,30 @@ export default async function DirectorDashboardPage() {
         </div>
       </div>
 
+      {/* Quick Action Links */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+        <Link href="/dashboard/director/attendance" className="glass-panel" style={{ padding: '1rem', textAlign: 'center', textDecoration: 'none', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+          <CheckCircle size={24} color="var(--color-primary)" />
+          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text)' }}>Staff Attendance</span>
+        </Link>
+        <Link href="/dashboard/director/finance" className="glass-panel" style={{ padding: '1rem', textAlign: 'center', textDecoration: 'none', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+          <LineChart size={24} color="var(--color-success)" />
+          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text)' }}>Financial Overview</span>
+        </Link>
+        <Link href="/dashboard/director/payrolls" className="glass-panel" style={{ padding: '1rem', textAlign: 'center', textDecoration: 'none', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+          <Banknote size={24} color="var(--color-accent)" />
+          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text)' }}>Manage Payrolls</span>
+        </Link>
+        <Link href="/dashboard/director/applications" className="glass-panel" style={{ padding: '1rem', textAlign: 'center', textDecoration: 'none', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+          <FileText size={24} color="var(--color-warning)" />
+          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text)' }}>Self-Service Inbox</span>
+        </Link>
+        <Link href="/dashboard/accountant/accounting/statements" className="glass-panel" style={{ padding: '1rem', textAlign: 'center', textDecoration: 'none', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+          <Wallet size={24} color="var(--color-primary)" />
+          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text)' }}>Financial Statements</span>
+        </Link>
+      </div>
+
       {/* Widgets Row 1 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.5rem' }}>
         

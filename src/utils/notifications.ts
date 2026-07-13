@@ -239,6 +239,7 @@ export async function triggerLeaveSubmitted(leaveId: string) {
 
       if (manager.phone) {
         await sendSMS(manager.phone, message)
+        await sendWhatsApp(manager.phone, message)
       }
 
       if (manager.email) {
@@ -303,6 +304,7 @@ export async function triggerLeaveReviewed(leaveId: string) {
 
     if (employeeProfile.phone) {
       await sendSMS(employeeProfile.phone, message)
+      await sendWhatsApp(employeeProfile.phone, message)
     }
 
     if (employeeProfile.email) {
@@ -370,6 +372,7 @@ export async function triggerSalaryAdvanceSubmitted(advanceId: string) {
 
       if (accountant.phone) {
         await sendSMS(accountant.phone, message)
+        await sendWhatsApp(accountant.phone, message)
       }
 
       if (accountant.email) {
@@ -387,6 +390,49 @@ export async function triggerSalaryAdvanceSubmitted(advanceId: string) {
           </div>
         `
         await sendEmail(accountant.email, 'New Salary Advance Request Submission', emailHtml)
+      }
+    }
+  }
+
+  // If the applicant is a Principal, also notify Directors
+  const employeeRole = (advance.employee as any)?.profiles?.role
+  const employeeRolesArr = (advance.employee as any)?.profiles?.roles
+  const isPrincipal = employeeRole === 'Principal' || (Array.isArray(employeeRolesArr) && employeeRolesArr.includes('Principal'))
+  
+  if (isPrincipal) {
+    const { data: directors } = await supabase
+      .from('profiles')
+      .select('id, phone, email, first_name, last_name')
+      .eq('role', 'Director')
+      
+    if (directors) {
+      for (const director of directors) {
+        await supabase.from('notifications').insert({
+          user_id: director.id,
+          message: `Principal ${employeeName} has submitted a salary advance request for ${formattedAmount}.`,
+          link_url: `/dashboard/director/applications`
+        })
+        
+        if (director.phone) {
+          await sendSMS(director.phone, `Principal ${employeeName} has submitted a salary advance request for ${formattedAmount}.`)
+          await sendWhatsApp(director.phone, `Principal ${employeeName} has submitted a salary advance request for ${formattedAmount}.`)
+        }
+        
+        if (director.email) {
+          const directorName = `${director.first_name || 'Director'}`
+          const emailHtml = `
+            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.6;">
+              <h2 style="color: #3bb3c3;">Principal Salary Advance Request</h2>
+              <p>Dear ${directorName},</p>
+              <p>Principal <strong>${employeeName}</strong> has submitted a salary advance request for <strong>${formattedAmount}</strong>.</p>
+              <p>Please log in to the ERP portal to review and approve/decline.</p>
+              <br/>
+              <p>Best regards,</p>
+              <p><strong>Leaders International School ERP</strong></p>
+            </div>
+          `
+          await sendEmail(director.email, 'Principal Salary Advance Request', emailHtml)
+        }
       }
     }
   }
@@ -431,6 +477,7 @@ export async function triggerSalaryAdvanceDisbursed(advanceId: string) {
 
     if (employeeProfile.phone) {
       await sendSMS(employeeProfile.phone, message)
+      await sendWhatsApp(employeeProfile.phone, message)
     }
 
     if (employeeProfile.email) {
@@ -470,30 +517,32 @@ export async function triggerPayrollProposed(payrollId: string) {
   const monthName = months[payroll.month - 1]
   const message = `Accountant has proposed a new payroll draft for ${monthName} ${payroll.year} for review.`
 
-  // Notify Principals with email
-  const { data: principals } = await supabase
+  // Notify Principals and Directors
+  const { data: managers } = await supabase
     .from('profiles')
-    .select('id, phone, email, first_name, last_name')
-    .eq('role', 'Principal')
+    .select('id, phone, email, role, first_name, last_name')
+    .in('role', ['Principal', 'Director'])
 
-  if (principals) {
-    for (const principal of principals) {
+  if (managers) {
+    for (const manager of managers) {
+      const linkUrl = manager.role === 'Director' ? `/dashboard/director/payrolls` : `/dashboard/principal/payrolls`
       await supabase.from('notifications').insert({
-        user_id: principal.id,
+        user_id: manager.id,
         message,
-        link_url: `/dashboard/principal/payrolls`
+        link_url: linkUrl
       })
 
-      if (principal.phone) {
-        await sendSMS(principal.phone, message)
+      if (manager.phone) {
+        await sendSMS(manager.phone, message)
+        await sendWhatsApp(manager.phone, message)
       }
 
-      if (principal.email) {
-        const principalName = `${principal.first_name || 'Principal'}`
+      if (manager.email) {
+        const managerName = `${manager.first_name || manager.role}`
         const emailHtml = `
           <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.6;">
             <h2 style="color: #3bb3c3;">Payroll Draft Proposed</h2>
-            <p>Dear ${principalName},</p>
+            <p>Dear ${managerName},</p>
             <p>${message}</p>
             <p>Please log in to the portal to review the payroll details.</p>
             <br/>
@@ -501,7 +550,7 @@ export async function triggerPayrollProposed(payrollId: string) {
             <p><strong>Leaders International School ERP</strong></p>
           </div>
         `
-        await sendEmail(principal.email, `Payroll Proposed: ${monthName} ${payroll.year}`, emailHtml)
+        await sendEmail(manager.email, `Payroll Proposed: ${monthName} ${payroll.year}`, emailHtml)
       }
     }
   }
@@ -543,6 +592,7 @@ export async function triggerPayrollReviewedPrincipal(payrollId: string, approve
 
       if (accountant.phone) {
         await sendSMS(accountant.phone, messageToAccountant)
+        await sendWhatsApp(accountant.phone, messageToAccountant)
       }
 
       if (accountant.email) {
@@ -579,6 +629,7 @@ export async function triggerPayrollReviewedPrincipal(payrollId: string, approve
 
         if (director.phone) {
           await sendSMS(director.phone, messageToDirector)
+          await sendWhatsApp(director.phone, messageToDirector)
         }
 
         if (director.email) {
@@ -637,6 +688,7 @@ export async function triggerPayrollReviewedDirector(payrollId: string, approve:
 
       if (manager.phone) {
         await sendSMS(manager.phone, message)
+        await sendWhatsApp(manager.phone, message)
       }
 
       if (manager.email) {

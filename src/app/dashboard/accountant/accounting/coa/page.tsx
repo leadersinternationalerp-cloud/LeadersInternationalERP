@@ -4,6 +4,18 @@ import { revalidatePath } from 'next/cache'
 export default async function ChartOfAccountsPage() {
   const supabase = await createClient()
 
+  // Verify access
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, roles')
+    .eq('id', user?.id)
+    .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const isAccountant = userRoles.includes('Accountant') || userRoles.includes('System Admin')
+
   const { data: accounts } = await supabase
     .from('chart_of_accounts')
     .select('*')
@@ -37,7 +49,7 @@ export default async function ChartOfAccountsPage() {
         <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)' }}>Chart of Accounts</h1>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isAccountant ? '1fr 300px' : '1fr', gap: '2rem', alignItems: 'start' }}>
         
         {/* Account List */}
         <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
@@ -93,37 +105,39 @@ export default async function ChartOfAccountsPage() {
         </div>
 
         {/* Add Account Form */}
-        <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
-          <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>Add Account</h2>
-          <form action={addAccountAction} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Account Code</label>
-              <input type="text" name="code" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} placeholder="e.g. 5220" />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Account Name</label>
-              <input type="text" name="name" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} placeholder="e.g. Advertising Expense" />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Type</label>
-              <select name="account_type" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                <option value="ASSET">ASSET</option>
-                <option value="LIABILITY">LIABILITY</option>
-                <option value="EQUITY">EQUITY</option>
-                <option value="REVENUE">REVENUE</option>
-                <option value="EXPENSE">EXPENSE</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Normal Balance</label>
-              <select name="normal_balance" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                <option value="DEBIT">DEBIT</option>
-                <option value="CREDIT">CREDIT</option>
-              </select>
-            </div>
-            <button type="submit" className="btn-primary" style={{ marginTop: '0.5rem' }}>Add Account</button>
-          </form>
-        </div>
+        {isAccountant && (
+          <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
+            <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>Add Account</h2>
+            <form action={addAccountAction} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Account Code</label>
+                <input type="text" name="code" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} placeholder="e.g. 5220" />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Account Name</label>
+                <input type="text" name="name" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} placeholder="e.g. Advertising Expense" />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Type</label>
+                <select name="account_type" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                  <option value="ASSET">ASSET</option>
+                  <option value="LIABILITY">LIABILITY</option>
+                  <option value="EQUITY">EQUITY</option>
+                  <option value="REVENUE">REVENUE</option>
+                  <option value="EXPENSE">EXPENSE</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Normal Balance</label>
+                <select name="normal_balance" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                  <option value="DEBIT">DEBIT</option>
+                  <option value="CREDIT">CREDIT</option>
+                </select>
+              </div>
+              <button type="submit" className="btn-primary" style={{ marginTop: '0.5rem' }}>Add Account</button>
+            </form>
+          </div>
+        )}
 
       </div>
     </div>

@@ -128,6 +128,26 @@ export default async function DirectorAttendanceReportsPage({
     }
   })
 
+  // Individual staff trends
+  const staffTrends: Record<string, { name: string; present: number; late: number; absent: number; excused: number; total: number; role: string }> = {}
+  if (viewType === 'staff') {
+    filteredRecords.forEach(r => {
+      const name = r.profiles ? `${r.profiles.first_name} ${r.profiles.last_name}` : 'Unknown'
+      if (!staffTrends[name]) {
+        staffTrends[name] = { name, present: 0, late: 0, absent: 0, excused: 0, total: 0, role: r.profiles?.role || 'Staff' }
+      }
+      staffTrends[name].total++
+      if (r.status === 'Present') staffTrends[name].present++
+      if (r.status === 'Late') staffTrends[name].late++
+      if (r.status === 'Absent') staffTrends[name].absent++
+      if (r.status === 'Excused') staffTrends[name].excused++
+    })
+  }
+  const staffTrendList = Object.values(staffTrends).map(t => ({
+    ...t,
+    rate: t.total > 0 ? Math.round(((t.present + t.late) / t.total) * 100) : 0
+  })).sort((a, b) => b.rate - a.rate)
+
   return (
     <div>
       <h1 style={{ fontSize: '1.75rem', marginBottom: '1.5rem', color: 'var(--color-primary)' }}>
@@ -208,6 +228,50 @@ export default async function DirectorAttendanceReportsPage({
       </div>
 
       {/* Attendance Trends & Detail Table Grid */}
+      {viewType === 'staff' && dateRange !== 'daily' && staffTrendList.length > 0 && (
+        <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', marginBottom: '2rem' }}>
+          <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)', backgroundColor: 'rgba(0,0,0,0.02)', fontWeight: 600 }}>
+            Individual Staff Attendance Summaries ({dateRange})
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'rgba(0,0,0,0.01)' }}>
+                  <th style={{ padding: '1rem' }}>Staff Name</th>
+                  <th style={{ padding: '1rem' }}>Role</th>
+                  <th style={{ padding: '1rem', textAlign: 'center' }}>Present</th>
+                  <th style={{ padding: '1rem', textAlign: 'center' }}>Late</th>
+                  <th style={{ padding: '1rem', textAlign: 'center' }}>Absent</th>
+                  <th style={{ padding: '1rem', textAlign: 'center' }}>Excused</th>
+                  <th style={{ padding: '1rem', textAlign: 'right' }}>Attendance Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {staffTrendList.map((staff) => (
+                  <tr key={staff.name} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                    <td style={{ padding: '1rem', fontWeight: 600 }}>{staff.name}</td>
+                    <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{staff.role}</td>
+                    <td style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-success)', fontWeight: 600 }}>{staff.present}</td>
+                    <td style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-warning)', fontWeight: 600 }}>{staff.late}</td>
+                    <td style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-error)', fontWeight: 600 }}>{staff.absent}</td>
+                    <td style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-primary)' }}>{staff.excused}</td>
+                    <td style={{ padding: '1rem', textAlign: 'right' }}>
+                      <span style={{
+                        padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', fontWeight: 700,
+                        backgroundColor: staff.rate >= 90 ? 'rgba(16, 185, 129, 0.1)' : staff.rate >= 75 ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                        color: staff.rate >= 90 ? 'var(--color-success)' : staff.rate >= 75 ? 'var(--color-warning)' : 'var(--color-error)'
+                      }}>
+                        {staff.rate}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: trends.length > 0 ? '1.5fr 1fr' : '1fr', gap: '2rem', alignItems: 'start', marginBottom: '2rem' }}>
         {/* Detail Records List */}
         <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>

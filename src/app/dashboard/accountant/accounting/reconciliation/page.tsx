@@ -13,6 +13,8 @@ export default async function BankReconciliationPage() {
     return <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}><h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2></div>
   }
 
+  const isAccountant = userRoles.includes('Accountant') || userRoles.includes('System Admin')
+
   // Fetch pending and reconciled bank statements
   const { data: reconciliations } = await supabase
     .from('bank_reconciliations')
@@ -65,7 +67,7 @@ export default async function BankReconciliationPage() {
         <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)' }}>Bank Reconciliation</h1>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '2rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isAccountant ? '1fr 350px' : '1fr', gap: '2rem', alignItems: 'start' }}>
         
         {/* Reconciliations List */}
         <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
@@ -78,7 +80,7 @@ export default async function BankReconciliationPage() {
                 <th style={{ textAlign: 'right', padding: '1rem', fontWeight: 600 }}>System Bal</th>
                 <th style={{ textAlign: 'right', padding: '1rem', fontWeight: 600 }}>Difference</th>
                 <th style={{ textAlign: 'center', padding: '1rem', fontWeight: 600 }}>Status</th>
-                <th style={{ textAlign: 'center', padding: '1rem', fontWeight: 600 }}>Actions</th>
+                {isAccountant && <th style={{ textAlign: 'center', padding: '1rem', fontWeight: 600 }}>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -102,19 +104,21 @@ export default async function BankReconciliationPage() {
                       {recon.status}
                     </span>
                   </td>
-                  <td style={{ padding: '1rem', textAlign: 'center' }}>
-                    {recon.status === 'DRAFT' && recon.difference === 0 && (
-                      <form action={markReconciledAction}>
-                        <input type="hidden" name="id" value={recon.id} />
-                        <button type="submit" className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', borderColor: 'var(--color-success)', color: 'var(--color-success)' }}>Reconcile</button>
-                      </form>
-                    )}
-                  </td>
+                  {isAccountant && (
+                    <td style={{ padding: '1rem', textAlign: 'center' }}>
+                      {recon.status === 'DRAFT' && recon.difference === 0 && (
+                        <form action={markReconciledAction}>
+                          <input type="hidden" name="id" value={recon.id} />
+                          <button type="submit" className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', borderColor: 'var(--color-success)', color: 'var(--color-success)' }}>Reconcile</button>
+                        </form>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
               {(!reconciliations || reconciliations.length === 0) && (
                 <tr>
-                  <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                  <td colSpan={isAccountant ? 7 : 6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                     No reconciliations found.
                   </td>
                 </tr>
@@ -124,33 +128,35 @@ export default async function BankReconciliationPage() {
         </div>
 
         {/* Create Draft Form */}
-        <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
-          <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>Start Reconciliation</h2>
-          <form action={createDraftAction} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Bank Account</label>
-              <select name="bank_account_id" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                <option value="CRDB Main Account">CRDB Main Account</option>
-                <option value="NMB Fees Account">NMB Fees Account</option>
-                <option value="M-Pesa Till">M-Pesa Till</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Statement Date</label>
-              <input type="date" name="statement_date" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Statement Ending Balance</label>
-              <input type="number" step="0.01" name="statement_balance" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>System Balance (Ledger)</label>
-              <input type="number" step="0.01" name="system_balance" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
-            </div>
-            
-            <button type="submit" className="btn-primary" style={{ marginTop: '0.5rem' }}>Compare & Draft</button>
-          </form>
-        </div>
+        {isAccountant && (
+          <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
+            <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>Start Reconciliation</h2>
+            <form action={createDraftAction} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Bank Account</label>
+                <select name="bank_account_id" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                  <option value="CRDB Main Account">CRDB Main Account</option>
+                  <option value="NMB Fees Account">NMB Fees Account</option>
+                  <option value="M-Pesa Till">M-Pesa Till</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Statement Date</label>
+                <input type="date" name="statement_date" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Statement Ending Balance</label>
+                <input type="number" step="0.01" name="statement_balance" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>System Balance (Ledger)</label>
+                <input type="number" step="0.01" name="system_balance" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
+              </div>
+              
+              <button type="submit" className="btn-primary" style={{ marginTop: '0.5rem' }}>Compare & Draft</button>
+            </form>
+          </div>
+        )}
 
       </div>
     </div>

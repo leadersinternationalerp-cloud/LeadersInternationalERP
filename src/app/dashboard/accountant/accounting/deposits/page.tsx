@@ -4,6 +4,18 @@ import { revalidatePath } from 'next/cache'
 export default async function BankDepositsPage() {
   const supabase = await createClient()
 
+  // Verify access
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, roles')
+    .eq('id', user?.id)
+    .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const isAccountant = userRoles.includes('Accountant') || userRoles.includes('System Admin')
+
   const { data: deposits } = await supabase
     .from('bank_deposits')
     .select(`
@@ -47,7 +59,7 @@ export default async function BankDepositsPage() {
     <div>
       <h1 style={{ fontSize: '1.75rem', marginBottom: '1.5rem', color: 'var(--color-primary)' }}>Bank Deposits</h1>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '2rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isAccountant ? '1fr 350px' : '1fr', gap: '2rem', alignItems: 'start' }}>
         
         {/* Deposits List */}
         <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
@@ -93,34 +105,36 @@ export default async function BankDepositsPage() {
         </div>
 
         {/* Add Deposit Form */}
-        <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
-          <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>Record Bank Deposit</h2>
-          <form action={addDepositAction} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Deposit Date</label>
-              <input type="date" name="deposit_date" required defaultValue={new Date().toISOString().slice(0, 10)} style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Reference / Slip No</label>
-              <input type="text" name="reference" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} placeholder="e.g. SLP-9923" />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Bank Account</label>
-              <select name="bank_account_id" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                <option value="">Select Bank...</option>
-                {(bankAccounts || []).map(b => (
-                  <option key={b.id} value={b.id}>{b.name} ({b.code})</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Total Amount</label>
-              <input type="number" step="0.01" name="amount" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} placeholder="Amount..." />
-            </div>
-            
-            <button type="submit" className="btn-primary" style={{ marginTop: '0.5rem' }}>Record Deposit</button>
-          </form>
-        </div>
+        {isAccountant && (
+          <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
+            <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>Record Bank Deposit</h2>
+            <form action={addDepositAction} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Deposit Date</label>
+                <input type="date" name="deposit_date" required defaultValue={new Date().toISOString().slice(0, 10)} style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Reference / Slip No</label>
+                <input type="text" name="reference" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} placeholder="e.g. SLP-9923" />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Bank Account</label>
+                <select name="bank_account_id" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                  <option value="">Select Bank...</option>
+                  {(bankAccounts || []).map(b => (
+                    <option key={b.id} value={b.id}>{b.name} ({b.code})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Total Amount</label>
+                <input type="number" step="0.01" name="amount" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} placeholder="Amount..." />
+              </div>
+              
+              <button type="submit" className="btn-primary" style={{ marginTop: '0.5rem' }}>Record Deposit</button>
+            </form>
+          </div>
+        )}
 
       </div>
     </div>

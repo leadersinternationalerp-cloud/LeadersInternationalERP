@@ -254,9 +254,6 @@ export default function DashboardLayoutClient({
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Administration
               </div>
-              <Link href="/dashboard/director" style={linkStyle('/dashboard/director')} onClick={() => setSidebarOpen(false)}>
-                Executive Dashboard
-              </Link>
               <Link href="/dashboard/admin/settings" style={linkStyle('/dashboard/admin/settings')} onClick={() => setSidebarOpen(false)}>
                 School Settings
               </Link>
@@ -295,6 +292,21 @@ export default function DashboardLayoutClient({
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, paddingLeft: '0.75rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Director Operations
               </div>
+              <Link href="/dashboard/director" style={linkStyle('/dashboard/director')} onClick={() => setSidebarOpen(false)}>
+                Executive Dashboard
+              </Link>
+              <Link href="/dashboard/director/attendance" style={linkStyle('/dashboard/director/attendance')} onClick={() => setSidebarOpen(false)}>
+                Staff Attendance
+              </Link>
+              <Link href="/dashboard/director/finance" style={linkStyle('/dashboard/director/finance')} onClick={() => setSidebarOpen(false)}>
+                Financial Overview
+              </Link>
+              <Link href="/dashboard/director/payrolls" style={linkStyle('/dashboard/director/payrolls')} onClick={() => setSidebarOpen(false)}>
+                Manage Payrolls
+              </Link>
+              <Link href="/dashboard/director/applications" style={linkStyle('/dashboard/director/applications')} onClick={() => setSidebarOpen(false)}>
+                Self-Service Inbox
+              </Link>
               <Link href="/dashboard/director/inventory" style={linkStyle('/dashboard/director/inventory')} onClick={() => setSidebarOpen(false)}>
                 Inventory
               </Link>

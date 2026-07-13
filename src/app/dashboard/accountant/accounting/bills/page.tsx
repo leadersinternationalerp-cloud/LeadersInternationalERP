@@ -4,6 +4,18 @@ import { revalidatePath } from 'next/cache'
 export default async function VendorBillsPage() {
   const supabase = await createClient()
 
+  // Verify access
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, roles')
+    .eq('id', user?.id)
+    .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const isAccountant = userRoles.includes('Accountant') || userRoles.includes('System Admin')
+
   const { data: bills } = await supabase
     .from('vendor_bills')
     .select(`
@@ -52,7 +64,7 @@ export default async function VendorBillsPage() {
     <div>
       <h1 style={{ fontSize: '1.75rem', marginBottom: '1.5rem', color: 'var(--color-primary)' }}>Vendor Bills & Accounts Payable</h1>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '2rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isAccountant ? '1fr 350px' : '1fr', gap: '2rem', alignItems: 'start' }}>
         
         {/* Bills List */}
         <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
@@ -100,44 +112,46 @@ export default async function VendorBillsPage() {
         </div>
 
         {/* Add Bill Form */}
-        <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
-          <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>Record Vendor Bill</h2>
-          <form action={addBillAction} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Vendor Name</label>
-              <input type="text" name="vendor_name" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} placeholder="e.g. ABC Stationers" />
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <div style={{ width: '50%' }}>
-                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Invoice #</label>
-                <input type="text" name="invoice_number" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
+        {isAccountant && (
+          <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
+            <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>Record Vendor Bill</h2>
+            <form action={addBillAction} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Vendor Name</label>
+                <input type="text" name="vendor_name" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} placeholder="e.g. ABC Stationers" />
               </div>
-              <div style={{ width: '50%' }}>
-                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Bill Date</label>
-                <input type="date" name="bill_date" required defaultValue={new Date().toISOString().slice(0, 10)} style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ width: '50%' }}>
+                  <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Invoice #</label>
+                  <input type="text" name="invoice_number" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
+                </div>
+                <div style={{ width: '50%' }}>
+                  <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Bill Date</label>
+                  <input type="date" name="bill_date" required defaultValue={new Date().toISOString().slice(0, 10)} style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
+                </div>
               </div>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Expense Account</label>
-              <select name="expense_account_id" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                <option value="">Select Account...</option>
-                {(expenseAccounts || []).map(a => (
-                  <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Total Amount</label>
-              <input type="number" step="0.01" name="amount" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} placeholder="Amount..." />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Description</label>
-              <textarea name="description" rows={2} style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} placeholder="What was purchased..."></textarea>
-            </div>
-            
-            <button type="submit" className="btn-primary" style={{ marginTop: '0.5rem' }}>Record Bill</button>
-          </form>
-        </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Expense Account</label>
+                <select name="expense_account_id" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                  <option value="">Select Account...</option>
+                  {(expenseAccounts || []).map(a => (
+                    <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Total Amount</label>
+                <input type="number" step="0.01" name="amount" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} placeholder="Amount..." />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Description</label>
+                <textarea name="description" rows={2} style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} placeholder="What was purchased..."></textarea>
+              </div>
+              
+              <button type="submit" className="btn-primary" style={{ marginTop: '0.5rem' }}>Record Bill</button>
+            </form>
+          </div>
+        )}
 
       </div>
     </div>

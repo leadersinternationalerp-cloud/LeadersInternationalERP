@@ -25,56 +25,70 @@ export default async function ExpensesPage() {
     }).format(amount)
   }
 
+  // Verify access
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, roles')
+    .eq('id', user?.id)
+    .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const isAccountant = userRoles.includes('Accountant') || userRoles.includes('System Admin')
+
   return (
     <div>
       <h1 style={{ fontSize: '1.75rem', marginBottom: '1.5rem', color: 'var(--color-primary)' }}>
         School Expenses Tracking
       </h1>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isAccountant ? '1fr 2fr' : '1fr', gap: '2rem', alignItems: 'start' }}>
         {/* Record Expense Form */}
-        <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
-          <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Record School Expense</h2>
+        {isAccountant && (
+          <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
+            <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Record School Expense</h2>
 
-          <form action={saveExpenseAction as any} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div className="form-group">
-              <label className="form-label">Expense Category</label>
-              <select name="category" className="input-field" required>
-                <option value="Utilities">Utilities</option>
-                <option value="Supplies">Supplies</option>
-                <option value="Maintenance">Maintenance</option>
-                <option value="Transport">Transport</option>
-                <option value="Events">Events</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
+            <form action={saveExpenseAction as any} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div className="form-group">
+                <label className="form-label">Expense Category</label>
+                <select name="category" className="input-field" required>
+                  <option value="Utilities">Utilities</option>
+                  <option value="Supplies">Supplies</option>
+                  <option value="Maintenance">Maintenance</option>
+                  <option value="Transport">Transport</option>
+                  <option value="Events">Events</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
 
-            <div className="form-group">
-              <label className="form-label">Amount (TZS)</label>
-              <input type="number" name="amount" min="1" placeholder="e.g. 80000" className="input-field" required />
-            </div>
+              <div className="form-group">
+                <label className="form-label">Amount (TZS)</label>
+                <input type="number" name="amount" min="1" placeholder="e.g. 80000" className="input-field" required />
+              </div>
 
-            <div className="form-group">
-              <label className="form-label">Description</label>
-              <textarea name="description" placeholder="Describe the expenditure..." className="input-field" style={{ minHeight: '60px', resize: 'vertical' }} required />
-            </div>
+              <div className="form-group">
+                <label className="form-label">Description</label>
+                <textarea name="description" placeholder="Describe the expenditure..." className="input-field" style={{ minHeight: '60px', resize: 'vertical' }} required />
+              </div>
 
-            <div className="form-group">
-              <label className="form-label">Date of Expense</label>
-              <input type="date" name="date" className="input-field" required defaultValue={new Date().toISOString().slice(0,10)} />
-            </div>
+              <div className="form-group">
+                <label className="form-label">Date of Expense</label>
+                <input type="date" name="date" className="input-field" required defaultValue={new Date().toISOString().slice(0,10)} />
+              </div>
 
-            {/* In a real app we'd allow uploading a receipt image/PDF. For now we put a placeholder input link */}
-            <div className="form-group">
-              <label className="form-label">Receipt File Link (Optional)</label>
-              <input type="text" name="receipt_url" placeholder="Paste link or path to file" className="input-field" />
-            </div>
+              {/* In a real app we'd allow uploading a receipt image/PDF. For now we put a placeholder input link */}
+              <div className="form-group">
+                <label className="form-label">Receipt File Link (Optional)</label>
+                <input type="text" name="receipt_url" placeholder="Paste link or path to file" className="input-field" />
+              </div>
 
-            <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem', marginTop: '0.5rem' }}>
-              Record Expense
-            </button>
-          </form>
-        </div>
+              <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem', marginTop: '0.5rem' }}>
+                Record Expense
+              </button>
+            </form>
+          </div>
+        )}
 
         {/* Expenses List */}
         <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
