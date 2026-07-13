@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
@@ -10,7 +10,7 @@ import {
   UsersRound, Scale, Plug, Fingerprint, Package, Bus, School,
   ClipboardCheck, PenLine, Baby, Puzzle, Layers, Sparkles,
   CreditCard, HandCoins, ListTree, BookCopy, Landmark, Building2,
-  HeartHandshake, Umbrella, Banknote
+  HeartHandshake, Umbrella, Banknote, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import PwaInstallPrompt from '@/components/PwaInstallPrompt'
 
@@ -37,11 +37,18 @@ export default function DashboardLayoutClient({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
 
-  const toggleSidebar = () => setSidebarOpen(!sidebarOpen)
+  const toggleMobile = () => setMobileOpen(!mobileOpen)
+  const toggleCollapsed = () => setCollapsed(!collapsed)
   const toggleNotifications = () => setNotificationsOpen(!notificationsOpen)
+
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
 
   // Map routes to dynamic titles
   const getPageTitle = () => {
@@ -64,20 +71,394 @@ export default function DashboardLayoutClient({
     return false
   }
 
+  const sidebarWidth = collapsed ? '68px' : '240px'
 
-  const NavLink = ({ href, icon: Icon, children, onClick }: any) => {
+  const NavLink = ({ href, icon: Icon, children: label }: { href: string; icon: any; children: React.ReactNode }) => {
     const active = isActive(href)
     return (
-      <Link href={href} onClick={onClick} className={`nav-link ${active ? 'active' : ''}`}>
-        <span className="nav-icon">{Icon && <Icon size={18} />}</span>
-        {children}
+      <Link
+        href={href}
+        onClick={() => setMobileOpen(false)}
+        className={`nav-link ${active ? 'active' : ''}`}
+        title={collapsed ? String(label) : undefined}
+        style={{
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          padding: collapsed ? '0.7rem' : '0.7rem 0.85rem',
+          position: 'relative',
+        }}
+      >
+        <span className="nav-icon" style={{ flexShrink: 0 }}>{Icon && <Icon size={18} />}</span>
+        <span
+          className="nav-label"
+          style={{
+            overflow: 'hidden',
+            whiteSpace: 'nowrap',
+            opacity: collapsed ? 0 : 1,
+            width: collapsed ? 0 : 'auto',
+            transition: 'opacity 0.2s ease, width 0.2s ease',
+          }}
+        >
+          {label}
+        </span>
       </Link>
     )
   }
 
+  const SectionHeader = ({ children: label }: { children: React.ReactNode }) => (
+    <div
+      className="nav-section"
+      style={{
+        opacity: collapsed ? 0 : 1,
+        height: collapsed ? '0.5rem' : 'auto',
+        overflow: 'hidden',
+        padding: collapsed ? '0' : '0.35rem 0.85rem',
+        marginTop: collapsed ? '0.5rem' : '0.85rem',
+        transition: 'all 0.2s ease',
+      }}
+    >
+      {label}
+    </div>
+  )
+
+  // Sidebar content (shared between mobile overlay and desktop sidebar)
+  const sidebarContent = (
+    <>
+      <SectionHeader>Main Menu</SectionHeader>
+
+      <NavLink href="/dashboard" icon={LayoutDashboard}>
+        Dashboard Overview
+      </NavLink>
+
+      <NavLink href="/dashboard/calendar" icon={CalendarDays}>
+        School Calendar
+      </NavLink>
+
+      {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal') || userRoles.includes('Teacher')) && (
+        <NavLink href="/dashboard/students" icon={Users}>
+          Students
+        </NavLink>
+      )}
+
+      {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal')) && (
+        <NavLink href="/dashboard/staff" icon={UserCog}>
+          Staff & Teachers
+        </NavLink>
+      )}
+
+      {(userRoles.includes('System Admin') || userRoles.includes('Principal') || userRoles.includes('Dean') || userRoles.includes('HOS')) && (
+        <>
+          <SectionHeader>Academic Leadership</SectionHeader>
+
+          {(userRoles.includes('System Admin') || userRoles.includes('Principal') || userRoles.includes('Director')) && (
+            <NavLink href="/dashboard/principal/lesson-plans" icon={BookOpen}>
+              Lesson Plan Reports
+            </NavLink>
+          )}
+
+          <NavLink href="/dashboard/principal/report-cards" icon={FileSpreadsheet}>
+            Report Cards Generator
+          </NavLink>
+        </>
+      )}
+
+      {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
+        <NavLink href="/dashboard/users" icon={UsersRound}>
+          User Management
+        </NavLink>
+      )}
+
+      {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal') || userRoles.includes('Accountant')) && (
+        <NavLink href="/dashboard/accountant/fee-balances" icon={Scale}>
+          Fee Balances
+        </NavLink>
+      )}
+
+      {userRoles.includes('System Admin') && (
+        <>
+          <SectionHeader>Administration</SectionHeader>
+          <NavLink href="/dashboard/admin/settings" icon={Settings}>
+            School Settings
+          </NavLink>
+          <NavLink href="/dashboard/admin/backups" icon={Settings}>
+            Database Backups
+          </NavLink>
+          <NavLink href="/dashboard/admin/audit-logs" icon={Settings}>
+            Security Audit Logs
+          </NavLink>
+          <NavLink href="/dashboard/admin/integrations" icon={Plug}>
+            Integrations
+          </NavLink>
+          <NavLink href="/dashboard/admin/syllabus" icon={Settings}>
+            Syllabus Setup
+          </NavLink>
+          <NavLink href="/dashboard/admin/subjects" icon={Settings}>
+            Subjects Setup
+          </NavLink>
+          <NavLink href="/dashboard/admin/teacher-assignments" icon={Settings}>
+            Teacher Assignments
+          </NavLink>
+          <NavLink href="/dashboard/admin/biometric/devices" icon={Fingerprint}>
+            Biometric Devices
+          </NavLink>
+          <NavLink href="/dashboard/admin/biometric/exceptions" icon={Fingerprint}>
+            Biometric Exceptions
+          </NavLink>
+          <NavLink href="/dashboard/admin/kitchen-content" icon={Settings}>
+            Kitchen Content
+          </NavLink>
+        </>
+      )}
+
+      {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
+        <>
+          <SectionHeader>Director Operations</SectionHeader>
+          <NavLink href="/dashboard/director" icon={LayoutDashboard}>
+            Executive Dashboard
+          </NavLink>
+          <NavLink href="/dashboard/director/attendance" icon={ClipboardCheck}>
+            Staff Attendance
+          </NavLink>
+          <NavLink href="/dashboard/director/finance" icon={Wallet}>
+            Financial Overview
+          </NavLink>
+          <NavLink href="/dashboard/director/payrolls" icon={HandCoins}>
+            Manage Payrolls
+          </NavLink>
+          <NavLink href="/dashboard/director/applications" icon={BookOpen}>
+            Self-Service Inbox
+          </NavLink>
+          <NavLink href="/dashboard/director/inventory" icon={Package}>
+            Inventory
+          </NavLink>
+          <NavLink href="/dashboard/director/transport" icon={Bus}>
+            Transport
+          </NavLink>
+        </>
+      )}
+
+      {(userRoles.includes('System Admin') || userRoles.includes('Dean')) && (
+        <>
+          <SectionHeader>Dean Operations</SectionHeader>
+          <NavLink href="/dashboard/dean" icon={LayoutDashboard}>
+            Dashboard Overview
+          </NavLink>
+          <NavLink href="/dashboard/dean/students" icon={UsersRound}>
+            Student Enrollment
+          </NavLink>
+          <NavLink href="/dashboard/dean/marks-overview" icon={PenLine}>
+            Marks Overview
+          </NavLink>
+          <NavLink href="/dashboard/dean/submissions" icon={BookOpen}>
+            Submissions Review
+          </NavLink>
+        </>
+      )}
+
+      {(userRoles.includes('System Admin') || userRoles.includes('HOS')) && (
+        <>
+          <SectionHeader>Section Operations</SectionHeader>
+          <NavLink href="/dashboard/hos/marks" icon={PenLine}>
+            Section Marks Overview
+          </NavLink>
+          <NavLink href="/dashboard/hos/attendance" icon={ClipboardCheck}>
+            Section Attendance
+          </NavLink>
+        </>
+      )}
+
+      {(userRoles.includes('System Admin') || userRoles.includes('Teacher')) && (
+        <>
+          <SectionHeader>My Classes</SectionHeader>
+          <NavLink href="/dashboard/teacher" icon={School}>
+            Teacher Dashboard
+          </NavLink>
+          <NavLink href="/dashboard/teacher/attendance" icon={ClipboardCheck}>
+            Daily Attendance
+          </NavLink>
+          <NavLink href="/dashboard/teacher/marks" icon={PenLine}>
+            Academic Marks
+          </NavLink>
+          <NavLink href="/dashboard/teacher/lesson-plans/new" icon={BookOpen}>
+            Lesson Plans
+          </NavLink>
+          <NavLink href="/dashboard/teacher/early-years" icon={Baby}>
+            Early Years
+          </NavLink>
+          <NavLink href="/dashboard/teacher/class-activities" icon={Puzzle}>
+            Class Activities
+          </NavLink>
+          <NavLink href="/dashboard/teacher/quizzes/bank" icon={Layers}>
+            Quiz Bank
+          </NavLink>
+          <NavLink href="/dashboard/teacher/quizzes/jobs" icon={Sparkles}>
+            Quiz Print Jobs
+          </NavLink>
+        </>
+      )}
+
+      {(userRoles.includes('System Admin') || userRoles.includes('Accountant')) && (
+        <>
+          <SectionHeader>Finance</SectionHeader>
+          <NavLink href="/dashboard/accountant" icon={Wallet}>
+            Financial Dashboard
+          </NavLink>
+          <NavLink href="/dashboard/accountant/invoices" icon={Receipt}>
+            Student Invoices
+          </NavLink>
+          <NavLink href="/dashboard/accountant/payments" icon={CreditCard}>
+            Record Payments
+          </NavLink>
+          <NavLink href="/dashboard/accountant/expenses" icon={FileSpreadsheet}>
+            Expenses & Bills
+          </NavLink>
+          <NavLink href="/dashboard/accountant/payroll" icon={HandCoins}>
+            Manage Payroll
+          </NavLink>
+          <NavLink href="/dashboard/accountant/advances" icon={HandCoins}>
+            Salary Advances
+          </NavLink>
+          <NavLink href="/dashboard/accountant/leave-config" icon={Settings}>
+            Leave Configuration
+          </NavLink>
+          <SectionHeader>Accounting Suite</SectionHeader>
+          <NavLink href="/dashboard/accountant/accounting/statements" icon={FileSpreadsheet}>
+            Financial Statements
+          </NavLink>
+          <NavLink href="/dashboard/accountant/accounting/coa" icon={ListTree}>
+            Chart of Accounts
+          </NavLink>
+          <NavLink href="/dashboard/accountant/accounting/journals" icon={BookCopy}>
+            Journals
+          </NavLink>
+          <NavLink href="/dashboard/accountant/accounting/reconciliation" icon={Scale}>
+            Reconciliation
+          </NavLink>
+          <NavLink href="/dashboard/accountant/accounting/bills" icon={Receipt}>
+            Bills & Payables
+          </NavLink>
+          <NavLink href="/dashboard/accountant/accounting/deposits" icon={Landmark}>
+            Bank Deposits
+          </NavLink>
+          <NavLink href="/dashboard/accountant/accounting/assets" icon={Building2}>
+            Fixed Assets
+          </NavLink>
+        </>
+      )}
+
+      {(userRoles.includes('System Admin') || userRoles.includes('Student')) && (
+        <>
+          <SectionHeader>My Academics</SectionHeader>
+          <NavLink href="/dashboard/student" icon={School}>
+            Student Dashboard
+          </NavLink>
+          <NavLink href="/dashboard/student/report-card" icon={FileSpreadsheet}>
+            Report Card
+          </NavLink>
+          <NavLink href="/dashboard/student/fees" icon={Receipt}>
+            Fee Statements
+          </NavLink>
+        </>
+      )}
+
+      {(userRoles.includes('System Admin') || userRoles.includes('Parent')) && (
+        <>
+          <SectionHeader>Parent Portal</SectionHeader>
+          <NavLink href="/dashboard/parent/dashboard" icon={HeartHandshake}>
+            Parent Dashboard
+          </NavLink>
+          <NavLink href="/dashboard/parent/students" icon={Users}>
+            My Children
+          </NavLink>
+          <NavLink href="/dashboard/parent/report-card" icon={FileSpreadsheet}>
+            Report Card
+          </NavLink>
+          <NavLink href="/dashboard/parent/fees" icon={Receipt}>
+            Fee Invoices
+          </NavLink>
+        </>
+      )}
+
+      {(userRoles.includes('Teacher') || userRoles.includes('Accountant') || userRoles.includes('HOS') || userRoles.includes('Dean') || userRoles.includes('Principal') || userRoles.includes('Director')) && (
+        <>
+          <SectionHeader>Self Service</SectionHeader>
+          <NavLink href="/dashboard/staff/self-service/leave" icon={Umbrella}>
+            My HR Dashboard
+          </NavLink>
+          <NavLink href="/dashboard/staff/self-service/leave" icon={Umbrella}>
+            My Leave
+          </NavLink>
+          <NavLink href="/dashboard/staff/self-service/advances" icon={HandCoins}>
+            My Salary Advances
+          </NavLink>
+          <NavLink href="/dashboard/staff/self-service/payslips" icon={Banknote}>
+            My Payslips
+          </NavLink>
+        </>
+      )}
+    </>
+  )
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', flexDirection: 'column' }}>
       
+      {/* Tooltip styles for collapsed sidebar */}
+      <style dangerouslySetInnerHTML={{__html: `
+        /* Desktop: sidebar always visible */
+        @media (min-width: 768px) {
+          .sidebar-desktop {
+            transform: translateX(0) !important;
+            position: relative !important;
+          }
+          .mobile-overlay { display: none !important; }
+          .mobile-sidebar { display: none !important; }
+          .mobile-toggle { display: none !important; }
+        }
+
+        /* Mobile: sidebar as overlay */
+        @media (max-width: 767px) {
+          .sidebar-desktop { display: none !important; }
+          .desktop-collapse-toggle { display: none !important; }
+        }
+
+        /* Collapsed sidebar tooltip on hover */
+        .sidebar-collapsed .nav-link {
+          position: relative;
+        }
+        .sidebar-collapsed .nav-link:hover::after {
+          content: attr(title);
+          position: absolute;
+          left: calc(100% + 8px);
+          top: 50%;
+          transform: translateY(-50%);
+          background: var(--color-text, #1a2332);
+          color: #fff;
+          padding: 0.4rem 0.75rem;
+          border-radius: 6px;
+          font-size: 0.8rem;
+          font-weight: 500;
+          white-space: nowrap;
+          z-index: 100;
+          pointer-events: none;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          animation: tooltipFade 0.15s ease-in-out;
+        }
+        .sidebar-collapsed .nav-link:hover::before {
+          content: '';
+          position: absolute;
+          left: calc(100% + 2px);
+          top: 50%;
+          transform: translateY(-50%);
+          border: 5px solid transparent;
+          border-right-color: var(--color-text, #1a2332);
+          z-index: 100;
+          pointer-events: none;
+        }
+        @keyframes tooltipFade {
+          from { opacity: 0; transform: translateY(-50%) translateX(-4px); }
+          to   { opacity: 1; transform: translateY(-50%) translateX(0); }
+        }
+      `}} />
+
       {/* Top Navbar */}
       <header style={{ 
         height: '64px', 
@@ -92,7 +473,12 @@ export default function DashboardLayoutClient({
         zIndex: 50
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button onClick={toggleSidebar} className="btn btn-icon btn-ghost" aria-label="Toggle Menu">
+          {/* Mobile hamburger */}
+          <button onClick={toggleMobile} className="btn btn-icon btn-ghost mobile-toggle" aria-label="Toggle Menu">
+            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+          {/* Desktop collapse/expand */}
+          <button onClick={toggleCollapsed} className="btn btn-icon btn-ghost desktop-collapse-toggle" aria-label="Toggle Sidebar">
             <Menu size={20} />
           </button>
           <Image src="/logo.png" alt="Logo" width={40} height={40} />
@@ -179,349 +565,72 @@ export default function DashboardLayoutClient({
 
       <div style={{ display: 'flex', flex: 1, position: 'relative' }}>
         
-        {/* Sidebar Overlay for Mobile */}
-        {sidebarOpen && (
+        {/* Mobile Overlay */}
+        {mobileOpen && (
           <div 
-            onClick={() => setSidebarOpen(false)}
-            style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 30 }}
+            className="mobile-overlay"
+            onClick={() => setMobileOpen(false)}
+            style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 30 }}
           />
         )}
 
-        {/* Sidebar */}
-        <aside style={{
-          width: '240px',
-          backgroundColor: 'var(--color-surface)',
-          borderRight: '1px solid var(--color-border)',
-          padding: '1.5rem 1rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.5rem',
-          position: 'absolute',
-          top: 0,
-          bottom: 0,
-          left: 0,
-          zIndex: 40,
-          transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
-          transition: 'transform 0.3s ease',
-          overflowY: 'auto'
-        }}>
-          <div className="nav-section">
-              Main Menu
-            </div>
-          
-          <NavLink href="/dashboard" onClick={() => setSidebarOpen(false)} icon={LayoutDashboard}>
-            Dashboard Overview
-          </NavLink>
+        {/* Mobile Sidebar (slide-in overlay — full expanded) */}
+        <aside
+          className="mobile-sidebar"
+          style={{
+            width: '260px',
+            backgroundColor: 'var(--color-surface)',
+            borderRight: '1px solid var(--color-border)',
+            padding: '1.5rem 1rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem',
+            position: 'fixed',
+            top: '64px',
+            bottom: 0,
+            left: 0,
+            zIndex: 40,
+            transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)',
+            transition: 'transform 0.3s ease',
+            overflowY: 'auto'
+          }}
+        >
+          {sidebarContent}
+        </aside>
 
-          <NavLink href="/dashboard/calendar" onClick={() => setSidebarOpen(false)} icon={CalendarDays}>
-            School Calendar
-          </NavLink>
-
-          {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal') || userRoles.includes('Teacher')) && (
-            <NavLink href="/dashboard/students" onClick={() => setSidebarOpen(false)} icon={Users}>
-            Students
-          </NavLink>
-          )}
-
-          {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal')) && (
-            <NavLink href="/dashboard/staff" onClick={() => setSidebarOpen(false)} icon={UserCog}>
-            Staff & Teachers
-          </NavLink>
-          )}
-
-          {(userRoles.includes('System Admin') || userRoles.includes('Principal') || userRoles.includes('Dean') || userRoles.includes('HOS')) && (
-            <>
-              <div className="nav-section">
-              Academic Leadership
-            </div>
-              
-              {(userRoles.includes('System Admin') || userRoles.includes('Principal') || userRoles.includes('Director')) && (
-                <NavLink href="/dashboard/principal/lesson-plans" onClick={() => setSidebarOpen(false)} icon={BookOpen}>
-            Lesson Plan Reports
-          </NavLink>
-              )}
-
-              <NavLink href="/dashboard/principal/report-cards" onClick={() => setSidebarOpen(false)} icon={FileSpreadsheet}>
-            Report Cards Generator
-          </NavLink>
-            </>
-          )}
-
-          {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
-            <NavLink href="/dashboard/users" onClick={() => setSidebarOpen(false)} icon={UsersRound}>
-            User Management
-          </NavLink>
-          )}
-
-          {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal') || userRoles.includes('Accountant')) && (
-            <NavLink href="/dashboard/accountant/fee-balances" onClick={() => setSidebarOpen(false)} icon={Scale}>
-            Fee Balances
-          </NavLink>
-          )}
-
-          {userRoles.includes('System Admin') && (
-            <>
-              <div className="nav-section">
-              Administration
-            </div>
-              <NavLink href="/dashboard/admin/settings" onClick={() => setSidebarOpen(false)} icon={Settings}>
-            School Settings
-          </NavLink>
-              <NavLink href="/dashboard/admin/backups" onClick={() => setSidebarOpen(false)} icon={Settings}>
-            Database Backups
-          </NavLink>
-              <NavLink href="/dashboard/admin/audit-logs" onClick={() => setSidebarOpen(false)} icon={Settings}>
-            Security Audit Logs
-          </NavLink>
-              <NavLink href="/dashboard/admin/integrations" onClick={() => setSidebarOpen(false)} icon={Plug}>
-            Integrations
-          </NavLink>
-              <NavLink href="/dashboard/admin/syllabus" onClick={() => setSidebarOpen(false)} icon={Settings}>
-            Syllabus Setup
-          </NavLink>
-              <NavLink href="/dashboard/admin/subjects" onClick={() => setSidebarOpen(false)} icon={Settings}>
-            Subjects Setup
-          </NavLink>
-              <NavLink href="/dashboard/admin/teacher-assignments" onClick={() => setSidebarOpen(false)} icon={Settings}>
-            Teacher Assignments
-          </NavLink>
-              <NavLink href="/dashboard/admin/biometric/devices" onClick={() => setSidebarOpen(false)} icon={Fingerprint}>
-            Biometric Devices
-          </NavLink>
-              <NavLink href="/dashboard/admin/biometric/exceptions" onClick={() => setSidebarOpen(false)} icon={Fingerprint}>
-            Biometric Exceptions
-          </NavLink>
-              <NavLink href="/dashboard/admin/kitchen-content" onClick={() => setSidebarOpen(false)} icon={Settings}>
-            Kitchen Content
-          </NavLink>
-            </>
-          )}
-
-          {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
-            <>
-              <div className="nav-section">
-              Director Operations
-            </div>
-              <NavLink href="/dashboard/director" onClick={() => setSidebarOpen(false)} icon={LayoutDashboard}>
-            Executive Dashboard
-          </NavLink>
-              <NavLink href="/dashboard/director/attendance" onClick={() => setSidebarOpen(false)} icon={ClipboardCheck}>
-            Staff Attendance
-          </NavLink>
-              <NavLink href="/dashboard/director/finance" onClick={() => setSidebarOpen(false)} icon={Wallet}>
-            Financial Overview
-          </NavLink>
-              <NavLink href="/dashboard/director/payrolls" onClick={() => setSidebarOpen(false)} icon={HandCoins}>
-            Manage Payrolls
-          </NavLink>
-              <NavLink href="/dashboard/director/applications" onClick={() => setSidebarOpen(false)} icon={BookOpen}>
-            Self-Service Inbox
-          </NavLink>
-              <NavLink href="/dashboard/director/inventory" onClick={() => setSidebarOpen(false)} icon={Package}>
-            Inventory
-          </NavLink>
-              <NavLink href="/dashboard/director/transport" onClick={() => setSidebarOpen(false)} icon={Bus}>
-            Transport
-          </NavLink>
-            </>
-          )}
-
-          {(userRoles.includes('System Admin') || userRoles.includes('Dean')) && (
-            <>
-              <div className="nav-section">
-              Dean Operations
-            </div>
-              <NavLink href="/dashboard/dean" onClick={() => setSidebarOpen(false)} icon={LayoutDashboard}>
-            Dashboard Overview
-          </NavLink>
-              <NavLink href="/dashboard/dean/students" onClick={() => setSidebarOpen(false)} icon={UsersRound}>
-            Student Enrollment
-          </NavLink>
-              <NavLink href="/dashboard/dean/marks-overview" onClick={() => setSidebarOpen(false)} icon={PenLine}>
-            Marks Overview
-          </NavLink>
-              <NavLink href="/dashboard/dean/submissions" onClick={() => setSidebarOpen(false)} icon={BookOpen}>
-            Submissions Review
-          </NavLink>
-            </>
-          )}
-
-          {(userRoles.includes('System Admin') || userRoles.includes('HOS')) && (
-            <>
-              <div className="nav-section">
-              Section Operations
-            </div>
-              <NavLink href="/dashboard/hos/marks" onClick={() => setSidebarOpen(false)} icon={PenLine}>
-            Section Marks Overview
-          </NavLink>
-              <NavLink href="/dashboard/hos/attendance" onClick={() => setSidebarOpen(false)} icon={ClipboardCheck}>
-            Section Attendance
-          </NavLink>
-            </>
-          )}
-
-          {(userRoles.includes('System Admin') || userRoles.includes('Teacher')) && (
-            <>
-              <div className="nav-section">
-              My Classes
-            </div>
-              <NavLink href="/dashboard/teacher" onClick={() => setSidebarOpen(false)} icon={School}>
-            Teacher Dashboard
-          </NavLink>
-              <NavLink href="/dashboard/teacher/attendance" onClick={() => setSidebarOpen(false)} icon={ClipboardCheck}>
-            Daily Attendance
-          </NavLink>
-              <NavLink href="/dashboard/teacher/marks" onClick={() => setSidebarOpen(false)} icon={PenLine}>
-            Academic Marks
-          </NavLink>
-              <NavLink href="/dashboard/teacher/lesson-plans/new" onClick={() => setSidebarOpen(false)} icon={BookOpen}>
-            Lesson Plans
-          </NavLink>
-              <NavLink href="/dashboard/teacher/early-years" onClick={() => setSidebarOpen(false)} icon={Baby}>
-            Early Years
-          </NavLink>
-              <NavLink href="/dashboard/teacher/class-activities" onClick={() => setSidebarOpen(false)} icon={Puzzle}>
-            Class Activities
-          </NavLink>
-              <NavLink href="/dashboard/teacher/quizzes/bank" onClick={() => setSidebarOpen(false)} icon={Layers}>
-            Quiz Bank
-          </NavLink>
-              <NavLink href="/dashboard/teacher/quizzes/jobs" onClick={() => setSidebarOpen(false)} icon={Sparkles}>
-            Quiz Print Jobs
-          </NavLink>
-            </>
-          )}
-
-          {(userRoles.includes('System Admin') || userRoles.includes('Accountant')) && (
-            <>
-              <div className="nav-section">
-              Finance
-            </div>
-              <NavLink href="/dashboard/accountant" onClick={() => setSidebarOpen(false)} icon={Wallet}>
-            Financial Dashboard
-          </NavLink>
-              <NavLink href="/dashboard/accountant/invoices" onClick={() => setSidebarOpen(false)} icon={Receipt}>
-            Student Invoices
-          </NavLink>
-              <NavLink href="/dashboard/accountant/payments" onClick={() => setSidebarOpen(false)} icon={CreditCard}>
-            Record Payments
-          </NavLink>
-              <NavLink href="/dashboard/accountant/expenses" onClick={() => setSidebarOpen(false)} icon={FileSpreadsheet}>
-            Expenses & Bills
-          </NavLink>
-              <NavLink href="/dashboard/accountant/payroll" onClick={() => setSidebarOpen(false)} icon={HandCoins}>
-            Manage Payroll
-          </NavLink>
-              <NavLink href="/dashboard/accountant/advances" onClick={() => setSidebarOpen(false)} icon={HandCoins}>
-            Salary Advances
-          </NavLink>
-              <NavLink href="/dashboard/accountant/leave-config" onClick={() => setSidebarOpen(false)} icon={Settings}>
-            Leave Configuration
-          </NavLink>
-              <div className="nav-section">
-              Accounting Suite
-            </div>
-              <NavLink href="/dashboard/accountant/accounting/statements" onClick={() => setSidebarOpen(false)} icon={FileSpreadsheet}>
-            Financial Statements
-          </NavLink>
-              <NavLink href="/dashboard/accountant/accounting/coa" onClick={() => setSidebarOpen(false)} icon={ListTree}>
-            Chart of Accounts
-          </NavLink>
-              <NavLink href="/dashboard/accountant/accounting/journals" onClick={() => setSidebarOpen(false)} icon={BookCopy}>
-            Journals
-          </NavLink>
-              <NavLink href="/dashboard/accountant/accounting/reconciliation" onClick={() => setSidebarOpen(false)} icon={Scale}>
-            Reconciliation
-          </NavLink>
-              <NavLink href="/dashboard/accountant/accounting/bills" onClick={() => setSidebarOpen(false)} icon={Receipt}>
-            Bills & Payables
-          </NavLink>
-              <NavLink href="/dashboard/accountant/accounting/deposits" onClick={() => setSidebarOpen(false)} icon={Landmark}>
-            Bank Deposits
-          </NavLink>
-              <NavLink href="/dashboard/accountant/accounting/assets" onClick={() => setSidebarOpen(false)} icon={Building2}>
-            Fixed Assets
-          </NavLink>
-            </>
-          )}
-
-          {(userRoles.includes('System Admin') || userRoles.includes('Student')) && (
-            <>
-              <div className="nav-section">
-              My Academics
-            </div>
-              <NavLink href="/dashboard/student" onClick={() => setSidebarOpen(false)} icon={School}>
-            Student Dashboard
-          </NavLink>
-              <NavLink href="/dashboard/student/report-card" onClick={() => setSidebarOpen(false)} icon={FileSpreadsheet}>
-            Report Card
-          </NavLink>
-              <NavLink href="/dashboard/student/fees" onClick={() => setSidebarOpen(false)} icon={Receipt}>
-            Fee Statements
-          </NavLink>
-            </>
-          )}
-
-          {(userRoles.includes('System Admin') || userRoles.includes('Parent')) && (
-            <>
-              <div className="nav-section">
-              Parent Portal
-            </div>
-              <NavLink href="/dashboard/parent/dashboard" onClick={() => setSidebarOpen(false)} icon={HeartHandshake}>
-            Parent Dashboard
-          </NavLink>
-              <NavLink href="/dashboard/parent/students" onClick={() => setSidebarOpen(false)} icon={Users}>
-            My Children
-          </NavLink>
-              <NavLink href="/dashboard/parent/report-card" onClick={() => setSidebarOpen(false)} icon={FileSpreadsheet}>
-            Report Card
-          </NavLink>
-              <NavLink href="/dashboard/parent/fees" onClick={() => setSidebarOpen(false)} icon={Receipt}>
-            Fee Invoices
-          </NavLink>
-            </>
-          )}
-
-          {(userRoles.includes('Teacher') || userRoles.includes('Accountant') || userRoles.includes('HOS') || userRoles.includes('Dean') || userRoles.includes('Principal') || userRoles.includes('Director')) && (
-            <>
-              <div className="nav-section">
-              Self Service
-            </div>
-              <NavLink href="/dashboard/staff/self-service/leave" onClick={() => setSidebarOpen(false)} icon={Umbrella}>
-            My HR Dashboard
-          </NavLink>
-              <NavLink href="/dashboard/staff/self-service/leave" onClick={() => setSidebarOpen(false)} icon={Umbrella}>
-            My Leave
-          </NavLink>
-              <NavLink href="/dashboard/staff/self-service/advances" onClick={() => setSidebarOpen(false)} icon={HandCoins}>
-            My Salary Advances
-          </NavLink>
-              <NavLink href="/dashboard/staff/self-service/payslips" onClick={() => setSidebarOpen(false)} icon={Banknote}>
-            My Payslips
-          </NavLink>
-            </>
-          )}
+        {/* Desktop Sidebar (always visible, collapsible) */}
+        <aside
+          className={`sidebar-desktop ${collapsed ? 'sidebar-collapsed' : ''}`}
+          style={{
+            width: sidebarWidth,
+            minWidth: sidebarWidth,
+            backgroundColor: 'var(--color-surface)',
+            borderRight: '1px solid var(--color-border)',
+            padding: collapsed ? '1rem 0.5rem' : '1.5rem 1rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem',
+            transition: 'width 0.25s ease, min-width 0.25s ease, padding 0.25s ease',
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            height: 'calc(100vh - 64px)',
+            position: 'sticky',
+            top: '64px',
+          }}
+        >
+          {sidebarContent}
         </aside>
 
         {/* Main Content Area */}
-        <main style={{ 
-          flex: 1, 
-          padding: '2rem', 
-          backgroundColor: 'var(--color-background)',
-          // Adjust padding-left to match sidebar width when expanded
-          // For simplicity in this demo, we'll just push the content on desktop
-          // and overlay on mobile. 
-        }}
-        // simple desktop spacer logic could go here, but a CSS class is better.
-        // We'll rely on inline styles for now.
-        className="main-content-area"
+        <main
+          style={{ 
+            flex: 1, 
+            padding: '2rem', 
+            backgroundColor: 'var(--color-background)',
+            minWidth: 0,
+          }}
+          className="main-content-area"
         >
-          {/* We add a style tag to handle desktop media query for sidebar */}
-          <style dangerouslySetInnerHTML={{__html: `
-            @media (min-width: 768px) {
-              aside { transform: translateX(0) !important; position: static !important; }
-            }
-          `}} />
           {children}
         </main>
       </div>
