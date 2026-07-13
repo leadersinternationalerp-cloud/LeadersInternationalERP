@@ -4,6 +4,13 @@ import { revalidatePath } from 'next/cache'
 export default async function FixedAssetsPage() {
   const supabase = await createClient()
 
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = await supabase.from('profiles').select('role, roles').eq('id', user?.id).single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const isAccountant = userRoles.includes('Accountant') || userRoles.includes('System Admin')
+
   const { data: assets } = await supabase
     .from('fixed_assets')
     .select(`

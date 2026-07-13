@@ -8,7 +8,7 @@ export default async function ParentStudentsPage() {
 
   // Find relationships
   const { data: relationships } = await supabase
-    .from('student_relationships')
+    .from('student_parents')
     .select(`
       student:student_id(
         id,
