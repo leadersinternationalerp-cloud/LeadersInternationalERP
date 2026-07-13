@@ -22,8 +22,8 @@ export default function LoginPage() {
           />
         </div>
         <div className="auth-header">
-          <h1 className="auth-title">Welcome Back</h1>
-          <p className="auth-subtitle">Sign in to your account</p>
+          <h1 className="auth-title" style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '0.5rem' }}>Leaders International ERP</h1>
+          <p className="auth-subtitle" style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>Staff and parents sign in with username and PIN</p>
         </div>
         
         <LoginForm />
