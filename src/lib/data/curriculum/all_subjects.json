@@ -1,0 +1,520 @@
+{
+  "ART&CRAFT": {
+    "Stage 1": [],
+    "Stage 2": [],
+    "Stage 3": [],
+    "Stage 4": [],
+    "Stage 5": [],
+    "Stage 6": []
+  },
+  "COMPUTING": {
+    "Stage 1": [],
+    "Stage 2": [],
+    "Stage 3": [],
+    "Stage 4": [],
+    "Stage 5": [],
+    "Stage 6": []
+  },
+  "DIGITAL LITERACY": {
+    "Stage 1": [],
+    "Stage 2": [],
+    "Stage 3": [],
+    "Stage 4": [],
+    "Stage 5": [],
+    "Stage 6": []
+  },
+  "ENGLISH": {
+    "Stage 1": [],
+    "Stage 2": [],
+    "Stage 3": [],
+    "Stage 4": [],
+    "Stage 5": [],
+    "Stage 6": []
+  },
+  "MATHEMATICS": {
+    "Stage 1": [
+      {
+        "topic": "Counting, estimating and recognising numbers\t10",
+        "content": ""
+      },
+      {
+        "topic": "Number patterns\t16",
+        "content": ""
+      },
+      {
+        "topic": "Comparing numbers\t23",
+        "content": "Unit 1.2 Time\t26"
+      },
+      {
+        "topic": "Time\t27",
+        "content": "Unit 1.3 Shapes, direction and movement\t31"
+      },
+      {
+        "topic": "Describing 2D and 3D shapes\t32",
+        "content": ""
+      },
+      {
+        "topic": "Position, direction and movement\t36",
+        "content": "Unit 1.4 Addition, subtraction and doubles\t39"
+      },
+      {
+        "topic": "Understanding addition\t40",
+        "content": ""
+      },
+      {
+        "topic": "Understanding subtraction\t43",
+        "content": ""
+      },
+      {
+        "topic": "Complements and doubles\t46",
+        "content": "Unit 1.5 Money\t50"
+      },
+      {
+        "topic": "Recognising money\t51",
+        "content": "Unit 1.6 Measurement\t53"
+      },
+      {
+        "topic": "Describing length, mass and capacity\t54",
+        "content": ""
+      },
+      {
+        "topic": "Measuring instruments\t58",
+        "content": "Unit 1.7 Fractions\t60"
+      },
+      {
+        "topic": "Splitting shapes\t61",
+        "content": ""
+      },
+      {
+        "topic": "Finding halves\t64",
+        "content": "Unit 1.8 Statistical methods\t67"
+      },
+      {
+        "topic": "The statistical cycle\t68",
+        "content": "Sample lesson 1\t72\nSample lesson 2\t74\nChanges to this Scheme of Work\t76\nChanges to this Scheme of Work\nFor information about changes to this Scheme of Work, go to page 76.\nThe latest Scheme of Work is version 2.1, published June 2025.\nIntroduction\nThis document is a scheme of work created by Cambridge Assessment International Education for Cambridge Primary Mathematics Stage 1.\nIt contains:\nsuggested units showing how the learning objectives in the curriculum framework can be grouped and ordered\nat least one suggested teaching activity for each learning objective\na list of subject-specific language that will be useful for your learners\ncommon misconceptions\nsample lesson plans\nlinks to relevant NRICH activities to enrich learners’ mathematical experiences, https://nrich.maths.org/\nYou do not need to use the ideas in this scheme of work to teach Cambridge Primary Mathematics Stage 1. Instead use them as a starting point for your planning and adapt them to suit the requirements of your school and the needs of your learners. The schemes of work are designed to indicate the types of activities you might use, and the intended depth and breadth of each learning objective. These activities are not designed to fill all the teaching time for this stage. You should use other activities with a similar level of difficulty, for example, those from endorsed resources.\nThe accompanying teacher guide for Cambridge Primary Mathematics suggests effective teaching and learning approaches. You can use this scheme of work as a starting point for your planning, adapting it to suit the requirements of your school and needs of your learners.\nLong-term plan\nThis long-term plan shows the units in this scheme of work and a suggestion of how long to spend teaching each one. The suggested teaching time is based on learners having about 4 to 5 hours of Mathematics per week (about 120 to 150 hours per stage). The actual number of teaching hours may vary according to your context.\nSample lesson plans\nYou will find two sample lesson plans at the end of this scheme of work. They are designed to illustrate how the suggested activities in this document can be turned into lessons. They are written in more detail than you would use for your own lesson plans. The Cambridge Primary Mathematics Teacher Guide has information on creating lesson plans.\nOther support for teaching Cambridge Primary Mathematics Stage 1\nCambridge Primary centres receive access to a range of resources when they register. The School Support Hub is a password-protected website that is the source of the majority of Cambridge-produced resources for the programme. Ask the Cambridge Coordinator or Exams Officer in your school if you do not already have a log-in for the School Support Hub.\nIncluded on the School Support Hub are:\nthe Cambridge Primary Mathematics Curriculum Framework, which contains the learning objectives that provide a structure for your teaching and learning\ngrids showing the progression of learning objectives across stages\nthe Cambridge Primary Mathematics Teacher Guide, which will help you to implement Cambridge Primary Mathematics in your school\ntemplates for planning\nworksheets for short teacher training activities that link to the teacher guide\nassessments provided by Cambridge\na list of endorsed resources, which have been through a detailed quality assurance process to make sure they are suitable for schools teaching Cambridge Primary Mathematics worldwide\nlinks to online communities of Cambridge Primary teachers.\nResources for the activities in this scheme of work\nWe have assumed that you will have access to these resources:\npaper, pens and pencils for learners to use\nrulers, set squares, protractors and calculators.\nOther suggested resources for individual units and/or activities are described in the rest of this document. You can swap these for other resources that are available in your school.\nWebsites\nWe recommend NRICH to support Cambridge Primary Mathematics at https://nrich.maths.org/\nNRICH publishes free and challenging mathematics activities for learners of all ages. The resources assist teachers to embed thinking and working mathematically with mathematics content. NRICH is based in both the University of Cambridge's Faculty of Education and the Centre for Mathematical Sciences.\nThere are many excellent online resources suitable for teaching Cambridge Primary Mathematics. Since these are updated frequently, and many are only available in some countries, we recommend that you and your colleagues identify and share resources that you have found to be effective for your learners.\nApproaches to teaching Cambridge Primary Mathematics Stage 1\nThinking and Working Mathematically\nThinking and Working Mathematically supports the mathematical concepts and skills in all strands of the Cambridge Primary Mathematics curriculum. When learners think and work mathematically, they actively engage with their learning of mathematics. They try to make sense of ideas and build connections between different facts, procedures and concepts. Learners who do not think and work mathematically can carry out processes that their teacher has shown them, but they may not understand why the processes work or what the results mean. Noticing inconsistencies, patterns and particular representations encourages learners to think and work mathematically. Practice, reflection and questioning will help them to improve.\nThinking and Working Mathematically has eight characteristics that are presented in four pairs:\nSpecialising and Generalising\nConjecturing and Convincing\nCharacterising and Classifying\nCritiquing and Improving.\nThe eight Thinking and Working Mathematically characteristics are all closely connected and interdependent. A high-quality mathematics task may include one or more of them. The characteristics provide learners with the language they need to think and work mathematically. Learners can then decide what mathematical knowledge, procedures and strategies to use in order to gain a deeper understanding of mathematical questions.\nThroughout this scheme of work, there are examples of classroom activities that link the Thinking and Working Mathematically characteristics with content learning objectives. We recommend you use the ideas in these examples to create further classroom activities.\nMisconceptions\nMathematical misconceptions are usually incorrect generalisations made by learners. Misconceptions should not be avoided, but instead used for teaching purposes to reveal learners’ thinking. Research suggests that asking learners open-ended questions about mathematical concepts is the most appropriate way to uncover misconceptions. Once a learner’s misconceptions have been identified, the next step is to know how to correct them. One approach is to give learners a variety of mathematical strategies to draw upon when finding solutions so that they can gain a deeper understanding of each mathematical concept.\nMental strategies and calculators\nMental calculation is a skill needed for everyday life, especially when paper or calculators are not available. Mental calculation relies on working memory, the organisation of thoughts and the use of efficient mathematical strategies when solving mathematical computations. It is important for learners to practise mental calculations and have a range of strategies as this improves understanding and recall as well as increasing confidence and proficiency.\nCalculators are useful teaching aides. Although learners need to practise doing mental and written calculations, calculators can help them to notice patterns. They are also useful when learners are solving problems where non-calculator calculations would take the focus away from strategies. When well used, calculators can help learners to learn about numbers and the number system. Use calculators as a teaching aid to promote mental calculation and mental strategies and to explore mathematical patterns. Learners should understand when it is best to use calculators to help them calculate, and when to calculate mentally or using written methods.\nAs Cambridge International includes calculator-based assessments at Stages 5, 6, 7, 8 and 9, we recommend that learners begin to use calculators for performing and checking calculations from Stage 4. At Stages 5 and 6, learners should be developing effective use of calculators so that they are familiar with the buttons and functions of a basic calculator.\nUnit 1.1 Numbers to 20\nUnit 1.2 Time\nUnit 1.3 Shapes, direction and movement\nUnit 1.4 Addition, subtraction and doubles\nUnit 1.5 Money\nUnit 1.6 Measurement\nUnit 1.7 Fractions\nUnit 1.8 Statistical methods\nSample lesson 1\nPlan\nSample lesson 2\nPlan\nChanges to this Scheme of Work\nThis Scheme of Work has been amended. The latest Scheme of Work is version 2.1, published June 2025.\nThe definition of the Thinking and Working Mathematically characteristic TWM.03 Conjecturing has been changed to: Forming mathematical questions or ideas.\nThe definition of the Thinking and Working Mathematically characteristic TWM 04 Convincing has been changed to: Presenting evidence to justify or challenge a mathematical idea or solution.\nThere may be other minor changes that do not affect teaching and learning.\nCambridge Assessment International Education\nThe Triangle Building, Shaftesbury Road, Cambridge, CB2 8EA, United Kingdom\nt: +44 1223 553554    f: +44 1223 553558\ne: info@cambridgeinternational.org    www.cambridgeinternational.org\n© UCLES September 2020"
+      }
+    ],
+    "Stage 2": [
+      {
+        "topic": "Counting and estimating\t10",
+        "content": ""
+      },
+      {
+        "topic": "Using and comparing numbers\t16",
+        "content": ""
+      },
+      {
+        "topic": "Addition and subtraction\t21",
+        "content": "Unit 2.2 Time\t27"
+      },
+      {
+        "topic": "Units of time\t28",
+        "content": ""
+      },
+      {
+        "topic": "Knowing the time\t30",
+        "content": "Unit 2.3 Exploring shapes and movement\t33"
+      },
+      {
+        "topic": "Describing shapes\t34",
+        "content": ""
+      },
+      {
+        "topic": "Symmetry and reflecting shapes\t38",
+        "content": ""
+      },
+      {
+        "topic": "Angles, turning and moving shapes\t41",
+        "content": ""
+      },
+      {
+        "topic": "3D shapes\t44",
+        "content": "Unit 2.4 Number patterns and place value\t46"
+      },
+      {
+        "topic": "Understanding place value\t47",
+        "content": ""
+      },
+      {
+        "topic": "Finding patterns\t51",
+        "content": "Unit 2.5 Multiplication and division\t55"
+      },
+      {
+        "topic": "Understanding multiplication\t56",
+        "content": ""
+      },
+      {
+        "topic": "Understanding division\t60",
+        "content": "Unit 2.6 Measurement\t62"
+      },
+      {
+        "topic": "Measuring length\t63",
+        "content": ""
+      },
+      {
+        "topic": "Mass and capacity\t67",
+        "content": "Unit 2.7 Fractions\t70"
+      },
+      {
+        "topic": "Finding quarters\t71",
+        "content": ""
+      },
+      {
+        "topic": "Building with fractions\t77",
+        "content": "Unit 2.8 Statistical methods and chance\t80"
+      },
+      {
+        "topic": "The statistical cycle\t81",
+        "content": ""
+      },
+      {
+        "topic": "Chance\t85",
+        "content": "Sample lesson 1\t88\nSample lesson 2\t91\nChanges to this Scheme of Work\t93\nChanges to this Scheme of Work\nFor information about changes to this Scheme of Work, go to page 93.\nThe latest Scheme of Work is version 2.1, published June 2025.\nIntroduction\nThis document is a scheme of work created by Cambridge Assessment International Education for Cambridge Primary Mathematics Stage 2.\nIt contains:\nsuggested units showing how the learning objectives in the curriculum framework can be grouped and ordered\nat least one suggested teaching activity for each learning objective\na list of subject-specific language that will be useful for your learners\ncommon misconceptions\nsample lesson plans\nlinks to relevant NRICH activities to enrich learners’ mathematical experiences, https://nrich.maths.org/\nYou do not need to use the ideas in this scheme of work to teach Cambridge Primary Mathematics Stage 2. Instead use them as a starting point for your planning and adapt them to suit the requirements of your school and the needs of your learners. The schemes of work are designed to indicate the types of activities you might use, and the intended depth and breadth of each learning objective. These activities are not designed to fill all the teaching time for this stage. You should use other activities with a similar level of difficulty, for example, those from endorsed resources.\nThe accompanying teacher guide for Cambridge Primary Mathematics suggests effective teaching and learning approaches. You can use this scheme of work as a starting point for your planning, adapting it to suit the requirements of your school and needs of your learners.\nLong-term plan\nThis long-term plan shows the units in this scheme of work and a suggestion of how long to spend teaching each one. The suggested teaching time is based on learners having about 4 to 5 hours of Mathematics per week (about 120 to 150 hours per stage). The actual number of teaching hours may vary according to your context.\nSample lesson plans\nYou will find two sample lesson plans at the end of this scheme of work. They are designed to illustrate how the suggested activities in this document can be turned into lessons. They are written in more detail than you would use for your own lesson plans. The Cambridge Primary Mathematics Teacher Guide has information on creating lesson plans.\nOther support for teaching Cambridge Primary Mathematics Stage 2\nCambridge Primary centres receive access to a range of resources when they register. The School Support Hub is a password-protected website that is the source of the majority of Cambridge-produced resources for the programme. Ask the Cambridge Coordinator or Exams Officer in your school if you do not already have a log-in for the School Support Hub.\nIncluded on the School Support Hub are:\nthe Cambridge Primary Mathematics Curriculum Framework, which contains the learning objectives that provide a structure for your teaching and learning\ngrids showing the progression of learning objectives across stages\nthe Cambridge Primary Mathematics Teacher Guide, which will help you to implement Cambridge Primary Mathematics in your school\ntemplates for planning\nworksheets for short teacher training activities that link to the teacher guide\nassessments provided by Cambridge\na list of endorsed resources, which have been through a detailed quality assurance process to make sure they are suitable for schools teaching Cambridge Primary Mathematics worldwide\nlinks to online communities of Cambridge Primary teachers.\nResources for the activities in this scheme of work\nWe have assumed that you will have access to these resources:\npaper, pens and pencils for learners to use\nrulers, set squares, protractors and calculators.\nOther suggested resources for individual units and/or activities are described in the rest of this document. You can swap these for other resources that are available in your school.\nWebsites\nWe recommend NRICH to support Cambridge Primary Mathematics at https://nrich.maths.org/\nNRICH publishes free and challenging mathematics activities for learners of all ages. The resources assist teachers to embed thinking and working mathematically with mathematics content. NRICH is based in both the University of Cambridge's Faculty of Education and the Centre for Mathematical Sciences.\nThere are many excellent online resources suitable for teaching Cambridge Primary Mathematics. Since these are updated frequently, and many are only available in some countries, we recommend that you and your colleagues identify and share resources that you have found to be effective for your learners.\nApproaches to teaching Cambridge Primary Mathematics Stage 2\nThinking and Working Mathematically\nThinking and Working Mathematically supports the mathematical concepts and skills in all strands of the Cambridge Primary Mathematics curriculum. When learners think and work mathematically, they actively engage with their learning of mathematics. They try to make sense of ideas and build connections between different facts, procedures and concepts. Learners who do not think and work mathematically can carry out processes that their teacher has shown them, but them may not understand why the processes work or what the results mean. Noticing inconsistencies, patterns and particular representations encourages learners to think and work mathematically. Practice, reflection and questioning will help them to improve.\nThinking and Working Mathematically has eight characteristics that are presented in four pairs:\nSpecialising and Generalising\nConjecturing and Convincing\nCharacterising and Classifying\nCritiquing and Improving.\nThe eight Thinking and Working Mathematically characteristics are all closely connected and interdependent. A high-quality mathematics task may include one or more of them. The characteristics provide learners with the language they need to think and work mathematically. Learners can then decide what mathematical knowledge, procedures and strategies to use in order to gain a deeper understanding of mathematical questions.\nThroughout this scheme of work, there are examples of classroom activities that link the Thinking and Working Mathematically characteristics with content learning objectives. We recommend you use the ideas in these examples to create further classroom activities.\nMisconceptions\nMathematical misconceptions are usually incorrect generalisations made by learners. Misconceptions should not be avoided, but instead used for teaching purposes to reveal learners’ thinking. Research suggests that asking learners open-ended questions about mathematical concepts is the most appropriate way to uncover misconceptions. Once a learner’s misconceptions have been identified, the next step is to know how to correct them. One approach is to give learners a variety of mathematical strategies to draw upon when finding solutions so that they can gain a deeper understanding of each mathematical concept.\nMental strategies and calculators\nMental calculation is a skill needed for everyday life, especially when paper or calculators are not available. Mental calculation relies on working memory, the organisation of thoughts and the use of efficient mathematical strategies when solving mathematical computations. It is important for learners to practise mental calculations and have a range of strategies as this improves understanding and recall as well as increasing confidence and proficiency.\nCalculators are useful teaching aides. Although learners need to practise doing mental and written calculations, calculators can help them to notice patterns. They are also useful when learners are solving problems where non-calculator calculations would take the focus away from strategies. When well used, calculators can help learners to learn about numbers and the number system. Use calculators as a teaching aid to promote mental calculation and mental strategies and to explore mathematical patterns. Learners should understand when it is best to use calculators to help them calculate, and when to calculate mentally or using written methods.\nAs Cambridge International includes calculator-based assessments at Stages 5, 6, 7, 8 and 9, we recommend that learners begin to use calculators for performing and checking calculations from Stage 4. At Stages 5 and 6, learners should be developing effective use of calculators so that they are familiar with the buttons and functions of a basic calculator.\nUnit 2.1 Numbers to 100, addition and subtraction\nUnit 2.2 Time\nUnit 2.3 Exploring shapes and movement\nUnit 2.4 Number patterns and place value\nUnit 2.5 Multiplication and division\nUnit 2.6 Measurement\nUnit 2.7 Fractions\nUnit 2.8 Statistical methods and chance\nSample lesson 1\nPlan\nSample lesson 2\nPlan\nChanges to this Scheme of Work\nThis Scheme of Work has been amended. The latest Scheme of Work is version 2.1, published June 2025.\nThe definition of the Thinking and Working Mathematically characteristic TWM.03 Conjecturing has been changed to: Forming mathematical questions or ideas.\nThe definition of the Thinking and Working Mathematically characteristic TWM 04 Convincing has been changed to: Presenting evidence to justify or challenge a mathematical idea or solution.\nThere may be other minor changes that do not affect teaching and learning.\nCambridge Assessment International Education\nThe Triangle Building, Shaftesbury Road, Cambridge, CB2 8EA, United Kingdom\nt: +44 1223 553554  f: +44 1223 553558\ne: info@cambridgeinternational.org  www.cambridgeinternational.org\n© UCLES September 2020"
+      }
+    ],
+    "Stage 3": [
+      {
+        "topic": "Understanding numbers\t10",
+        "content": ""
+      },
+      {
+        "topic": "Using addition and subtraction facts\t16",
+        "content": ""
+      },
+      {
+        "topic": "Strategies for addition and subtraction\t20",
+        "content": "Unit 3.2 Time\t22"
+      },
+      {
+        "topic": "Reading and recording time\t23",
+        "content": ""
+      },
+      {
+        "topic": "Time problems\t26",
+        "content": "Unit 3.3 Shapes and angles\t29"
+      },
+      {
+        "topic": "2D and 3D shapes\t30",
+        "content": ""
+      },
+      {
+        "topic": "Symmetry and reflection\t34",
+        "content": ""
+      },
+      {
+        "topic": "Angles, direction and position\t36",
+        "content": "Unit 3.4 Patterns, place value and rounding\t38"
+      },
+      {
+        "topic": "Making patterns\t39",
+        "content": ""
+      },
+      {
+        "topic": "Using place value and rounding\t42",
+        "content": "Unit 3.5 Measurement\t47"
+      },
+      {
+        "topic": "Measuring length, mass, capacity and temperature\t48",
+        "content": "Unit 3.6 Multiplication and division\t54"
+      },
+      {
+        "topic": "Using multiplication and division facts\t55",
+        "content": ""
+      },
+      {
+        "topic": "Strategies for multiplication and division\t60",
+        "content": "Unit 3.7 Fractions\t63"
+      },
+      {
+        "topic": "Understanding fractions\t64",
+        "content": ""
+      },
+      {
+        "topic": "Comparing fractions\t68",
+        "content": ""
+      },
+      {
+        "topic": "Calculating with fractions\t71",
+        "content": "Unit 3.8 Statistical methods and chance\t74"
+      },
+      {
+        "topic": "The statistical cycle\t75",
+        "content": ""
+      },
+      {
+        "topic": "Chance\t79",
+        "content": "Sample lesson 1\t81\nSample lesson 2\t84\nChanges to this Scheme of Work\t86\nChanges to this Scheme of Work\nFor information about changes to this Scheme of Work, go to page 86.\nThe latest Scheme of Work is version 2.1, published June 2025.\nIntroduction\nThis document is a scheme of work created by Cambridge Assessment International Education for Cambridge Primary Mathematics Stage 3.\nIt contains:\nsuggested units showing how the learning objectives in the curriculum framework can be grouped and ordered\nat least one suggested teaching activity for each learning objective\na list of subject-specific language that will be useful for your learners\ncommon misconceptions\nsample lesson plans\nlinks to relevant NRICH activities to enrich learners’ mathematical experiences, https://nrich.maths.org/\nYou do not need to use the ideas in this scheme of work to teach Cambridge Primary Mathematics Stage 3. Instead use them as a starting point for your planning and adapt them to suit the requirements of your school and the needs of your learners. The schemes of work are designed to indicate the types of activities you might use, and the intended depth and breadth of each learning objective. These activities are not designed to fill all the teaching time for this stage. You should use other activities with a similar level of difficulty, for example, those from endorsed resources.\nThe accompanying teacher guide for Cambridge Primary Mathematics suggests effective teaching and learning approaches. You can use this scheme of work as a starting point for your planning, adapting it to suit the requirements of your school and needs of your learners.\nLong-term plan\nThis long-term plan shows the units in this scheme of work and a suggestion of how long to spend teaching each one. The suggested teaching time is based on learners having about 4 to 5 hours of Mathematics per week (about 120 to 150 hours per stage). The actual number of teaching hours may vary according to your context.\nSample lesson plans\nYou will find two sample lesson plans at the end of this scheme of work. They are designed to illustrate how the suggested activities in this document can be turned into lessons. They are written in more detail than you would use for your own lesson plans. The Cambridge Primary Mathematics Teacher Guide has information on creating lesson plans.\nOther support for teaching Cambridge Primary Mathematics Stage 3\nCambridge Primary centres receive access to a range of resources when they register. The School Support Hub is a password-protected website that is the source of the majority of Cambridge-produced resources for the programme. Ask the Cambridge Coordinator or Exams Officer in your school if you do not already have a log-in for the School Support Hub.\nIncluded on the School Support Hub are:\nthe Cambridge Primary Mathematics Curriculum Framework, which contains the learning objectives that provide a structure for your teaching and learning\ngrids showing the progression of learning objectives across stages\nthe Cambridge Primary Mathematics Teacher Guide, which will help you to implement Cambridge Primary Mathematics in your school\ntemplates for planning\nworksheets for short teacher training activities that link to the teacher guide\nassessments provided by Cambridge\na list of endorsed resources, which have been through a detailed quality assurance process to make sure they are suitable for schools teaching Cambridge Primary Mathematics worldwide\nlinks to online communities of Cambridge Primary teachers.\nResources for the activities in this scheme of work\nWe have assumed that you will have access to these resources:\npaper, pens and pencils for learners to use\nrulers, set squares, protractors and calculators.\nOther suggested resources for individual units and/or activities are described in the rest of this document. You can swap these for other resources that are available in your school.\nWebsites\nWe recommend NRICH to support Cambridge Primary Mathematics at https://nrich.maths.org/\nNRICH publishes free and challenging mathematics activities for learners of all ages. The resources assist teachers to embed thinking and working mathematically with mathematics content. NRICH is based in both the University of Cambridge's Faculty of Education and the Centre for Mathematical Sciences.\nThere are many excellent online resources suitable for teaching Cambridge Primary Mathematics. Since these are updated frequently, and many are only available in some countries, we recommend that you and your colleagues identify and share resources that you have found to be effective for your learners.\nApproaches to teaching Cambridge Primary Mathematics Stage 3\nThinking and Working Mathematically\nThinking and Working Mathematically supports the mathematical concepts and skills in all strands of the Cambridge Primary Mathematics curriculum. When learners think and work mathematically, they actively engage with their learning of mathematics. They try to make sense of ideas and build connections between different facts, procedures and concepts. Learners who do not think and work mathematically can carry out processes that their teacher has shown them, but they may not understand why the processes work or what the results mean. Noticing inconsistencies, patterns and particular representations encourages learners to think and work mathematically. Practice, reflection and questioning will help them to improve.\nThinking and Working Mathematically has eight characteristics that are presented in four pairs:\nSpecialising and Generalising\nConjecturing and Convincing\nCharacterising and Classifying\nCritiquing and Improving.\nThe eight Thinking and Working Mathematically characteristics are all closely connected and interdependent. A high-quality mathematics task may include one or more of them. The characteristics provide learners with the language they need to think and work mathematically. Learners can then decide what mathematical knowledge, procedures and strategies to use in order to gain a deeper understanding of mathematical questions.\nThroughout this scheme of work, there are examples of classroom activities that link the Thinking and Working Mathematically characteristics with content learning objectives. We recommend you use the ideas in these examples to create further classroom activities.\nMisconceptions\nMathematical misconceptions are usually incorrect generalisations made by learners. Misconceptions should not be avoided, but instead used for teaching purposes to reveal learners’ thinking. Research suggests that asking learners open-ended questions about mathematical concepts is the most appropriate way to uncover misconceptions. Once a learner’s misconceptions have been identified, the next step is to know how to correct them. One approach is to give learners a variety of mathematical strategies to draw upon when finding solutions so that they can gain a deeper understanding of each mathematical concept.\nMental strategies and calculators\nMental calculation is a skill needed for everyday life, especially when paper or calculators are not available. Mental calculation relies on working memory, the organisation of thoughts and the use of efficient mathematical strategies when solving mathematical computations. It is important for learners to practise mental calculations and have a range of strategies as this improves understanding and recall as well as increasing confidence and proficiency.\nCalculators are useful teaching aides. Although learners need to practise doing mental and written calculations, calculators can help them to notice patterns. They are also useful when learners are solving problems where non-calculator calculations would take the focus away from strategies. When well used, calculators can help learners to learn about numbers and the number system. Use calculators as a teaching aid to promote mental calculation and mental strategies and to explore mathematical patterns. Learners should understand when it is best to use calculators to help them calculate, and when to calculate mentally or using written methods.\nAs Cambridge International includes calculator-based assessments at Stages 5, 6, 7, 8 and 9, we recommend that learners begin to use calculators for performing and checking calculations from Stage 4. At Stages 5 and 6, learners should be developing effective use of calculators so that they are familiar with the buttons and functions of a basic calculator.\nUnit 3.1 Numbers to 1000, addition and subtraction\nUnit 3.2 Time\nUnit 3.3 Shapes and angles\nUnit 3.4 Patterns, place value and rounding\nUnit 3.5 Measurement\nUnit 3.6 Multiplication and division\nUnit 3.7 Fractions\nUnit 3.8 Statistical methods and chance\nSample lesson 1\nPlan\nSample lesson 2\nPlan\nChanges to this Scheme of Work\nThis Scheme of Work has been amended. The latest Scheme of Work is version 2.1, published June 2025.\nThe definition of the Thinking and Working Mathematically characteristic TWM.03 Conjecturing has been changed to: Forming mathematical questions or ideas.\nThe definition of the Thinking and Working Mathematically characteristic TWM 04 Convincing has been changed to: Presenting evidence to justify or challenge a mathematical idea or solution.\nThere may be other minor changes that do not affect teaching and learning.\nCambridge Assessment International Education\nThe Triangle Building, Shaftesbury Road, Cambridge, CB2 8EA, United Kingdom\nt: +44 1223 553554    f: +44 1223 553558\ne: info@cambridgeinternational.org    www.cambridgeinternational.org\n© UCLES September 2020"
+      }
+    ],
+    "Stage 4": [
+      {
+        "topic": "Introducing negative numbers\t10",
+        "content": ""
+      },
+      {
+        "topic": "Patterns and sequences\t14",
+        "content": ""
+      },
+      {
+        "topic": "Place value and rounding\t17",
+        "content": ""
+      },
+      {
+        "topic": "Factors and multiples\t21",
+        "content": "Unit 4.2 Time\t24"
+      },
+      {
+        "topic": "Reading and recording time\t25",
+        "content": ""
+      },
+      {
+        "topic": "Time problems\t28",
+        "content": "Unit 4.3 2D and 3D shape\t30"
+      },
+      {
+        "topic": "Tessellation, symmetry and reflection\t31",
+        "content": ""
+      },
+      {
+        "topic": "Area and perimeter\t35",
+        "content": ""
+      },
+      {
+        "topic": "Recognising and building 3D shapes\t39",
+        "content": "Unit 4.4 Calculation\t41"
+      },
+      {
+        "topic": "Addition and subtraction\t42",
+        "content": ""
+      },
+      {
+        "topic": "Multiplication and division\t45",
+        "content": "Unit 4.5 Statistical methods\t50"
+      },
+      {
+        "topic": "Collecting data\t51",
+        "content": ""
+      },
+      {
+        "topic": "Presenting and interpreting data\t53",
+        "content": ""
+      },
+      {
+        "topic": "The statistical cycle\t55",
+        "content": "Unit 4.6 Fractions and percentages\t58"
+      },
+      {
+        "topic": "Understanding fractions\t59",
+        "content": ""
+      },
+      {
+        "topic": "Calculating with fractions\t64",
+        "content": ""
+      },
+      {
+        "topic": "Percentages and equivalence\t66",
+        "content": "Unit 4.7 Angles, position and direction\t69"
+      },
+      {
+        "topic": "Angles\t70",
+        "content": ""
+      },
+      {
+        "topic": "Position and direction\t72",
+        "content": "Unit 4.8 Probability\t75"
+      },
+      {
+        "topic": "Describing chance\t76",
+        "content": ""
+      },
+      {
+        "topic": "Conducting experiments\t78",
+        "content": "Sample lesson 1\t80\nSample lesson 2\t83\nChanges to this Scheme of Work\t85\nChanges to this Scheme of Work\nFor information about changes to this Scheme of Work, go to page 85.\nThe latest Scheme of Work is version 2.1, published June 2025.\nIntroduction\nThis document is a scheme of work created by Cambridge Assessment International Education for Cambridge Primary Mathematics Stage 4.\nIt contains:\nsuggested units showing how the learning objectives in the curriculum framework can be grouped and ordered\nat least one suggested teaching activity for each learning objective\na list of subject-specific language that will be useful for your learners\ncommon misconceptions\nsample lesson plans\nlinks to relevant NRICH activities to enrich learners’ mathematical experiences, https://nrich.maths.org/\nYou do not need to use the ideas in this scheme of work to teach Cambridge Primary Mathematics Stage 4. Instead use them as a starting point for your planning and adapt them to suit the requirements of your school and the needs of your learners. The schemes of work are designed to indicate the types of activities you might use, and the intended depth and breadth of each learning objective. These activities are not designed to fill all the teaching time for this stage. You should use other activities with a similar level of difficulty, for example, those from endorsed resources.\nThe accompanying teacher guide for Cambridge Primary Mathematics suggests effective teaching and learning approaches. You can use this scheme of work as a starting point for your planning, adapting it to suit the requirements of your school and needs of your learners.\nLong-term plan\nThis long-term plan shows the units in this scheme of work and a suggestion of how long to spend teaching each one. The suggested teaching time is based on learners having about 4 to 5 hours of Mathematics per week (about 120 to 150 hours per stage). The actual number of teaching hours may vary according to your context.\nSample lesson plans\nYou will find two sample lesson plans at the end of this scheme of work. They are designed to illustrate how the suggested activities in this document can be turned into lessons. They are written in more detail than you would use for your own lesson plans. The Cambridge Primary Mathematics Teacher Guide has information on creating lesson plans.\nOther support for teaching Cambridge Primary Mathematics Stage 4\nCambridge Primary centres receive access to a range of resources when they register. The School Support Hub is a password-protected website that is the source of the majority of Cambridge-produced resources for the programme. Ask the Cambridge Coordinator or Exams Officer in your school if you do not already have a log-in for the School Support Hub.\nIncluded on the School Support Hub are:\nthe Cambridge Primary Mathematics Curriculum Framework, which contains the learning objectives that provide a structure for your teaching and learning\ngrids showing the progression of learning objectives across stages\nthe Cambridge Primary Mathematics Teacher Guide, which will help you to implement Cambridge Primary Mathematics in your school\ntemplates for planning\nworksheets for short teacher training activities that link to the teacher guide\nassessments provided by Cambridge\na list of endorsed resources, which have been through a detailed quality assurance process to make sure they are suitable for schools teaching Cambridge Primary Mathematics worldwide\nlinks to online communities of Cambridge Primary teachers.\nResources for the activities in this scheme of work\nWe have assumed that you will have access to these resources:\npaper, pens and pencils for learners to use\nrulers, set squares, protractors and calculators.\nOther suggested resources for individual units and/or activities are described in the rest of this document. You can swap these for other resources that are available in your school.\nWebsites\nWe recommend NRICH to support Cambridge Primary Mathematics at https://nrich.maths.org/\nNRICH publishes free and challenging mathematics activities for learners of all ages. The resources assist teachers to embed thinking and working mathematically with mathematics content. NRICH is based in both the University of Cambridge's Faculty of Education and the Centre for Mathematical Sciences.\nThere are many excellent online resources suitable for teaching Cambridge Primary Mathematics. Since these are updated frequently, and many are only available in some countries, we recommend that you and your colleagues identify and share resources that you have found to be effective for your learners.\nApproaches to teaching Cambridge Primary Mathematics Stage 4\nThinking and Working Mathematically\nThinking and Working Mathematically supports the mathematical concepts and skills in all strands of the Cambridge Primary Mathematics curriculum. When learners think and work mathematically, they actively engage with their learning of mathematics. They try to make sense of ideas and build connections between different facts, procedures and concepts. Learners who do not think and work mathematically can carry out processes that their teacher has shown them, but they may not understand why the processes work or what the results mean. Noticing inconsistencies, patterns and particular representations encourages learners to think and work mathematically. Practice, reflection and questioning will help them to improve.\nThinking and Working Mathematically has eight characteristics that are presented in four pairs:\nSpecialising and Generalising\nConjecturing and Convincing\nCharacterising and Classifying\nCritiquing and Improving.\nThe eight Thinking and Working Mathematically characteristics are all closely connected and interdependent. A high-quality mathematics task may include one or more of them. The characteristics provide learners with the language they need to think and work mathematically. Learners can then decide what mathematical knowledge, procedures and strategies to use in order to gain a deeper understanding of mathematical questions.\nThroughout this scheme of work, there are examples of classroom activities that link the Thinking and Working Mathematically characteristics with content learning objectives. We recommend you use the ideas in these examples to create further classroom activities.\nMisconceptions\nMathematical misconceptions are usually incorrect generalisations made by learners. Misconceptions should not be avoided, but instead used for teaching purposes to reveal learners’ thinking. Research suggests that asking learners open-ended questions about mathematical concepts is the most appropriate way to uncover misconceptions. Once a learner’s misconceptions have been identified, the next step is to know how to correct them. One approach is to give learners a variety of mathematical strategies to draw upon when finding solutions so that they can gain a deeper understanding of each mathematical concept.\nMental strategies and calculators\nMental calculation is a skill needed for everyday life, especially when paper or calculators are not available. Mental calculation relies on working memory, the organisation of thoughts and the use of efficient mathematical strategies when solving mathematical computations. It is important for learners to practise mental calculations and have a range of strategies as this improves understanding and recall as well as increasing confidence and proficiency.\nCalculators are useful teaching aides. Although learners need to practise doing mental and written calculations, calculators can help them to notice patterns. They are also useful when learners are solving problems where non-calculator calculations would take the focus away from strategies. When well used, calculators can help learners to learn about numbers and the number system. Use calculators as a teaching aid to promote mental calculation and mental strategies and to explore mathematical patterns. Learners should understand when it is best to use calculators to help them calculate, and when to calculate mentally or using written methods.\nAs Cambridge International includes calculator-based assessments at Stages 5, 6, 7, 8 and 9, we recommend that learners begin to use calculators for performing and checking calculations from Stage 4. At Stages 5 and 6, learners should be developing effective use of calculators so that they are familiar with the buttons and functions of a basic calculator.\nUnit 4.1 Number\nUnit 4.2 Time\nUnit 4.3 2D and 3D shape\nUnit 4.4 Calculation\nUnit 4.5 Statistical methods\nUnit 4.6 Fractions and percentages\nUnit 4.7 Angles, position and direction\nUnit 4.8 Probability\nSample lesson 1\nPlan\nSample lesson 2\nPlan\nChanges to this Scheme of Work\nThis Scheme of Work has been amended. The latest Scheme of Work is version 2.1, published June 2025.\nThe definition of the Thinking and Working Mathematically characteristic TWM.03 Conjecturing has been changed to: Forming mathematical questions or ideas.\nThe definition of the Thinking and Working Mathematically characteristic TWM 04 Convincing has been changed to: Presenting evidence to justify or challenge a mathematical idea or solution.\nThere may be other minor changes that do not affect teaching and learning.\nCambridge Assessment International Education\nThe Triangle Building, Shaftesbury Road, Cambridge, CB2 8EA, United Kingdom\nt: +44 1223 553554    f: +44 1223 553558\ne: info@cambridgeinternational.org    www.cambridgeinternational.org\n© UCLES September 2020"
+      }
+    ],
+    "Stage 5": [
+      {
+        "topic": "Place value\t10",
+        "content": ""
+      },
+      {
+        "topic": "Explaining sequences\t15",
+        "content": ""
+      },
+      {
+        "topic": "Special numbers\t19",
+        "content": "Unit 5.2 Time\t23"
+      },
+      {
+        "topic": "Time problems\t24",
+        "content": "Unit 5.3 Angles and shape\t29"
+      },
+      {
+        "topic": "Angles\t30",
+        "content": ""
+      },
+      {
+        "topic": "Triangles, area and perimeter\t35",
+        "content": ""
+      },
+      {
+        "topic": "3D shapes\t39",
+        "content": "Unit 5.4 Calculation\t42"
+      },
+      {
+        "topic": "Addition, subtraction and negative numbers\t43",
+        "content": ""
+      },
+      {
+        "topic": "Multiplication and division\t49",
+        "content": ""
+      },
+      {
+        "topic": "Rules for calculations\t55",
+        "content": "Unit 5.5 Statistical methods\t58"
+      },
+      {
+        "topic": "Designing the enquiry\t59",
+        "content": ""
+      },
+      {
+        "topic": "Presenting and explaining results\t61",
+        "content": ""
+      },
+      {
+        "topic": "Using the mode and the median\t64",
+        "content": ""
+      },
+      {
+        "topic": "The statistical cycle\t67",
+        "content": "Unit 5.6 Fractions, percentages, decimals and proportion\t71"
+      },
+      {
+        "topic": "Understanding and comparing fractions and decimals\t72",
+        "content": ""
+      },
+      {
+        "topic": "Calculating with fractions\t78",
+        "content": ""
+      },
+      {
+        "topic": "Understanding percentage and equivalence\t84",
+        "content": ""
+      },
+      {
+        "topic": "Ratio and proportion\t88",
+        "content": "Unit 5.7 Location and movement\t91"
+      },
+      {
+        "topic": "Using coordinates\t92",
+        "content": ""
+      },
+      {
+        "topic": "Symmetry, reflection and translation\t95",
+        "content": "Unit 5.8 Probability\t99"
+      },
+      {
+        "topic": "Describing possibilities\t100",
+        "content": ""
+      },
+      {
+        "topic": "Conducting tests\t103",
+        "content": "Sample lesson 1\t106\nSample lesson 2\t109\nChanges to this Scheme of Work\t112\nChanges to this Scheme of Work\nFor information about changes to this Scheme of Work, go to page 112.\nThe latest Scheme of Work is version 2.1, published June 2025.\nIntroduction\nThis document is a scheme of work created by Cambridge Assessment International Education for Cambridge Primary Mathematics Stage 5.\nIt contains:\nsuggested units showing how the learning objectives in the curriculum framework can be grouped and ordered\nat least one suggested teaching activity for each learning objective\na list of subject-specific language that will be useful for your learners\ncommon misconceptions\nsample lesson plans\nlinks to relevant NRICH activities to enrich learners’ mathematical experiences, https://nrich.maths.org/\nYou do not need to use the ideas in this scheme of work to teach Cambridge Primary Mathematics Stage 5. Instead use them as a starting point for your planning and adapt them to suit the requirements of your school and the needs of your learners. The schemes of work are designed to indicate the types of activities you might use, and the intended depth and breadth of each learning objective. These activities are not designed to fill all the teaching time for this stage. You should use other activities with a similar level of difficulty, for example, those from endorsed resources.\nThe accompanying teacher guide for Cambridge Primary Mathematics suggests effective teaching and learning approaches. You can use this scheme of work as a starting point for your planning, adapting it to suit the requirements of your school and needs of your learners.\nLong-term plan\nThis long-term plan shows the units in this scheme of work and a suggestion of how long to spend teaching each one. The suggested teaching time is based on learners having about 4 to 5 hours of Mathematics per week (about 120 to 150 hours per stage). The actual number of teaching hours may vary according to your context.\nSample lesson plans\nYou will find two sample lesson plans at the end of this scheme of work. They are designed to illustrate how the suggested activities in this document can be turned into lessons. They are written in more detail than you would use for your own lesson plans. The Cambridge Primary Mathematics Teacher Guide has information on creating lesson plans.\nOther support for teaching Cambridge Primary Mathematics Stage 5\nCambridge Primary centres receive access to a range of resources when they register. The School Support Hub is a password-protected website that is the source of the majority of Cambridge-produced resources for the programme. Ask the Cambridge Coordinator or Exams Officer in your school if you do not already have a log-in for the School Support Hub.\nIncluded on the School Support Hub are:\nthe Cambridge Primary Mathematics Curriculum Framework, which contains the learning objectives that provide a structure for your teaching and learning\ngrids showing the progression of learning objectives across stages\nthe Cambridge Primary Mathematics Teacher Guide, which will help you to implement Cambridge Primary Mathematics in your school\ntemplates for planning\nworksheets for short teacher training activities that link to the teacher guide\nassessments provided by Cambridge\na list of endorsed resources, which have been through a detailed quality assurance process to make sure they are suitable for schools teaching Cambridge Primary Mathematics worldwide\nlinks to online communities of Cambridge Primary teachers.\nResources for the activities in this scheme of work\nWe have assumed that you will have access to these resources:\npaper, pens and pencils for learners to use\nrulers, set squares, protractors and calculators.\nOther suggested resources for individual units and/or activities are described in the rest of this document. You can swap these for other resources that are available in your school.\nWebsites\nWe recommend NRICH to support Cambridge Primary Mathematics at https://nrich.maths.org/\nNRICH publishes free and challenging mathematics activities for learners of all ages. The resources assist teachers to embed thinking and working mathematically with mathematics content. NRICH is based in both the University of Cambridge's Faculty of Education and the Centre for Mathematical Sciences.\nThere are many excellent online resources suitable for teaching Cambridge Primary Mathematics. Since these are updated frequently, and many are only available in some countries, we recommend that you and your colleagues identify and share resources that you have found to be effective for your learners.\nApproaches to teaching Cambridge Primary Mathematics Stage 5\nThinking and Working Mathematically\nThinking and Working Mathematically supports the mathematical concepts and skills in all strands of the Cambridge Primary Mathematics curriculum. When learners think and work mathematically, they actively engage with their learning of mathematics. They try to make sense of ideas and build connections between different facts, procedures and concepts. Learners who do not think and work mathematically can carry out processes that their teacher has shown them, but they may not understand why the processes work or what the results mean. Noticing inconsistencies, patterns and particular representations encourages learners to think and work mathematically. Practice, reflection and questioning will help them to improve.\nThinking and Working Mathematically has eight characteristics that are presented in four pairs:\nSpecialising and Generalising\nConjecturing and Convincing\nCharacterising and Classifying\nCritiquing and Improving.\nThe eight Thinking and Working Mathematically characteristics are all closely connected and interdependent. A high-quality mathematics task may include one or more of them. The characteristics provide learners with the language they need to think and work mathematically. Learners can then decide what mathematical knowledge, procedures and strategies to use in order to gain a deeper understanding of mathematical questions.\nThroughout this scheme of work, there are examples of classroom activities that link the Thinking and Working Mathematically characteristics with content learning objectives. We recommend you use the ideas in these examples to create further classroom activities.\nMisconceptions\nMathematical misconceptions are usually incorrect generalisations made by learners. Misconceptions should not be avoided, but instead used for teaching purposes to reveal learners’ thinking. Research suggests that asking learners open-ended questions about mathematical concepts is the most appropriate way to uncover misconceptions. Once a learner’s misconceptions have been identified, the next step is to know how to correct them. One approach is to give learners a variety of mathematical strategies to draw upon when finding solutions so that they can gain a deeper understanding of each mathematical concept.\nMental strategies and calculators\nMental calculation is a skill needed for everyday life, especially when paper or calculators are not available. Mental calculation relies on working memory, the organisation of thoughts and the use of efficient mathematical strategies when solving mathematical computations. It is important for learners to practise mental calculations and have a range of strategies as this improves understanding and recall as well as increasing confidence and proficiency.\nCalculators are useful teaching aides. Although learners need to practise doing mental and written calculations, calculators can help them to notice patterns. They are also useful when learners are solving problems where non-calculator calculations would take the focus away from strategies. When well used, calculators can help learners to learn about numbers and the number system. Use calculators as a teaching aid to promote mental calculation and mental strategies and to explore mathematical patterns. Learners should understand when it is best to use calculators to help them calculate, and when to calculate mentally or using written methods.\nAs Cambridge International includes calculator-based assessments at Stages 5, 6, 7, 8 and 9, we recommend that learners begin to use calculators for performing and checking calculations from Stage 4. At Stages 5 and 6, learners should be developing effective use of calculators so that they are familiar with the buttons and functions of a basic calculator.\nUnit 5.1 Number\nUnit 5.2 Time\nUnit 5.3 Angles and shape\nUnit 5.4 Calculation\nUnit 5.5 Statistical methods\nUnit 5.6 Fractions, percentages, decimals and proportion\nUnit 5.7 Location and movement\nUnit 5.8 Probability\nSample lesson 1\nPlan\nSample lesson 2\nPlan\nChanges to this Scheme of Work\nThis Scheme of Work has been amended. The latest Scheme of Work is version 2.1, published June 2025.\nThe definition of the Thinking and Working Mathematically characteristic TWM.03 Conjecturing has been changed to: Forming mathematical questions or ideas.\nThe definition of the Thinking and Working Mathematically characteristic TWM 04 Convincing has been changed to: Presenting evidence to justify or challenge a mathematical idea or solution.\nThere may be other minor changes that do not affect teaching and learning.\nCambridge Assessment International Education\nThe Triangle Building, Shaftesbury Road, Cambridge, CB2 8EA, United Kingdom\nt: +44 1223 553554    f: +44 1223 553558\ne: info@cambridgeinternational.org    www.cambridgeinternational.org\n© UCLES September 2020"
+      }
+    ],
+    "Stage 6": [
+      {
+        "topic": "The number system\t10",
+        "content": ""
+      },
+      {
+        "topic": "Number patterns\t19",
+        "content": "Unit 6.2 2D and 3D shape\t22"
+      },
+      {
+        "topic": "Quadrilaterals, circles and area\t23",
+        "content": ""
+      },
+      {
+        "topic": "Angles\t28",
+        "content": ""
+      },
+      {
+        "topic": "3D shapes, volume and capacity\t31",
+        "content": "Unit 6.3 Calculation\t35"
+      },
+      {
+        "topic": "Addition and subtraction\t36",
+        "content": ""
+      },
+      {
+        "topic": "Multiplication and division\t39",
+        "content": "Unit 6.4 Statistical methods\t45"
+      },
+      {
+        "topic": "Designing the enquiry\t46",
+        "content": ""
+      },
+      {
+        "topic": "Presenting and explaining results\t48",
+        "content": ""
+      },
+      {
+        "topic": "Using statistical measures\t52",
+        "content": ""
+      },
+      {
+        "topic": "The statistical cycle\t54",
+        "content": "Unit 6.5 Fractions, percentages, decimals and proportion\t58"
+      },
+      {
+        "topic": "Comparing fractions\t59",
+        "content": ""
+      },
+      {
+        "topic": "Calculating with fractions\t62",
+        "content": ""
+      },
+      {
+        "topic": "Understanding percentage and equivalence\t66",
+        "content": ""
+      },
+      {
+        "topic": "Ratio and proportion\t68",
+        "content": "Unit 6.6 The coordinate grid\t71"
+      },
+      {
+        "topic": "Using coordinates\t72",
+        "content": ""
+      },
+      {
+        "topic": "Reflection and rotation\t75",
+        "content": "Unit 6.7 Probability\t78"
+      },
+      {
+        "topic": "Describing possibilities\t79",
+        "content": ""
+      },
+      {
+        "topic": "Conducting tests\t82",
+        "content": "Sample lesson 1\t84\nSample lesson 2\t87\nChanges to this Scheme of Work\t89\nChanges to this Scheme of Work\nFor information about changes to this Scheme of Work, go to page 89.\nThe latest Scheme of Work is version 2.1, published June 2025.\nIntroduction\nThis document is a scheme of work created by Cambridge Assessment International Education for Cambridge Primary Mathematics Stage 6.\nIt contains:\nsuggested units showing how the learning objectives in the curriculum framework can be grouped and ordered\nat least one suggested teaching activity for each learning objective\na list of subject-specific language that will be useful for your learners\ncommon misconceptions\nsample lesson plans\nlinks to relevant NRICH activities to enrich learners’ mathematical experiences, https://nrich.maths.org/\nYou do not need to use the ideas in this scheme of work to teach Cambridge Primary Mathematics Stage 6. Instead use them as a starting point for your planning and adapt them to suit the requirements of your school and the needs of your learners. The schemes of work are designed to indicate the types of activities you might use, and the intended depth and breadth of each learning objective. These activities are not designed to fill all the teaching time for this stage. You should use other activities with a similar level of difficulty, for example, those from endorsed resources.\nThe accompanying teacher guide for Cambridge Primary Mathematics suggests effective teaching and learning approaches. You can use this scheme of work as a starting point for your planning, adapting it to suit the requirements of your school and needs of your learners.\nLong-term plan\nThis long-term plan shows the units in this scheme of work and a suggestion of how long to spend teaching each one. The suggested teaching time is based on learners having about 4 to 5 hours of Mathematics per week (about 120 to 150 hours per stage). The actual number of teaching hours may vary according to your context.\nSample lesson plans\nYou will find two sample lesson plans at the end of this scheme of work. They are designed to illustrate how the suggested activities in this document can be turned into lessons. They are written in more detail than you would use for your own lesson plans. The Cambridge Primary Mathematics Teacher Guide has information on creating lesson plans.\nOther support for teaching Cambridge Primary Mathematics Stage 6\nCambridge Primary centres receive access to a range of resources when they register. The School Support Hub is a password-protected website that is the source of the majority of Cambridge-produced resources for the programme. Ask the Cambridge Coordinator or Exams Officer in your school if you do not already have a log-in for the School Support Hub.\nIncluded on the School Support Hub are:\nthe Cambridge Primary Mathematics Curriculum Framework, which contains the learning objectives that provide a structure for your teaching and learning\ngrids showing the progression of learning objectives across stages\nthe Cambridge Primary Mathematics Teacher Guide, which will help you to implement Cambridge Primary Mathematics in your school\ntemplates for planning\nworksheets for short teacher training activities that link to the teacher guide\nassessments provided by Cambridge\na list of endorsed resources, which have been through a detailed quality assurance process to make sure they are suitable for schools teaching Cambridge Primary Mathematics worldwide\nlinks to online communities of Cambridge Primary teachers.\nResources for the activities in this scheme of work\nWe have assumed that you will have access to these resources:\npaper, pens and pencils for learners to use\nrulers, set squares, protractors and calculators.\nOther suggested resources for individual units and/or activities are described in the rest of this document. You can swap these for other resources that are available in your school.\nWebsites\nWe recommend NRICH to support Cambridge Primary Mathematics at https://nrich.maths.org/\nNRICH publishes free and challenging mathematics activities for learners of all ages. The resources assist teachers to embed thinking and working mathematically with mathematics content. NRICH is based in both the University of Cambridge's Faculty of Education and the Centre for Mathematical Sciences.\nThere are many excellent online resources suitable for teaching Cambridge Primary Mathematics. Since these are updated frequently, and many are only available in some countries, we recommend that you and your colleagues identify and share resources that you have found to be effective for your learners.\nApproaches to teaching Cambridge Primary Mathematics Stage 6\nThinking and Working Mathematically\nThinking and Working Mathematically supports the mathematical concepts and skills in all strands of the Cambridge Primary Mathematics curriculum. When learners think and work mathematically, they actively engage with their learning of mathematics. They try to make sense of ideas and build connections between different facts, procedures and concepts. Learners who do not think and work mathematically can carry out processes that their teacher has shown them, but they may not understand why the processes work or what the results mean. Noticing inconsistencies, patterns and particular representations encourages learners to think and work mathematically. Practice, reflection and questioning will help them to improve.\nThinking and Working Mathematically has eight characteristics that are presented in four pairs:\nSpecialising and Generalising\nConjecturing and Convincing\nCharacterising and Classifying\nCritiquing and Improving.\nThe eight Thinking and Working Mathematically characteristics are all closely connected and interdependent. A high-quality mathematics task may include one or more of them. The characteristics provide learners with the language they need to think and work mathematically. Learners can then decide what mathematical knowledge, procedures and strategies to use in order to gain a deeper understanding of mathematical questions.\nThroughout this scheme of work, there are examples of classroom activities that link the Thinking and Working Mathematically characteristics with content learning objectives. We recommend you use the ideas in these examples to create further classroom activities.\nMisconceptions\nMathematical misconceptions are usually incorrect generalisations made by learners. Misconceptions should not be avoided, but instead used for teaching purposes to reveal learners’ thinking. Research suggests that asking learners open-ended questions about mathematical concepts is the most appropriate way to uncover misconceptions. Once a learner’s misconceptions have been identified, the next step is to know how to correct them. One approach is to give learners a variety of mathematical strategies to draw upon when finding solutions so that they can gain a deeper understanding of each mathematical concept.\nMental strategies and calculators\nMental calculation is a skill needed for everyday life, especially when paper or calculators are not available. Mental calculation relies on working memory, the organisation of thoughts and the use of efficient mathematical strategies when solving mathematical computations. It is important for learners to practise mental calculations and have a range of strategies as this improves understanding and recall as well as increasing confidence and proficiency.\nCalculators are useful teaching aides. Although learners need to practise doing mental and written calculations, calculators can help them to notice patterns. They are also useful when learners are solving problems where non-calculator calculations would take the focus away from strategies. When well used, calculators can help learners to learn about numbers and the number system. Use calculators as a teaching aid to promote mental calculation and mental strategies and to explore mathematical patterns. Learners should understand when it is best to use calculators to help them calculate, and when to calculate mentally or using written methods.\nAs Cambridge International includes calculator-based assessments at Stages 5, 6, 7, 8, and 9, we recommend that learners begin to use calculators for performing and checking calculations from Stage 4. At Stages 5 and 6, learners should be developing effective use of calculators so that they are familiar with the buttons and functions of a basic calculator.\nUnit 6.1 Number\nUnit 6.2 2D and 3D shape\nUnit 6.3 Calculation\nUnit 6.4 Statistical methods\nUnit 6.5 Fractions, percentages, decimals and proportion\nUnit 6.6 The coordinate grid\nUnit 6.7 Probability\nSample lesson 1\nPlan\nSample lesson 2\nPlan\nChanges to this Scheme of Work\nThis Scheme of Work has been amended. The latest Scheme of Work is version 2.1, published June 2025.\nThe definition of the Thinking and Working Mathematically characteristic TWM.03 Conjecturing has been changed to: Forming mathematical questions or ideas.\nThe definition of the Thinking and Working Mathematically characteristic TWM 04 Convincing has been changed to: Presenting evidence to justify or challenge a mathematical idea or solution.\nThere may be other minor changes that do not affect teaching and learning.\nCambridge Assessment International Education\nThe Triangle Building, Shaftesbury Road, Cambridge, CB2 8EA, United Kingdom\nt: +44 1223 553554    f: +44 1223 553558\ne: info@cambridgeinternational.org    www.cambridgeinternational.org\n© UCLES September 2020"
+      }
+    ]
+  },
+  "MUSIC": {
+    "Stage 1": [],
+    "Stage 2": [],
+    "Stage 3": [],
+    "Stage 4": [],
+    "Stage 5": [],
+    "Stage 6": []
+  },
+  "SCIENCE": {
+    "Stage 1": [],
+    "Stage 2": [],
+    "Stage 3": [],
+    "Stage 4": [],
+    "Stage 6": [],
+    "Stage 5": []
+  }
+}

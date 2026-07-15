@@ -157,51 +157,87 @@ export function getFallbackQuiz(subject: string, grade: string, topic: string, n
     };
   }
 
-  // 4. Default English/Comprehension fallback (including any other subjects)
+  // 4. Default dynamic fallback using Cambridge Curriculum Data
+  let objectiveSnippet = `Understand key topics in ${cleanSubject} related to ${cleanTopic}.`;
+  try {
+    const data = require('./data/curriculum/all_subjects.json');
+    const subjKey = Object.keys(data).find(k => k.toLowerCase() === cleanSubject.toLowerCase());
+    if (subjKey) {
+      const stageObj = data[subjKey];
+      const stageNumMatch = cleanGrade.match(/\d+/);
+      if (stageNumMatch) {
+        const stKey = `Stage ${stageNumMatch[0]}`;
+        const topicsList = stageObj[stKey] || [];
+        const matchedTopic = topicsList.find((t: any) => t.topic.toLowerCase().includes(cleanTopic.toLowerCase()));
+        if (matchedTopic && matchedTopic.content) {
+          // Use the first few sentences of the curriculum content as the objective
+          objectiveSnippet = matchedTopic.content.split('\n')[0].substring(0, 120) + "...";
+        }
+      }
+    }
+  } catch (e) {
+    // silently fail and use default
+  }
+
   return {
     title: `${cleanSubject} Quiz: ${cleanTopic} (Local Offline Backup)`,
     description: `A generic offline quiz on ${cleanTopic} under ${cleanSubject}.`,
-    cambridgeObjective: `Understand key topics in ${cleanSubject} related to ${cleanTopic}.`,
+    cambridgeObjective: objectiveSnippet,
     questions: [
       {
         id: 'q1',
-        question: `Which word is closest in meaning to "${cleanTopic}"?`,
-        options: ['Example', 'Topic detail', 'Related subject', 'Category'],
+        question: `Which concept is primarily studied under the topic "${cleanTopic}"?`,
+        options: ['General knowledge', 'Core curriculum principles', 'Extracurricular activities', 'Irrelevant facts'],
         correctIndex: 1,
-        explanation: 'This is a general vocabulary question related to the topic.'
+        explanation: 'This question tests your basic understanding of the curriculum structure.'
       },
       {
         id: 'q2',
-        question: `Why is the study of "${cleanTopic}" important in Zanzibar?`,
+        question: `Why is the study of "${cleanTopic}" important?`,
         options: [
           'It has no relevance',
-          'It connects to local history, trade, and natural environment',
-          'It only applies in other countries',
-          'It is a random subject'
+          'It helps build foundational knowledge for this subject',
+          'It is only useful for exams',
+          'It is a random topic'
         ],
         correctIndex: 1,
-        explanation: 'Most subjects at Leaders International link directly to local history, ocean ecology, or agriculture.'
+        explanation: 'All topics in the Cambridge framework build foundational knowledge.'
       },
       {
         id: 'q3',
-        question: 'Identify the noun in the sentence: "The students saw a beautiful dhow (traditional boat) sailing near Stone Town."',
-        options: ['saw', 'beautiful', 'dhow (traditional boat)', 'sailing'],
-        correctIndex: 2,
-        explanation: '"Dhow" (traditional sailing vessel) is a person, place, or thing, which makes it a noun.'
+        question: `Which of the following would be an expected learning outcome for "${cleanTopic}"?`,
+        options: [
+          'Forgetting the material',
+          'Applying the concept to solve problems',
+          'Ignoring the teacher',
+          'Sleeping in class'
+        ],
+        correctIndex: 1,
+        explanation: 'Applying concepts to solve problems is a core objective of learning.'
       },
       {
         id: 'q4',
-        question: 'Which of the following describes the climate of Zanzibar?',
-        options: ['Snowy and freezing', 'Hot and tropical', 'Dry desert', 'Cold and temperate'],
-        correctIndex: 1,
-        explanation: 'Zanzibar is situated near the equator and has a warm, humid tropical climate.'
+        question: `How does "${cleanTopic}" relate to previous learning?`,
+        options: [
+          'It builds on prior knowledge in a spiral approach',
+          'It is completely disconnected',
+          'It contradicts everything learned before',
+          'It deletes past memories'
+        ],
+        correctIndex: 0,
+        explanation: 'Cambridge Primary uses a spiral approach, revisiting and expanding on topics.'
       },
       {
         id: 'q5',
-        question: 'What is the capital and historical heart of Zanzibar?',
-        options: ['Dar es Salaam', 'Arusha', 'Stone Town', 'Dodoma'],
-        correctIndex: 2,
-        explanation: 'Stone Town (Mji Mkongwe in Swahili, meaning "Old Town") is the historical city center of Zanzibar City.'
+        question: `What should a student do if they struggle with "${cleanTopic}"?`,
+        options: [
+          'Give up immediately',
+          'Ask the teacher or use reference materials',
+          'Skip the topic entirely',
+          'Guess all the answers'
+        ],
+        correctIndex: 1,
+        explanation: 'Asking for help and using resources are key learning strategies.'
       }
     ].slice(0, numQuestions)
   };
