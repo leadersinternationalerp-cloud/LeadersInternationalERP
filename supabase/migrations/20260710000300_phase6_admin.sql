@@ -61,39 +61,47 @@ CREATE INDEX IF NOT EXISTS idx_backups_created ON public.backups(created_at);
 -- 6. RLS POLICIES
 
 -- audit_logs
+DROP POLICY IF EXISTS "Admins can view audit logs" ON public.audit_logs;
 CREATE POLICY "Admins can view audit logs"
   ON public.audit_logs FOR SELECT TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director'));
 
+DROP POLICY IF EXISTS "Allow system audit insertions" ON public.audit_logs;
 CREATE POLICY "Allow system audit insertions"
   ON public.audit_logs FOR INSERT TO authenticated
   WITH CHECK (true);
 
 -- system_settings
+DROP POLICY IF EXISTS "All authenticated users can view system settings" ON public.system_settings;
 CREATE POLICY "All authenticated users can view system settings"
   ON public.system_settings FOR SELECT TO authenticated
   USING (true);
 
+DROP POLICY IF EXISTS "Admins can manage system settings" ON public.system_settings;
 CREATE POLICY "Admins can manage system settings"
   ON public.system_settings FOR ALL TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director'))
   WITH CHECK (public.get_user_role(auth.uid()) IN ('System Admin', 'Director'));
 
 -- academic_years
+DROP POLICY IF EXISTS "All authenticated users can view academic years" ON public.academic_years;
 CREATE POLICY "All authenticated users can view academic years"
   ON public.academic_years FOR SELECT TO authenticated
   USING (true);
 
+DROP POLICY IF EXISTS "Admins can manage academic years" ON public.academic_years;
 CREATE POLICY "Admins can manage academic years"
   ON public.academic_years FOR ALL TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director'))
   WITH CHECK (public.get_user_role(auth.uid()) IN ('System Admin', 'Director'));
 
 -- backups
+DROP POLICY IF EXISTS "Admins can view backups" ON public.backups;
 CREATE POLICY "Admins can view backups"
   ON public.backups FOR SELECT TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director'));
 
+DROP POLICY IF EXISTS "Admins can manage backups" ON public.backups;
 CREATE POLICY "Admins can manage backups"
   ON public.backups FOR ALL TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director'))

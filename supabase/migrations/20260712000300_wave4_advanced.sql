@@ -112,13 +112,21 @@ ALTER TABLE public.syllabus_kb ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.kitchen_display_items ENABLE ROW LEVEL SECURITY;
 
 -- Base Policies
+DROP POLICY IF EXISTS "Allow all authenticated users read access to syllabus" ON public.cambridge_stages;
 CREATE POLICY "Allow all authenticated users read access to syllabus" ON public.cambridge_stages FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Allow all authenticated users read access to subjects" ON public.cambridge_subjects;
 CREATE POLICY "Allow all authenticated users read access to subjects" ON public.cambridge_subjects FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Allow all authenticated users read access to units" ON public.cambridge_units;
 CREATE POLICY "Allow all authenticated users read access to units" ON public.cambridge_units FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Allow all authenticated users read access to topics" ON public.cambridge_topics;
 CREATE POLICY "Allow all authenticated users read access to topics" ON public.cambridge_topics FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Allow all authenticated users read access to objectives" ON public.cambridge_learning_objectives;
 CREATE POLICY "Allow all authenticated users read access to objectives" ON public.cambridge_learning_objectives FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Allow all authenticated users read access to KB" ON public.syllabus_kb;
 CREATE POLICY "Allow all authenticated users read access to KB" ON public.syllabus_kb FOR SELECT TO authenticated USING (true);
 
 -- Kitchen Policies (Allow anon read for public kiosk, Admin write)
+DROP POLICY IF EXISTS "Allow public read access to kitchen display" ON public.kitchen_display_items;
 CREATE POLICY "Allow public read access to kitchen display" ON public.kitchen_display_items FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow admin manage kitchen display" ON public.kitchen_display_items;
 CREATE POLICY "Allow admin manage kitchen display" ON public.kitchen_display_items FOR ALL TO authenticated USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal'));

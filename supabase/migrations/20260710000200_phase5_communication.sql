@@ -121,20 +121,24 @@ CREATE INDEX IF NOT EXISTS idx_notifications_unread ON public.notifications(user
 -- 8. RLS POLICIES
 
 -- calendar_events
+DROP POLICY IF EXISTS "All users can view calendar events" ON public.calendar_events;
 CREATE POLICY "All users can view calendar events"
   ON public.calendar_events FOR SELECT TO authenticated
   USING (true);
 
+DROP POLICY IF EXISTS "Reviewers can manage calendar events" ON public.calendar_events;
 CREATE POLICY "Reviewers can manage calendar events"
   ON public.calendar_events FOR ALL TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Dean', 'Head of Section'))
   WITH CHECK (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Dean', 'Head of Section'));
 
 -- submitted_reports
+DROP POLICY IF EXISTS "Employees can view own submitted reports" ON public.submitted_reports;
 CREATE POLICY "Employees can view own submitted reports"
   ON public.submitted_reports FOR SELECT TO authenticated
   USING (submitted_by = auth.uid());
 
+DROP POLICY IF EXISTS "Reviewers can view reports submitted to them" ON public.submitted_reports;
 CREATE POLICY "Reviewers can view reports submitted to them"
   ON public.submitted_reports FOR SELECT TO authenticated
   USING (
@@ -143,15 +147,18 @@ CREATE POLICY "Reviewers can view reports submitted to them"
     (submit_to = 'Both' AND public.get_user_role(auth.uid()) IN ('System Admin', 'Principal', 'Director'))
   );
 
+DROP POLICY IF EXISTS "Employees can submit reports" ON public.submitted_reports;
 CREATE POLICY "Employees can submit reports"
   ON public.submitted_reports FOR INSERT TO authenticated
   WITH CHECK (submitted_by = auth.uid());
 
+DROP POLICY IF EXISTS "Submitter can edit returned reports" ON public.submitted_reports;
 CREATE POLICY "Submitter can edit returned reports"
   ON public.submitted_reports FOR UPDATE TO authenticated
   USING (submitted_by = auth.uid() AND status = 'Returned')
   WITH CHECK (submitted_by = auth.uid() AND status = 'Returned');
 
+DROP POLICY IF EXISTS "Reviewers can update reports" ON public.submitted_reports;
 CREATE POLICY "Reviewers can update reports"
   ON public.submitted_reports FOR UPDATE TO authenticated
   USING (
@@ -166,28 +173,34 @@ CREATE POLICY "Reviewers can update reports"
   );
 
 -- appraisal_cycles
+DROP POLICY IF EXISTS "All users can view appraisal cycles" ON public.appraisal_cycles;
 CREATE POLICY "All users can view appraisal cycles"
   ON public.appraisal_cycles FOR SELECT TO authenticated
   USING (true);
 
+DROP POLICY IF EXISTS "Reviewers can manage cycles" ON public.appraisal_cycles;
 CREATE POLICY "Reviewers can manage cycles"
   ON public.appraisal_cycles FOR ALL TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal'))
   WITH CHECK (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal'));
 
 -- appraisals
+DROP POLICY IF EXISTS "Employees can view own appraisals" ON public.appraisals;
 CREATE POLICY "Employees can view own appraisals"
   ON public.appraisals FOR SELECT TO authenticated
   USING (employee_id = auth.uid());
 
+DROP POLICY IF EXISTS "Reviewers can view all appraisals" ON public.appraisals;
 CREATE POLICY "Reviewers can view all appraisals"
   ON public.appraisals FOR SELECT TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal'));
 
+DROP POLICY IF EXISTS "Employees can create self appraisals" ON public.appraisals;
 CREATE POLICY "Employees can create self appraisals"
   ON public.appraisals FOR INSERT TO authenticated
   WITH CHECK (employee_id = auth.uid());
 
+DROP POLICY IF EXISTS "Employees and Reviewers can update appraisals" ON public.appraisals;
 CREATE POLICY "Employees and Reviewers can update appraisals"
   ON public.appraisals FOR UPDATE TO authenticated
   USING (
@@ -200,10 +213,12 @@ CREATE POLICY "Employees and Reviewers can update appraisals"
   );
 
 -- discipline_records
+DROP POLICY IF EXISTS "Staff can view discipline records" ON public.discipline_records;
 CREATE POLICY "Staff can view discipline records"
   ON public.discipline_records FOR SELECT TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Dean'));
 
+DROP POLICY IF EXISTS "Parents can view child discipline records" ON public.discipline_records;
 CREATE POLICY "Parents can view child discipline records"
   ON public.discipline_records FOR SELECT TO authenticated
   USING (
@@ -214,17 +229,20 @@ CREATE POLICY "Parents can view child discipline records"
     )
   );
 
+DROP POLICY IF EXISTS "Dean can manage discipline records" ON public.discipline_records;
 CREATE POLICY "Dean can manage discipline records"
   ON public.discipline_records FOR ALL TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Dean'))
   WITH CHECK (public.get_user_role(auth.uid()) IN ('System Admin', 'Dean'));
 
 -- notifications
+DROP POLICY IF EXISTS "Users can manage own notifications" ON public.notifications;
 CREATE POLICY "Users can manage own notifications"
   ON public.notifications FOR ALL TO authenticated
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Allow global system notification creation" ON public.notifications;
 CREATE POLICY "Allow global system notification creation"
   ON public.notifications FOR INSERT TO authenticated
   WITH CHECK (true);

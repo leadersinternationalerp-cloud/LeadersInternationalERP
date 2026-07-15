@@ -110,7 +110,11 @@ export function getCambridgePrompt(subject: string, grade: string, topic: string
   let topicObjectives = "";
   try {
     const data = curriculumData as any;
-    const subjKey = Object.keys(data).find(k => k.toLowerCase() === normalizedSubject.toLowerCase());
+    const subjKey = Object.keys(data).find(k => {
+      const normK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const normS = normalizedSubject.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return normK === normS || (normS.includes('english') && normK === 'english') || (normS.includes('art') && normK.includes('art'));
+    });
     if (subjKey) {
       const stageObj = data[subjKey];
       // Match something like "Stage 1", "Stage 2" against grade

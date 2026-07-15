@@ -12,6 +12,82 @@ AS $$
   SELECT role FROM public.profiles WHERE id = user_id;
 $$;
 
+
+-- Core baseline tables (if not already existing from initial setup)
+CREATE TABLE IF NOT EXISTS public.profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email TEXT,
+    first_name TEXT,
+    last_name TEXT,
+    role TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.classes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT,
+    class_name TEXT,
+    section TEXT,
+    grade_level TEXT,
+    academic_year TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.students (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    profile_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    student_id TEXT UNIQUE,
+    grade_level TEXT,
+    class_id UUID REFERENCES public.classes(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.subjects (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT UNIQUE,
+    subject_name TEXT,
+    code TEXT,
+    subject_code TEXT,
+    department TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.class_subjects (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    class_id UUID REFERENCES public.classes(id) ON DELETE CASCADE,
+    subject_id UUID REFERENCES public.subjects(id) ON DELETE CASCADE,
+    teacher_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(class_id, subject_id)
+);
+
+-- Enable RLS on core tables
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.classes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.subjects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.class_subjects ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow authenticated read on profiles" ON public.profiles;
+CREATE POLICY "Allow authenticated read on profiles" ON public.profiles FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Allow authenticated read on classes" ON public.classes;
+CREATE POLICY "Allow authenticated read on classes" ON public.classes FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Allow authenticated read on students" ON public.students;
+CREATE POLICY "Allow authenticated read on students" ON public.students FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Allow authenticated read on subjects" ON public.subjects;
+CREATE POLICY "Allow authenticated read on subjects" ON public.subjects FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Allow authenticated read on class_subjects" ON public.class_subjects;
+CREATE POLICY "Allow authenticated read on class_subjects" ON public.class_subjects FOR SELECT TO authenticated USING (true);
+
+
 -- 2. Create student_parents relationship table if not exists
 CREATE TABLE IF NOT EXISTS public.student_parents (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -127,29 +203,35 @@ CREATE INDEX IF NOT EXISTS idx_expenses_date ON public.expenses(date);
 -- 9. RLS POLICIES
 
 -- student_parents policies
+DROP POLICY IF EXISTS "Staff and Admins can view/manage student_parents" ON public.student_parents;
 CREATE POLICY "Staff and Admins can view/manage student_parents"
   ON public.student_parents TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal'));
 
+DROP POLICY IF EXISTS "Parents can view their own child links" ON public.student_parents;
 CREATE POLICY "Parents can view their own child links"
   ON public.student_parents TO authenticated
   USING (parent_id = auth.uid());
 
 -- fee_structures policies
+DROP POLICY IF EXISTS "All authenticated users can view fee structures" ON public.fee_structures;
 CREATE POLICY "All authenticated users can view fee structures"
   ON public.fee_structures FOR SELECT TO authenticated
   USING (true);
 
+DROP POLICY IF EXISTS "Admins and Accountants can manage fee structures" ON public.fee_structures;
 CREATE POLICY "Admins and Accountants can manage fee structures"
   ON public.fee_structures FOR ALL TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'))
   WITH CHECK (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'));
 
 -- invoices policies
+DROP POLICY IF EXISTS "Staff and Accountants can view invoices" ON public.invoices;
 CREATE POLICY "Staff and Accountants can view invoices"
   ON public.invoices FOR SELECT TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'));
 
+DROP POLICY IF EXISTS "Parents can view invoices for their children" ON public.invoices;
 CREATE POLICY "Parents can view invoices for their children"
   ON public.invoices FOR SELECT TO authenticated
   USING (
@@ -160,16 +242,19 @@ CREATE POLICY "Parents can view invoices for their children"
     )
   );
 
+DROP POLICY IF EXISTS "Admins and Accountants can manage invoices" ON public.invoices;
 CREATE POLICY "Admins and Accountants can manage invoices"
   ON public.invoices FOR ALL TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'))
   WITH CHECK (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'));
 
 -- invoice_items policies
+DROP POLICY IF EXISTS "Staff and Accountants can view invoice items" ON public.invoice_items;
 CREATE POLICY "Staff and Accountants can view invoice items"
   ON public.invoice_items FOR SELECT TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'));
 
+DROP POLICY IF EXISTS "Parents can view invoice items for their children" ON public.invoice_items;
 CREATE POLICY "Parents can view invoice items for their children"
   ON public.invoice_items FOR SELECT TO authenticated
   USING (
@@ -181,16 +266,19 @@ CREATE POLICY "Parents can view invoice items for their children"
     )
   );
 
+DROP POLICY IF EXISTS "Admins and Accountants can manage invoice items" ON public.invoice_items;
 CREATE POLICY "Admins and Accountants can manage invoice items"
   ON public.invoice_items FOR ALL TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'))
   WITH CHECK (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'));
 
 -- payments policies
+DROP POLICY IF EXISTS "Staff and Accountants can view payments" ON public.payments;
 CREATE POLICY "Staff and Accountants can view payments"
   ON public.payments FOR SELECT TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'));
 
+DROP POLICY IF EXISTS "Parents can view payments for their children" ON public.payments;
 CREATE POLICY "Parents can view payments for their children"
   ON public.payments FOR SELECT TO authenticated
   USING (
@@ -201,11 +289,13 @@ CREATE POLICY "Parents can view payments for their children"
     )
   );
 
+DROP POLICY IF EXISTS "Admins and Accountants can record payments" ON public.payments;
 CREATE POLICY "Admins and Accountants can record payments"
   ON public.payments FOR INSERT TO authenticated
   WITH CHECK (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'));
 
 -- expenses policies
+DROP POLICY IF EXISTS "Staff and Accountants can view and manage expenses" ON public.expenses;
 CREATE POLICY "Staff and Accountants can view and manage expenses"
   ON public.expenses FOR ALL TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'))
@@ -241,6 +331,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Trigger for payment status update
+DROP TRIGGER IF EXISTS tr_update_payment_status ON public.payments;
 CREATE TRIGGER tr_update_payment_status
 AFTER INSERT ON public.payments
 FOR EACH ROW

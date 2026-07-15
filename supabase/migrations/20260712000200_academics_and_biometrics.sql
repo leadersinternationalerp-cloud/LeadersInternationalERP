@@ -118,16 +118,27 @@ ALTER TABLE public.attendance_exceptions ENABLE ROW LEVEL SECURITY;
 
 -- Basic Policies (allowing Admin/Principal/Teacher appropriate access)
 -- Note: In a real environment, you'd tailor these exactly to the get_user_role() function.
+DROP POLICY IF EXISTS "Allow all authenticated users read access" ON public.grade_boundaries;
 CREATE POLICY "Allow all authenticated users read access" ON public.grade_boundaries FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Allow all authenticated users read access" ON public.learning_area_progress;
 CREATE POLICY "Allow all authenticated users read access" ON public.learning_area_progress FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Allow teachers to insert learning progress" ON public.learning_area_progress;
 CREATE POLICY "Allow teachers to insert learning progress" ON public.learning_area_progress FOR INSERT TO authenticated WITH CHECK (public.get_user_role(auth.uid()) IN ('Teacher', 'Principal', 'System Admin'));
+DROP POLICY IF EXISTS "Allow all authenticated users read access" ON public.report_card_releases;
 CREATE POLICY "Allow all authenticated users read access" ON public.report_card_releases FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Allow principal to publish report cards" ON public.report_card_releases;
 CREATE POLICY "Allow principal to publish report cards" ON public.report_card_releases FOR ALL TO authenticated USING (public.get_user_role(auth.uid()) IN ('Principal', 'System Admin'));
 
+DROP POLICY IF EXISTS "Allow teachers to manage quiz banks" ON public.quiz_banks;
 CREATE POLICY "Allow teachers to manage quiz banks" ON public.quiz_banks FOR ALL TO authenticated USING (public.get_user_role(auth.uid()) IN ('Teacher', 'Principal', 'System Admin'));
+DROP POLICY IF EXISTS "Allow teachers to manage quiz items" ON public.quiz_bank_items;
 CREATE POLICY "Allow teachers to manage quiz items" ON public.quiz_bank_items FOR ALL TO authenticated USING (public.get_user_role(auth.uid()) IN ('Teacher', 'Principal', 'System Admin'));
+DROP POLICY IF EXISTS "Allow teachers to manage quiz jobs" ON public.quiz_generation_jobs;
 CREATE POLICY "Allow teachers to manage quiz jobs" ON public.quiz_generation_jobs FOR ALL TO authenticated USING (public.get_user_role(auth.uid()) IN ('Teacher', 'Principal', 'System Admin'));
 
+DROP POLICY IF EXISTS "Allow admin to manage biometric devices" ON public.biometric_devices;
 CREATE POLICY "Allow admin to manage biometric devices" ON public.biometric_devices FOR ALL TO authenticated USING (public.get_user_role(auth.uid()) IN ('System Admin'));
+DROP POLICY IF EXISTS "Allow admin to view biometric logs" ON public.biometric_logs;
 CREATE POLICY "Allow admin to view biometric logs" ON public.biometric_logs FOR SELECT TO authenticated USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal'));
+DROP POLICY IF EXISTS "Allow admin to manage exceptions" ON public.attendance_exceptions;
 CREATE POLICY "Allow admin to manage exceptions" ON public.attendance_exceptions FOR ALL TO authenticated USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Principal'));
