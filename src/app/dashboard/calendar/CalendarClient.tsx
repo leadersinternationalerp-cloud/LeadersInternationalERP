@@ -55,6 +55,16 @@ export default function CalendarClient({
   // Selected Event Details Modal State
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
 
+  // Print State
+  const [showPrintModal, setShowPrintModal] = useState(false)
+  const [printFromDate, setPrintFromDate] = useState('')
+  const [printToDate, setPrintToDate] = useState('')
+  
+  const handlePrintAction = () => {
+    if (!printFromDate || !printToDate) return;
+    window.print();
+  }
+
   const allowedToManage = ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section'].includes(userRole)
 
   // Calendar calculations
@@ -262,18 +272,27 @@ export default function CalendarClient({
           </p>
         </div>
 
-        {allowedToManage && (
-          <button 
-            className="btn btn-primary"
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-secondary no-print"
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-            onClick={() => {
-              setShowAddForm(!showAddForm)
-              setFormMessage(null)
-            }}
+            onClick={() => setShowPrintModal(true)}
           >
-            {showAddForm ? '✕ Close Form' : '➕ Add Event'}
+            🖨️ Print Events
           </button>
-        )}
+          {allowedToManage && (
+            <button 
+              className="btn btn-primary no-print"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              onClick={() => {
+                setShowAddForm(!showAddForm)
+                setFormMessage(null)
+              }}
+            >
+              {showAddForm ? '✕ Close Form' : '➕ Add Event'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Grid Container: calendar/form and sidebar */}
@@ -818,6 +837,84 @@ export default function CalendarClient({
           </div>
         </div>
       )}
+
+      {/* Print Modal */}
+      {showPrintModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }} className="no-print">
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '400px', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: '1.5rem', position: 'relative' }}>
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: 'var(--color-primary)' }}>Print Calendar Events</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem' }}>From Date</label>
+                <input type="date" className="input-field" value={printFromDate} onChange={(e) => setPrintFromDate(e.target.value)} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem' }}>To Date</label>
+                <input type="date" className="input-field" value={printToDate} onChange={(e) => setPrintToDate(e.target.value)} />
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', justifyContent: 'flex-end' }}>
+                <button className="btn btn-outline" onClick={() => setShowPrintModal(false)}>Cancel</button>
+                <button className="btn btn-primary" onClick={handlePrintAction} disabled={!printFromDate || !printToDate}>🖨️ Print Now</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden Print Container */}
+      <div className="print-only" style={{ display: 'none' }}>
+        <h1 style={{ fontSize: '24px', marginBottom: '8px' }}>School Calendar & Schedule</h1>
+        <p style={{ marginBottom: '24px', fontSize: '14px', color: '#666' }}>
+          Date Range: {printFromDate || '...'} to {printToDate || '...'}
+        </p>
+        
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid #000' }}>
+              <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Date</th>
+              <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Event</th>
+              <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Type</th>
+              <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Audience</th>
+            </tr>
+          </thead>
+          <tbody>
+            {events
+              .filter(e => {
+                if (!printFromDate || !printToDate) return false;
+                const eStart = new Date(e.start_date);
+                const from = new Date(printFromDate);
+                const to = new Date(printToDate);
+                to.setHours(23, 59, 59, 999);
+                return eStart >= from && eStart <= to;
+              })
+              .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
+              .map(e => (
+                <tr key={e.id} style={{ borderBottom: '1px solid #ddd' }}>
+                  <td style={{ padding: '8px', whiteSpace: 'nowrap' }}>{new Date(e.start_date).toLocaleDateString()}</td>
+                  <td style={{ padding: '8px', fontWeight: 'bold' }}>{e.title}</td>
+                  <td style={{ padding: '8px' }}>{e.event_type}</td>
+                  <td style={{ padding: '8px' }}>{e.target_audience}</td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+        
+        <style dangerouslySetInnerHTML={{__html: `
+          @media print {
+            .no-print, .sidebar-desktop, .mobile-overlay, .mobile-sidebar, header, .mobile-toggle, .glass-panel { 
+              display: none !important; 
+            }
+            body, .main-content-area, html { 
+              background: white !important;
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+            .print-only {
+              display: block !important;
+            }
+          }
+        `}} />
+      </div>
 
     </div>
   )
