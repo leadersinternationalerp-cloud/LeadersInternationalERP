@@ -105,56 +105,68 @@ CREATE INDEX IF NOT EXISTS idx_payslips_employee ON public.payslips(employee_id)
 -- 7. RLS POLICIES
 
 -- leave_applications policies
+DROP POLICY IF EXISTS "Employees can view own leave applications" ON public.leave_applications;
 CREATE POLICY "Employees can view own leave applications"
   ON public.leave_applications FOR SELECT TO authenticated
   USING (employee_id = auth.uid());
 
+DROP POLICY IF EXISTS "Reviewers can view all leave applications" ON public.leave_applications;
 CREATE POLICY "Reviewers can view all leave applications"
   ON public.leave_applications FOR SELECT TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal'));
 
+DROP POLICY IF EXISTS "Employees can apply for leave" ON public.leave_applications;
 CREATE POLICY "Employees can apply for leave"
   ON public.leave_applications FOR INSERT TO authenticated
   WITH CHECK (employee_id = auth.uid());
 
+DROP POLICY IF EXISTS "Reviewers can update leave applications" ON public.leave_applications;
 CREATE POLICY "Reviewers can update leave applications"
   ON public.leave_applications FOR UPDATE TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal'))
   WITH CHECK (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal'));
 
 -- leave_balances policies
+DROP POLICY IF EXISTS "Employees can view own leave balances" ON public.leave_balances;
 CREATE POLICY "Employees can view own leave balances"
   ON public.leave_balances FOR SELECT TO authenticated
   USING (employee_id = auth.uid());
 
+DROP POLICY IF EXISTS "Reviewers and Accountants can view all leave balances" ON public.leave_balances;
 CREATE POLICY "Reviewers and Accountants can view all leave balances"
   ON public.leave_balances FOR SELECT TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'));
 
+DROP POLICY IF EXISTS "Accountants and Admins can manage leave balances" ON public.leave_balances;
 CREATE POLICY "Accountants and Admins can manage leave balances"
   ON public.leave_balances FOR ALL TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'))
   WITH CHECK (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'));
 
 -- salary_advances policies
+DROP POLICY IF EXISTS "Employees can view own salary advances" ON public.salary_advances;
 CREATE POLICY "Employees can view own salary advances"
   ON public.salary_advances FOR SELECT TO authenticated
   USING (employee_id = auth.uid());
 
+DROP POLICY IF EXISTS "Reviewers and Accountants can view all salary advances" ON public.salary_advances;
 CREATE POLICY "Reviewers and Accountants can view all salary advances"
   ON public.salary_advances FOR SELECT TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'));
 
+DROP POLICY IF EXISTS "Employees can apply for salary advance" ON public.salary_advances;
 CREATE POLICY "Employees can apply for salary advance"
   ON public.salary_advances FOR INSERT TO authenticated
   WITH CHECK (employee_id = auth.uid());
 
+DROP POLICY IF EXISTS "Reviewers can update salary advances" ON public.salary_advances;
 CREATE POLICY "Reviewers can update salary advances"
   ON public.salary_advances FOR UPDATE TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'))
   WITH CHECK (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'));
 
 -- advance_repayments policies
+DROP POLICY IF EXISTS "Employees can view own repayments" ON public.advance_repayments;
 CREATE POLICY "Employees can view own repayments"
   ON public.advance_repayments FOR SELECT TO authenticated
   USING (
@@ -165,20 +177,24 @@ CREATE POLICY "Employees can view own repayments"
     )
   );
 
+DROP POLICY IF EXISTS "Accountants can view and manage all repayments" ON public.advance_repayments;
 CREATE POLICY "Accountants can view and manage all repayments"
   ON public.advance_repayments FOR ALL TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'))
   WITH CHECK (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'));
 
 -- payslips policies
+DROP POLICY IF EXISTS "Employees can view own payslips" ON public.payslips;
 CREATE POLICY "Employees can view own payslips"
   ON public.payslips FOR SELECT TO authenticated
   USING (employee_id = auth.uid());
 
+DROP POLICY IF EXISTS "Accountants and Reviewers can view all payslips" ON public.payslips;
 CREATE POLICY "Accountants and Reviewers can view all payslips"
   ON public.payslips FOR SELECT TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'));
 
+DROP POLICY IF EXISTS "Accountants and Admins can manage payslips" ON public.payslips;
 CREATE POLICY "Accountants and Admins can manage payslips"
   ON public.payslips FOR ALL TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'))
@@ -201,6 +217,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS tr_seed_leave_balances ON public.profiles;
 CREATE TRIGGER tr_seed_leave_balances
 AFTER INSERT ON public.profiles
 FOR EACH ROW
@@ -221,6 +238,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS tr_handle_leave_approval ON public.leave_applications;
 CREATE TRIGGER tr_handle_leave_approval
 AFTER UPDATE ON public.leave_applications
 FOR EACH ROW

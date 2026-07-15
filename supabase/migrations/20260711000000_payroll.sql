@@ -29,20 +29,24 @@ CREATE INDEX IF NOT EXISTS idx_payrolls_period ON public.payrolls(month, year);
 CREATE INDEX IF NOT EXISTS idx_payrolls_status ON public.payrolls(status);
 
 -- 3. RLS Policies
+DROP POLICY IF EXISTS "Authorized staff can view payrolls" ON public.payrolls;
 CREATE POLICY "Authorized staff can view payrolls"
   ON public.payrolls FOR SELECT TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'));
 
+DROP POLICY IF EXISTS "Accountants can manage payrolls" ON public.payrolls;
 CREATE POLICY "Accountants can manage payrolls"
   ON public.payrolls FOR ALL TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Accountant'))
   WITH CHECK (public.get_user_role(auth.uid()) IN ('System Admin', 'Accountant'));
 
+DROP POLICY IF EXISTS "Principal can review payrolls" ON public.payrolls;
 CREATE POLICY "Principal can review payrolls"
   ON public.payrolls FOR UPDATE TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Principal'))
   WITH CHECK (public.get_user_role(auth.uid()) IN ('System Admin', 'Principal'));
 
+DROP POLICY IF EXISTS "Director can review payrolls" ON public.payrolls;
 CREATE POLICY "Director can review payrolls"
   ON public.payrolls FOR UPDATE TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director'))

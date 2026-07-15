@@ -22,24 +22,28 @@ CREATE TABLE IF NOT EXISTS public.student_classes (
 
 ALTER TABLE public.class_activities ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Teachers can create activities" ON public.class_activities;
 CREATE POLICY "Teachers can create activities" 
     ON public.class_activities FOR INSERT TO authenticated
     WITH CHECK (
         public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Teacher', 'Head of Section', 'Dean')
     );
 
+DROP POLICY IF EXISTS "Teachers can update activities" ON public.class_activities;
 CREATE POLICY "Teachers can update activities" 
     ON public.class_activities FOR UPDATE TO authenticated
     USING (
         public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Teacher', 'Head of Section', 'Dean')
     );
 
+DROP POLICY IF EXISTS "Teachers can delete activities" ON public.class_activities;
 CREATE POLICY "Teachers can delete activities" 
     ON public.class_activities FOR DELETE TO authenticated
     USING (
         public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Teacher', 'Head of Section', 'Dean')
     );
 
+DROP POLICY IF EXISTS "Users can view activities" ON public.class_activities;
 CREATE POLICY "Users can view activities" 
     ON public.class_activities FOR SELECT TO authenticated
     USING (

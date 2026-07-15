@@ -28,10 +28,14 @@ CREATE TABLE IF NOT EXISTS public.budget_lines (
 
 -- RLS for report_cards
 ALTER TABLE public.report_cards ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow read for authenticated on report_cards" ON public.report_cards;
 CREATE POLICY "Allow read for authenticated on report_cards" ON public.report_cards FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Allow all for admin/principal on report_cards" ON public.report_cards;
 CREATE POLICY "Allow all for admin/principal on report_cards" ON public.report_cards FOR ALL TO authenticated USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Principal'));
 
 -- RLS for budget_lines
 ALTER TABLE public.budget_lines ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow read for authenticated on budget_lines" ON public.budget_lines;
 CREATE POLICY "Allow read for authenticated on budget_lines" ON public.budget_lines FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Allow all for accountant/admin on budget_lines" ON public.budget_lines;
 CREATE POLICY "Allow all for accountant/admin on budget_lines" ON public.budget_lines FOR ALL TO authenticated USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Accountant'));

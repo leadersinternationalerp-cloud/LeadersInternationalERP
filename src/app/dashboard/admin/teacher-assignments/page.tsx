@@ -6,7 +6,7 @@ export default async function TeacherAssignmentsPage() {
 
   const { data: teachers } = await supabase.from('profiles').select('id, first_name, last_name').eq('role', 'Teacher').order('first_name', { ascending: true })
   const { data: classes } = await supabase.from('classes').select('*').order('class_name', { ascending: true })
-  const { data: subjects } = await supabase.from('subjects').select('*').order('subject_name', { ascending: true })
+  const { data: subjects } = await supabase.from('subjects').select('*').order('name', { ascending: true })
 
   // Assume table `teacher_allocations(id, teacher_id, class_id, subject_id)` exists from initial setup
   // We'll catch errors gracefully if the table is slightly differently named.
@@ -78,7 +78,7 @@ export default async function TeacherAssignmentsPage() {
             <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Subject</label>
             <select name="subject_id" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
               <option value="">Select Subject...</option>
-              {(subjects || []).map(s => <option key={s.id} value={s.id}>{s.subject_name}</option>)}
+              {(subjects || []).map(s => <option key={s.id} value={s.id}>{s.name || s.subject_name}</option>)}
             </select>
           </div>
           

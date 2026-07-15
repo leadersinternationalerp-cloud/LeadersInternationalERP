@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 export default async function SubjectsPage() {
   const supabase = await createClient()
 
-  const { data: subjects } = await supabase.from('subjects').select('*').order('subject_name', { ascending: true })
+  const { data: subjects } = await supabase.from('subjects').select('*').order('name', { ascending: true })
 
   async function addSubjectAction(formData: FormData) {
     'use server'
@@ -17,7 +17,9 @@ export default async function SubjectsPage() {
     if (!subject_name) return
 
     await supabase.from('subjects').insert({
+      name: subject_name,
       subject_name,
+      code: subject_code,
       subject_code,
       department
     })
@@ -47,8 +49,8 @@ export default async function SubjectsPage() {
             <tbody>
               {(subjects || []).map((sub) => (
                 <tr key={sub.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                  <td style={{ padding: '1rem', fontWeight: 600 }}>{sub.subject_name}</td>
-                  <td style={{ padding: '1rem', fontFamily: 'monospace' }}>{sub.subject_code || '-'}</td>
+                  <td style={{ padding: '1rem', fontWeight: 600 }}>{sub.name || sub.subject_name}</td>
+                  <td style={{ padding: '1rem', fontFamily: 'monospace' }}>{sub.code || sub.subject_code || '-'}</td>
                   <td style={{ padding: '1rem' }}>{sub.department || 'General'}</td>
                   <td style={{ padding: '1rem', textAlign: 'center' }}>
                     <span style={{ 

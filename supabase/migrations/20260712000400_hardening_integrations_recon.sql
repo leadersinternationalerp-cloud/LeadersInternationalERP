@@ -38,5 +38,7 @@ CREATE TABLE IF NOT EXISTS public.bank_reconciliations (
 ALTER TABLE public.integration_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bank_reconciliations ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow admin full access to integrations" ON public.integration_config;
 CREATE POLICY "Allow admin full access to integrations" ON public.integration_config FOR ALL TO authenticated USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director'));
+DROP POLICY IF EXISTS "Allow accountant access to bank recon" ON public.bank_reconciliations;
 CREATE POLICY "Allow accountant access to bank recon" ON public.bank_reconciliations FOR ALL TO authenticated USING (public.get_user_role(auth.uid()) IN ('Accountant', 'Director', 'System Admin'));

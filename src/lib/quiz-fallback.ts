@@ -157,11 +157,285 @@ export function getFallbackQuiz(subject: string, grade: string, topic: string, n
     };
   }
 
-  // 4. Default dynamic fallback using Cambridge Curriculum Data
+  // 4. English Language fallback
+  if (cleanSubject.toLowerCase().includes('english')) {
+    return {
+      title: `${cleanSubject} Quiz: ${cleanTopic} (Local Offline Backup)`,
+      description: `A fallback English language quiz covering ${cleanTopic} with Zanzibar context.`,
+      cambridgeObjective: 'Develop vocabulary, reading comprehension, and correct grammar usage in practical scenarios.',
+      questions: [
+        {
+          id: 'q1',
+          question: 'Choose the correct adjective to complete the sentence: "The traditional dhow boat sailed across the ________ ocean."',
+          options: ['loudly', 'blue', 'run', 'yesterday'],
+          correctIndex: 1,
+          explanation: '"blue" is an adjective describing the noun "ocean".'
+        },
+        {
+          id: 'q2',
+          question: 'What is the past tense of the verb "to visit" in the sentence: "We ________ Stone Town last Saturday"?',
+          options: ['visiting', 'visits', 'visited', 'visit'],
+          correctIndex: 2,
+          explanation: '"visited" is the simple past tense of "visit".'
+        },
+        {
+          id: 'q3',
+          question: 'Which word is a noun in this sentence: "The aromatic cloves grow on tall trees in Pemba"?',
+          options: ['aromatic', 'cloves', 'grow', 'tall'],
+          correctIndex: 1,
+          explanation: '"cloves" (karafuu) is a noun naming the spice.'
+        },
+        {
+          id: 'q4',
+          question: 'Identify the correct punctuation mark to end the question: "Have you seen the giant tortoises on Prison Island________"',
+          options: ['.', '!', '?', ','],
+          correctIndex: 2,
+          explanation: 'A question mark (?) is required at the end of an interrogative sentence.'
+        },
+        {
+          id: 'q5',
+          question: 'What is the synonym (word with similar meaning) for "ancient" when referring to the ancient buildings of Stone Town?',
+          options: ['new', 'old', 'small', 'bright'],
+          correctIndex: 1,
+          explanation: '"old" has a similar meaning to "ancient".'
+        }
+      ].slice(0, numQuestions)
+    };
+  }
+
+  // 5. Global Perspectives fallback
+  if (cleanSubject.toLowerCase().includes('global') || cleanSubject.toLowerCase().includes('perspectives')) {
+    return {
+      title: `${cleanSubject} Quiz: ${cleanTopic} (Local Offline Backup)`,
+      description: `A fallback Global Perspectives quiz covering ${cleanTopic} with local community and global awareness.`,
+      cambridgeObjective: 'Examine community responsibilities, cultural heritage, and environmental sustainability.',
+      questions: [
+        {
+          id: 'q1',
+          question: 'Why is it important to protect coral reefs along the coast of Zanzibar?',
+          options: [
+            'They provide habitats for fish and protect our coastline from heavy waves',
+            'They make the ocean water hotter',
+            'They prevent ships from sailing anywhere',
+            'They have no effect on marine life'
+          ],
+          correctIndex: 0,
+          explanation: 'Coral reefs are vital marine ecosystems and act as natural barriers against coastal erosion.'
+        },
+        {
+          id: 'q2',
+          question: 'What does community cooperation (umoja ni nguvu - unity is strength) mean in our daily lives?',
+          options: [
+            'Working alone and refusing help from everyone',
+            'Helping neighbors and working together on community cleanup projects',
+            'Ignoring litter on school grounds',
+            'Arguing with friends over minor disagreements'
+          ],
+          correctIndex: 1,
+          explanation: 'Cooperation means joining efforts to help others and improve our shared environment.'
+        },
+        {
+          id: 'q3',
+          question: 'How can students reduce plastic waste around coastal areas like Nungwi and Paje?',
+          options: [
+            'Throwing plastic bottles into the sea',
+            'Using reusable bags and recycling water bottles',
+            'Burning all plastic garbage on the beach',
+            'Buying more single-use plastics every day'
+          ],
+          correctIndex: 1,
+          explanation: 'Reusable items and proper recycling reduce ocean plastic pollution.'
+        },
+        {
+          id: 'q4',
+          question: 'Why do visitors and travelers from around the world visit Stone Town?',
+          options: [
+            'To experience its unique Swahili architecture, history, and diverse cultural heritage',
+            'Because there are no other islands anywhere',
+            'To avoid seeing any historical landmarks',
+            'Because Stone Town has no history'
+          ],
+          correctIndex: 0,
+          explanation: 'Stone Town is a UNESCO World Heritage site known for its rich cultural history and architecture.'
+        },
+        {
+          id: 'q5',
+          question: 'When people from different cultures share their music and food, what positive outcome happens?',
+          options: [
+            'We learn to respect and appreciate mutual global diversity and understanding',
+            'Everybody stops talking to each other',
+            'Communities become weaker',
+            'People forget how to cook'
+          ],
+          correctIndex: 0,
+          explanation: 'Sharing culture builds global understanding, empathy, and respect.'
+        }
+      ].slice(0, numQuestions)
+    };
+  }
+
+  // 6. Computing & Digital Literacy fallback
+  if (cleanSubject.toLowerCase().includes('computing') || cleanSubject.toLowerCase().includes('digital')) {
+    return {
+      title: `${cleanSubject} Quiz: ${cleanTopic} (Local Offline Backup)`,
+      description: `A fallback computing quiz about ${cleanTopic} focusing on basic technology and safe internet use.`,
+      cambridgeObjective: 'Understand digital tools, basic programming logic, and online safety principles.',
+      questions: [
+        {
+          id: 'q1',
+          question: 'Which of the following is considered personal information that you should NEVER share online with strangers?',
+          options: ['Your favorite fruit', 'Your full home address and passwords', 'The name of your school sport team', 'Your favorite school subject'],
+          correctIndex: 1,
+          explanation: 'Home addresses and passwords are confidential personal data and must be kept private.'
+        },
+        {
+          id: 'q2',
+          question: 'In computer programming, what is an "algorithm"?',
+          options: [
+            'A type of computer screen',
+            'A step-by-step set of instructions to solve a problem or complete a task',
+            'A broken keyboard button',
+            'A computer virus'
+          ],
+          correctIndex: 1,
+          explanation: 'An algorithm is a precise sequence of steps or instructions.'
+        },
+        {
+          id: 'q3',
+          question: 'What hardware device is used to move the pointer on a computer screen and click on icons?',
+          options: ['Printer', 'Mouse or touchpad', 'Speaker', 'Microphone'],
+          correctIndex: 1,
+          explanation: 'A computer mouse or touchpad controls the screen cursor.'
+        },
+        {
+          id: 'q4',
+          question: 'Why should you always ask a teacher or parent before downloading an unknown file from the internet?',
+          options: [
+            'Because the file might contain malware or viruses that can harm the computer',
+            'Because downloading always turns off the monitor',
+            'Because computers cannot download files',
+            'Because files have no names'
+          ],
+          correctIndex: 0,
+          explanation: 'Safety checks prevent downloading harmful software or viruses.'
+        },
+        {
+          id: 'q5',
+          question: 'What does the "Save" icon (usually shaped like a floppy disk) do when working on a digital document?',
+          options: ['Deletes your work permanently', 'Stores your work in computer memory so it is not lost', 'Prints the page immediately', 'Shuts down the computer'],
+          correctIndex: 1,
+          explanation: 'Saving stores data safely to disk or cloud storage.'
+        }
+      ].slice(0, numQuestions)
+    };
+  }
+
+  // 7. Art & Craft fallback
+  if (cleanSubject.toLowerCase().includes('art') || cleanSubject.toLowerCase().includes('craft')) {
+    return {
+      title: `${cleanSubject} Quiz: ${cleanTopic} (Local Offline Backup)`,
+      description: `A fallback Art & Craft quiz about ${cleanTopic} covering colors and traditional Zanzibar crafts.`,
+      cambridgeObjective: 'Explore artistic expression, color theory, and local craft traditions.',
+      questions: [
+        {
+          id: 'q1',
+          question: 'When you mix the primary colors blue and yellow together, what secondary color is created?',
+          options: ['Red', 'Green', 'Purple', 'Orange'],
+          correctIndex: 1,
+          explanation: 'Blue mixed with yellow produces green.'
+        },
+        {
+          id: 'q2',
+          question: 'Tingatinga is a famous East African painting style originated in Tanzania. What are its typical characteristics?',
+          options: [
+            'Bright, vibrant colors depicting stylized animals and birds with bold outlines',
+            'Black and white pencil sketches of only cars',
+            'Invisible paint on dark paper',
+            'Photographs taken with a camera'
+          ],
+          correctIndex: 0,
+          explanation: 'Tingatinga art is renowned for its brilliant colors and whimsical depiction of African wildlife.'
+        },
+        {
+          id: 'q3',
+          question: 'What natural material commonly found along the Zanzibar coast is woven by artisans to make traditional baskets and mats (mkeka)?',
+          options: ['Palm leaves (makuti/ukili)', 'Iron rods', 'Glass beads', 'Wool yarn'],
+          correctIndex: 0,
+          explanation: 'Palm leaves (ukili/makuti) are harvested and dried to weave beautiful mats and baskets.'
+        },
+        {
+          id: 'q4',
+          question: 'Which of the following is considered a "warm color" in art theory?',
+          options: ['Blue', 'Ice gray', 'Red or orange', 'Dark green'],
+          correctIndex: 2,
+          explanation: 'Red, orange, and yellow remind us of heat and sunshine, so they are warm colors.'
+        },
+        {
+          id: 'q5',
+          question: 'What tool does an artist use to blend soft charcoal or pencil shading on a drawing?',
+          options: ['Hammer', 'Blending stump or clean cloth/paper', 'Scissors', 'Water bucket'],
+          correctIndex: 1,
+          explanation: 'Blending stumps or soft paper smooth and blend charcoal shades.'
+        }
+      ].slice(0, numQuestions)
+    };
+  }
+
+  // 8. Music fallback
+  if (cleanSubject.toLowerCase().includes('music')) {
+    return {
+      title: `${cleanSubject} Quiz: ${cleanTopic} (Local Offline Backup)`,
+      description: `A fallback Music quiz about ${cleanTopic} covering rhythm and traditional musical instruments.`,
+      cambridgeObjective: 'Recognize rhythm, melody, and traditional instruments in regional and global music.',
+      questions: [
+        {
+          id: 'q1',
+          question: 'Taarab is a popular traditional musical genre of Zanzibar. Which instrument, often played in Taarab, is a traditional stringed zither or lute?',
+          options: ['Qanun (or Oud)', 'Electric bass guitar', 'Trumpet', 'Snare drum'],
+          correctIndex: 0,
+          explanation: 'The Qanun and Oud are classic string instruments essential to traditional Taarab orchestras in Zanzibar.'
+        },
+        {
+          id: 'q2',
+          question: 'In music, what do we call the steady pulse or beat that you can clap along to in a song?',
+          options: ['Silence', 'Rhythm / Tempo', 'Lyrics', 'Volume'],
+          correctIndex: 1,
+          explanation: 'The rhythm or tempo is the steady beat governing the speed and flow of music.'
+        },
+        {
+          id: 'q3',
+          question: 'Which of these is a percussion instrument that produces sound when struck with hands or sticks?',
+          options: ['Flute', 'Ngoma (African Drum)', 'Violin', 'Clarinet'],
+          correctIndex: 1,
+          explanation: 'The Ngoma (drum) is a traditional percussion instrument played across East Africa.'
+        },
+        {
+          id: 'q4',
+          question: 'What is the term for two or more notes played or sung together at the same time to create a pleasing sound?',
+          options: ['Solo', 'Harmony', 'Whisper', 'Silence'],
+          correctIndex: 1,
+          explanation: 'Harmony occurs when different pitches combine simultaneously.'
+        },
+        {
+          id: 'q5',
+          question: 'When a piece of music gradually gets louder, what is the musical dynamic term for this increase in volume?',
+          options: ['Crescendo', 'Diminuendo', 'Staccato', 'Presto'],
+          correctIndex: 0,
+          explanation: 'Crescendo means gradually increasing in loudness.'
+        }
+      ].slice(0, numQuestions)
+    };
+  }
+
+  // 9. Default dynamic fallback using Cambridge Curriculum Data
   let objectiveSnippet = `Understand key topics in ${cleanSubject} related to ${cleanTopic}.`;
   try {
     const data = require('./data/curriculum/all_subjects.json');
-    const subjKey = Object.keys(data).find(k => k.toLowerCase() === cleanSubject.toLowerCase());
+    const subjKey = Object.keys(data).find(k => {
+      const normK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const normS = cleanSubject.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return normK === normS || (normS.includes('english') && normK === 'english') || (normS.includes('art') && normK.includes('art'));
+    });
     if (subjKey) {
       const stageObj = data[subjKey];
       const stageNumMatch = cleanGrade.match(/\d+/);

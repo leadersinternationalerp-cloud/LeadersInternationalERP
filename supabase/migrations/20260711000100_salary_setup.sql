@@ -15,10 +15,12 @@ CREATE TABLE IF NOT EXISTS public.salary_settings (
 ALTER TABLE public.salary_settings ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Authorized staff can view salary settings" ON public.salary_settings;
 CREATE POLICY "Authorized staff can view salary settings"
   ON public.salary_settings FOR SELECT TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Director', 'Principal', 'Accountant'));
 
+DROP POLICY IF EXISTS "Accountants can manage salary settings" ON public.salary_settings;
 CREATE POLICY "Accountants can manage salary settings"
   ON public.salary_settings FOR ALL TO authenticated
   USING (public.get_user_role(auth.uid()) IN ('System Admin', 'Accountant'))

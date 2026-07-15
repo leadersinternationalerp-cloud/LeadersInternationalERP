@@ -117,7 +117,7 @@ export default async function SyllabusAdminPage() {
             <div>
               <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Subject</label>
               <select name="subject_id" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                {(subjects || []).map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+                {(subjects || []).map(s => <option key={s.id} value={s.id}>{s.name || s.subject_name} ({s.code || s.subject_code || '-'})</option>)}
               </select>
             </div>
             <div>

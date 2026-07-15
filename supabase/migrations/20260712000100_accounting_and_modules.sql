@@ -251,25 +251,39 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Finance Policies (Accounting tables)
+DROP POLICY IF EXISTS "Finance managers full access to accounting" ON chart_of_accounts;
 CREATE POLICY "Finance managers full access to accounting" ON chart_of_accounts FOR ALL TO authenticated USING (is_finance_manager());
+DROP POLICY IF EXISTS "Finance managers full access to journals" ON journal_entries;
 CREATE POLICY "Finance managers full access to journals" ON journal_entries FOR ALL TO authenticated USING (is_finance_manager());
+DROP POLICY IF EXISTS "Finance managers full access to journal lines" ON journal_entry_lines;
 CREATE POLICY "Finance managers full access to journal lines" ON journal_entry_lines FOR ALL TO authenticated USING (is_finance_manager());
+DROP POLICY IF EXISTS "Finance managers full access to fiscal years" ON fiscal_years;
 CREATE POLICY "Finance managers full access to fiscal years" ON fiscal_years FOR ALL TO authenticated USING (is_finance_manager());
+DROP POLICY IF EXISTS "Finance managers full access to periods" ON accounting_periods;
 CREATE POLICY "Finance managers full access to periods" ON accounting_periods FOR ALL TO authenticated USING (is_finance_manager());
+DROP POLICY IF EXISTS "Finance managers full access to vendor bills" ON vendor_bills;
 CREATE POLICY "Finance managers full access to vendor bills" ON vendor_bills FOR ALL TO authenticated USING (is_finance_manager());
+DROP POLICY IF EXISTS "Finance managers full access to vendor payments" ON vendor_bill_payments;
 CREATE POLICY "Finance managers full access to vendor payments" ON vendor_bill_payments FOR ALL TO authenticated USING (is_finance_manager());
+DROP POLICY IF EXISTS "Finance managers full access to deposits" ON bank_deposits;
 CREATE POLICY "Finance managers full access to deposits" ON bank_deposits FOR ALL TO authenticated USING (is_finance_manager());
+DROP POLICY IF EXISTS "Finance managers full access to assets" ON fixed_assets;
 CREATE POLICY "Finance managers full access to assets" ON fixed_assets FOR ALL TO authenticated USING (is_finance_manager());
+DROP POLICY IF EXISTS "Finance managers full access to depreciation" ON depreciation_schedules;
 CREATE POLICY "Finance managers full access to depreciation" ON depreciation_schedules FOR ALL TO authenticated USING (is_finance_manager());
 
 -- Inventory & Transport Policies
+DROP POLICY IF EXISTS "Inventory managers full access to stock items" ON stock_items;
 CREATE POLICY "Inventory managers full access to stock items" ON stock_items FOR ALL TO authenticated USING (is_inventory_manager());
+DROP POLICY IF EXISTS "Inventory managers full access to stock movements" ON stock_movements;
 CREATE POLICY "Inventory managers full access to stock movements" ON stock_movements FOR ALL TO authenticated USING (is_inventory_manager());
+DROP POLICY IF EXISTS "Inventory managers full access to transport" ON transport_routes;
 CREATE POLICY "Inventory managers full access to transport" ON transport_routes FOR ALL TO authenticated USING (is_inventory_manager());
 
 -- Config & Logs
+DROP POLICY IF EXISTS "Finance managers full access to config" ON integration_config;
 CREATE POLICY "Finance managers full access to config" ON integration_config FOR ALL TO authenticated USING (is_finance_manager());
+DROP POLICY IF EXISTS "Finance managers full access to whatsapp logs" ON whatsapp_logs;
 CREATE POLICY "Finance managers full access to whatsapp logs" ON whatsapp_logs FOR ALL TO authenticated USING (is_finance_manager());
-I N S E R T   I N T O   s t o r a g e . b u c k e t s   ( i d ,   n a m e ,   p u b l i c )   V A L U E S   ( ' r e c e i p t s ' ,   ' r e c e i p t s ' ,   t r u e )   O N   C O N F L I C T   ( i d )   D O   N O T H I N G ; 
- 
- 
+INSERT INTO storage.buckets (id, name, public) VALUES ('receipts', 'receipts', true) ON CONFLICT (id) DO NOTHING;
+

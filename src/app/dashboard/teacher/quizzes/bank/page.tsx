@@ -5,7 +5,7 @@ export default async function QuizBankPage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  const { data: subjects } = await supabase.from('subjects').select('*').order('subject_name', { ascending: true })
+  const { data: subjects } = await supabase.from('subjects').select('*').order('name', { ascending: true })
 
   // Load Banks
   const { data: banks } = await supabase
@@ -107,7 +107,7 @@ export default async function QuizBankPage() {
               <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Subject (Optional)</label>
               <select name="subject_id" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                 <option value="">No specific subject</option>
-                {(subjects || []).map(s => <option key={s.id} value={s.id}>{s.subject_name}</option>)}
+                {(subjects || []).map(s => <option key={s.id} value={s.id}>{s.name || s.subject_name}</option>)}
               </select>
             </div>
             <button type="submit" className="btn-primary" style={{ marginTop: '0.5rem' }}>Create Bank</button>
