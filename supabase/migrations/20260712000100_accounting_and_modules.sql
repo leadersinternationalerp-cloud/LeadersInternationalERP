@@ -1,6 +1,6 @@
 -- 1. ACCOUNTING CORE
 CREATE TABLE IF NOT EXISTS fiscal_years (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(50) NOT NULL, -- e.g. "2026", "2026-2027"
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS fiscal_years (
 );
 
 CREATE TABLE IF NOT EXISTS accounting_periods (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     fiscal_year_id UUID REFERENCES fiscal_years(id) ON DELETE CASCADE,
     name VARCHAR(50) NOT NULL, -- e.g. "January 2026"
     start_date DATE NOT NULL,
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS accounting_periods (
 );
 
 CREATE TABLE IF NOT EXISTS chart_of_accounts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     code VARCHAR(20) UNIQUE NOT NULL,
     name VARCHAR(150) NOT NULL,
     account_type VARCHAR(50) NOT NULL CHECK (account_type IN ('ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE')),
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS chart_of_accounts (
 );
 
 CREATE TABLE IF NOT EXISTS journal_entries (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     reference VARCHAR(100) NOT NULL,
     entry_type VARCHAR(50) NOT NULL, -- e.g. 'MANUAL', 'FEE_PAYMENT', 'EXPENSE', 'PAYROLL'
     description TEXT,
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS journal_entries (
 );
 
 CREATE TABLE IF NOT EXISTS journal_entry_lines (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     journal_id UUID REFERENCES journal_entries(id) ON DELETE CASCADE,
     account_id UUID REFERENCES chart_of_accounts(id) ON DELETE RESTRICT,
     description TEXT,
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS journal_entry_lines (
 
 -- 2. ACCOUNTS PAYABLE & BANKING
 CREATE TABLE IF NOT EXISTS vendor_bills (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     vendor_name VARCHAR(150) NOT NULL,
     invoice_number VARCHAR(100),
     bill_date DATE NOT NULL,
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS vendor_bills (
 );
 
 CREATE TABLE IF NOT EXISTS vendor_bill_payments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     bill_id UUID REFERENCES vendor_bills(id) ON DELETE CASCADE,
     payment_date DATE NOT NULL,
     amount NUMERIC(15, 2) NOT NULL,
@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS vendor_bill_payments (
 );
 
 CREATE TABLE IF NOT EXISTS bank_deposits (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     deposit_date DATE NOT NULL,
     amount NUMERIC(15, 2) NOT NULL,
     reference VARCHAR(100),
@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS bank_deposits (
 
 -- 3. FIXED ASSETS
 CREATE TABLE IF NOT EXISTS fixed_assets (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(150) NOT NULL,
     asset_code VARCHAR(50) UNIQUE NOT NULL,
     category VARCHAR(100),
@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS fixed_assets (
 );
 
 CREATE TABLE IF NOT EXISTS depreciation_schedules (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     asset_id UUID REFERENCES fixed_assets(id) ON DELETE CASCADE,
     depreciation_date DATE NOT NULL,
     amount NUMERIC(15, 2) NOT NULL,
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS depreciation_schedules (
 
 -- 4. INVENTORY & KITCHEN
 CREATE TABLE IF NOT EXISTS stock_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(150) NOT NULL,
     category VARCHAR(50) DEFAULT 'STATIONERY' CHECK (category IN ('STATIONERY', 'UNIFORM', 'FURNITURE', 'CLEANING', 'ELECTRONICS', 'KITCHEN', 'OTHER')),
     quantity NUMERIC(10, 2) DEFAULT 0.00,
@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS stock_items (
 );
 
 CREATE TABLE IF NOT EXISTS stock_movements (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     stock_item_id UUID REFERENCES stock_items(id) ON DELETE CASCADE,
     movement_type VARCHAR(10) CHECK (movement_type IN ('IN', 'OUT')),
     quantity NUMERIC(10, 2) NOT NULL,
@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS stock_movements (
 
 -- 5. TRANSPORT
 CREATE TABLE IF NOT EXISTS transport_routes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(150) NOT NULL,
     vehicle_number VARCHAR(50) NOT NULL,
     driver_name VARCHAR(100) NOT NULL,
@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS integration_config (
 );
 
 CREATE TABLE IF NOT EXISTS whatsapp_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     phone_number VARCHAR(20) NOT NULL,
     message_type VARCHAR(50) NOT NULL, -- e.g. 'RECEIPT', 'FEE_REMINDER'
     reference_id VARCHAR(100),
@@ -270,5 +270,6 @@ CREATE POLICY "Inventory managers full access to transport" ON transport_routes 
 -- Config & Logs
 CREATE POLICY "Finance managers full access to config" ON integration_config FOR ALL TO authenticated USING (is_finance_manager());
 CREATE POLICY "Finance managers full access to whatsapp logs" ON whatsapp_logs FOR ALL TO authenticated USING (is_finance_manager());
-I N S E R T   I N T O   s t o r a g e . b u c k e t s   ( i d ,   n a m e ,   p u b l i c )   V A L U E S   ( ' r e c e i p t s ' ,   ' r e c e i p t s ' ,   t r u e )   O N   C O N F L I C T   ( i d )   D O   N O T H I N G ;  
+I N S E R T   I N T O   s t o r a g e . b u c k e t s   ( i d ,   n a m e ,   p u b l i c )   V A L U E S   ( ' r e c e i p t s ' ,   ' r e c e i p t s ' ,   t r u e )   O N   C O N F L I C T   ( i d )   D O   N O T H I N G ; 
+ 
  

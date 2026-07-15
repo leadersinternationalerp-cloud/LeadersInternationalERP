@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS public.report_cards (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     student_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
     term_id UUID REFERENCES public.terms(id) ON DELETE CASCADE,
     academic_year VARCHAR NOT NULL,
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS public.report_cards (
 );
 
 CREATE TABLE IF NOT EXISTS public.budget_lines (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     academic_year VARCHAR NOT NULL,
     account_id UUID REFERENCES public.chart_of_accounts(id) ON DELETE CASCADE,
     allocated_amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
