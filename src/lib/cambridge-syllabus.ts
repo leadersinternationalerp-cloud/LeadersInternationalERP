@@ -76,13 +76,29 @@ export function getCambridgePrompt(subject: string, grade: string, topic: string
 - Localize examples: Nungwi/Paje coral reefs, Indian Ocean marine life (sea turtles, dolphins, red colobus monkeys in Jozani Forest), Stone Town weather, or tropical plants (clove tree, cinnamon).`;
       break;
 
-    case "kiswahili":
+    case "art & craft":
       subjectGuidelines = `
-- Focus on grammar, vocabulary, or traditional Swahili sayings (methali).
-- CRITICAL RULE: Since the primary instruction language is English, any Kiswahili phrase, proverb (methali), or vocabulary word used in questions or options MUST immediately be followed by its English translation in parentheses. Example: "kanga (printed cotton fabric)" or "Subira kwanza huleta baraka (Patience brings blessings)".`;
+- Focus on creative expression, colors, materials, and local Zanzibar arts (like Tingatinga paintings or weaving).`;
+      break;
+
+    case "computing":
+    case "digital literacy":
+      subjectGuidelines = `
+- Focus on basic computer skills, safe internet usage, logical thinking, and introductory programming concepts.`;
+      break;
+
+    case "music":
+      subjectGuidelines = `
+- Focus on rhythm, melody, instruments, and local Taarab or traditional African drumming where appropriate.`;
+      break;
+
+    case "global perspectives":
+      subjectGuidelines = `
+- Focus on community, environment, global cultures, and local Zanzi/Tanzanian heritage.`;
       break;
 
     case "english language":
+    case "english":
     default:
       subjectGuidelines = `
 - Focus on grammar, vocabulary, comprehension, or sentence structure.

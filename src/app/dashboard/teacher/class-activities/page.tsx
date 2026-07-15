@@ -95,8 +95,17 @@ export default async function TeacherClassActivitiesPage() {
     classes = fallbackClasses || [];
   }
   if (subjects.length === 0) {
-    const { data: fallbackSubjects } = await supabase.from('subjects').select('id, name').limit(5);
-    subjects = fallbackSubjects || [];
+    const { data: fallbackSubjects } = await supabase.from('subjects').select('id, name').order('name');
+    subjects = fallbackSubjects || [
+      { id: '1', name: 'Art & Craft' },
+      { id: '2', name: 'Computing' },
+      { id: '3', name: 'Digital Literacy' },
+      { id: '4', name: 'English Language' },
+      { id: '5', name: 'Global Perspectives' },
+      { id: '6', name: 'Mathematics' },
+      { id: '7', name: 'Music' },
+      { id: '8', name: 'Science' }
+    ];
   }
 
   // 3. Fetch all class activities
