@@ -16,7 +16,7 @@ SET username = split_part(email, '@', 1)
 WHERE username IS NULL;
 
 UPDATE public.profiles
-SET roles = ARRAY(SELECT trim(r) FROM unnest(string_to_array(role, ',')) r)
+SET roles = ARRAY(SELECT trim(r) FROM unnest(string_to_array(role::text, ',')) r)
 WHERE role IS NOT NULL AND (roles IS NULL OR roles = '{}'::text[]);
 
 -- 3. Update get_user_role helper function to return SETOF text
