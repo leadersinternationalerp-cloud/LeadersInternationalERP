@@ -32,7 +32,24 @@ export default async function StudentsPage() {
     `)
     .order('created_at', { ascending: false })
 
-  const studentsList = students || []
+  let studentsList = students || []
+
+  // Filter if user is a Teacher and not an Admin/Director/Principal/etc.
+  if (userRoles.includes('Teacher') && !userRoles.includes('System Admin') && !userRoles.includes('Director') && !userRoles.includes('Principal') && !userRoles.includes('HOS') && !userRoles.includes('Dean')) {
+    const { data: classSubjects } = await supabase
+      .from('class_subjects')
+      .select('classes (name, section)')
+      .eq('teacher_id', user?.id)
+
+    const assignedClasses = classSubjects?.map((cs: any) => cs.classes).filter(Boolean) || []
+    
+    studentsList = studentsList.filter(s => {
+      return assignedClasses.some((ac: any) => 
+        ac.name === s.grade_level && 
+        (ac.section === s.section || (!ac.section && !s.section))
+      )
+    })
+  }
 
   // 1. Calculate statistics per class/grade
   const gradeCounts: Record<string, number> = {}

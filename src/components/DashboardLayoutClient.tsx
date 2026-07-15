@@ -131,9 +131,11 @@ export default function DashboardLayoutClient({
     <>
       <SectionHeader>Main Menu</SectionHeader>
 
-      <NavLink href="/dashboard" icon={LayoutDashboard}>
-        Dashboard Overview
-      </NavLink>
+      {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal') || userRoles.includes('Dean') || userRoles.includes('HOS') || userRoles.includes('Accountant')) && (
+        <NavLink href="/dashboard" icon={LayoutDashboard}>
+          Dashboard Overview
+        </NavLink>
+      )}
 
       <NavLink href="/dashboard/calendar" icon={CalendarDays}>
         School Calendar
