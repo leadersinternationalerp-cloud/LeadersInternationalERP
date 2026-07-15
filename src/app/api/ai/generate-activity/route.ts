@@ -4,6 +4,8 @@ import { getCambridgePrompt } from '@/lib/cambridge-syllabus';
 import { getFallbackQuiz } from '@/lib/quiz-fallback';
 import { createClient } from '@/utils/supabase/server';
 
+export const maxDuration = 60; // Allow Vercel to run up to 60 seconds for AI generation
+
 export async function POST(request: Request) {
   try {
     // 1. Authenticate the user (only teachers/admin can generate quizzes)
@@ -58,28 +60,28 @@ export async function POST(request: Request) {
     const genAI = new GoogleGenerativeAI(apiKey);
     
     let quizData = null;
-    let usedModel = 'gemini-2.5-flash';
+    let usedModel = 'gemini-1.5-flash';
 
     // Try primary model
     try {
-      console.log('Attempting quiz generation with model: gemini-2.5-flash');
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      console.log('Attempting quiz generation with model: gemini-1.5-flash');
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
       const result = await model.generateContent(prompt);
       const text = result.response.text();
       quizData = parseGenAIResponse(text);
     } catch (primaryError: any) {
-      console.error('Primary gemini-2.5-flash failed:', primaryError.message || primaryError);
+      console.error('Primary gemini-1.5-flash failed:', primaryError.message || primaryError);
       
       // Fallback model
       try {
-        usedModel = 'gemini-2.5-flash-lite';
-        console.log('Attempting quiz generation with fallback model: gemini-2.5-flash-lite');
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+        usedModel = 'gemini-1.5-flash-8b';
+        console.log('Attempting quiz generation with fallback model: gemini-1.5-flash-8b');
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-8b' });
         const result = await model.generateContent(prompt);
         const text = result.response.text();
         quizData = parseGenAIResponse(text);
       } catch (fallbackError: any) {
-        console.error('Fallback gemini-2.5-flash-lite failed:', fallbackError.message || fallbackError);
+        console.error('Fallback gemini-1.5-flash-8b failed:', fallbackError.message || fallbackError);
       }
     }
 
