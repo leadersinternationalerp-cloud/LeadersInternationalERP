@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Question } from '@/lib/cambridge-syllabus';
+import curriculumData from '@/lib/data/curriculum/all_subjects.json';
 
 interface ClassSubject {
   class_id: string;
@@ -28,6 +29,10 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
   const [selectedSubject, setSelectedSubject] = useState(subjects[0]?.name || 'Mathematics');
   const [gradeLevel, setGradeLevel] = useState('Grade 1');
   const [topic, setTopic] = useState('');
+  const [topicsList, setTopicsList] = useState<string[]>([]);
+  const [subtopicsList, setSubtopicsList] = useState<string[]>([]);
+  const [selectedTopic, setSelectedTopic] = useState('');
+  const [selectedSubtopic, setSelectedSubtopic] = useState('');
   const [numQuestions, setNumQuestions] = useState(5);
   const [timeLimit, setTimeLimit] = useState(15);
   const [maxAttempts, setMaxAttempts] = useState(1);
@@ -41,11 +46,74 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
   const [cambridgeObjective, setCambridgeObjective] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
 
+  // Derive topics and subtopics from curriculum JSON when subject/grade change
+  useEffect(() => {
+    try {
+      const data: any = curriculumData as any;
+      const normalizedSubject = (selectedSubject || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const subjKey = Object.keys(data).find((k: string) => {
+        const normK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return normK === normalizedSubject || (normalizedSubject.includes('english') && normK === 'english') || (normalizedSubject.includes('art') && normK.includes('art'));
+      });
+
+      const stageNumMatch = (gradeLevel || '').match(/\d+/);
+      const stKey = stageNumMatch ? `Stage ${stageNumMatch[0]}` : 'Stage 1';
+
+      const topicsArr = subjKey && data[subjKey] && data[subjKey][stKey] ? data[subjKey][stKey] : [];
+      const tList = (topicsArr || []).map((t: any) => (t.topic || '').replace(/\t.*$/, '').trim()).filter((x: string) => x.length > 0);
+      setTopicsList(tList);
+      setSelectedTopic(tList[0] || '');
+      // populate subtopics for initial selection
+      const firstTopicObj = (topicsArr || []).find((t: any) => ((t.topic || '').replace(/\t.*$/, '').trim()) === (tList[0] || ''));
+      if (firstTopicObj && firstTopicObj.content) {
+        const subs = String(firstTopicObj.content).split(/\r?\n|Unit/).map((s: string) => s.trim()).filter((s: string) => s.length > 0 && !s.toLowerCase().includes('sample lesson') && !s.toLowerCase().includes('changes to this'));
+        setSubtopicsList(subs);
+      } else {
+        setSubtopicsList([]);
+      }
+      setSelectedSubtopic('');
+    } catch (e) {
+      console.error('Error deriving topics from curriculum', e);
+      setTopicsList([]);
+      setSubtopicsList([]);
+      setSelectedTopic('');
+      setSelectedSubtopic('');
+    }
+  }, [selectedSubject, gradeLevel]);
+
+  // Update subtopics when topic selection changes
+  useEffect(() => {
+    try {
+      const data: any = curriculumData as any;
+      const normalizedSubject = (selectedSubject || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const subjKey = Object.keys(data).find((k: string) => {
+        const normK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return normK === normalizedSubject || (normalizedSubject.includes('english') && normK === 'english') || (normalizedSubject.includes('art') && normK.includes('art'));
+      });
+      const stageNumMatch = (gradeLevel || '').match(/\d+/);
+      const stKey = stageNumMatch ? `Stage ${stageNumMatch[0]}` : 'Stage 1';
+      const topicsArr = subjKey && data[subjKey] && data[subjKey][stKey] ? data[subjKey][stKey] : [];
+      const topicObj = (topicsArr || []).find((t: any) => ((t.topic || '').replace(/\t.*$/, '').trim()) === selectedTopic);
+      if (topicObj && topicObj.content) {
+        const subs = String(topicObj.content).split(/\r?\n|Unit/).map((s: string) => s.trim()).filter((s: string) => s.length > 0 && !s.toLowerCase().includes('sample lesson') && !s.toLowerCase().includes('changes to this'));
+        setSubtopicsList(subs);
+      } else {
+        setSubtopicsList([]);
+      }
+      setSelectedSubtopic('');
+    } catch (e) {
+      console.error('Error deriving subtopics', e);
+      setSubtopicsList([]);
+      setSelectedSubtopic('');
+    }
+  }, [selectedTopic, selectedSubject, gradeLevel]);
+
   // Generation step trigger
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!topic) {
-      alert('Please enter a topic to guide the AI!');
+    const effectiveTopic = selectedSubtopic ? `${selectedTopic} - ${selectedSubtopic}` : selectedTopic || topic;
+    if (!effectiveTopic) {
+      alert('Please select a topic (and subtopic if available) to guide the AI!');
       return;
     }
 
@@ -60,7 +128,7 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
         body: JSON.stringify({
           subject: selectedSubject,
           gradeLevel,
-          topic,
+          topic: effectiveTopic,
           numQuestions
         })
       });
@@ -68,8 +136,8 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
       const result = await response.json();
       if (result.success && result.data) {
         const data = result.data;
-        setQuizTitle(data.title || `Cambridge ${selectedSubject} Quiz: ${topic}`);
-        setQuizDescription(data.description || `Auto-marked MCQ quiz covering ${topic}.`);
+        setQuizTitle(data.title || `Cambridge ${selectedSubject} Quiz: ${effectiveTopic}`);
+        setQuizDescription(data.description || `Auto-marked MCQ quiz covering ${effectiveTopic}.`);
         setCambridgeObjective(data.cambridgeObjective || '');
         setQuestions(data.questions || []);
         
