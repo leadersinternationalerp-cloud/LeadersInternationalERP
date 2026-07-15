@@ -136,6 +136,24 @@ export function UserTable({ users, currentUserId }: UserTableProps) {
     }
   }
 
+  // Filter state
+  const [searchTerm, setSearchTerm] = useState('')
+  const [roleFilter, setRoleFilter] = useState('')
+
+  const filteredUsers = users.filter((user) => {
+    const matchesSearch = searchTerm
+      ? (user.first_name + ' ' + user.last_name).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (user.username && user.username.toLowerCase().includes(searchTerm.toLowerCase()))
+      : true;
+    
+    const matchesRole = roleFilter
+      ? user.role === roleFilter || (user.role && user.role.includes(roleFilter))
+      : true;
+
+    return matchesSearch && matchesRole;
+  })
+
   // Helper to map DB role to UI role label
   const getRoleLabel = (roleVal: string) => {
     const match = AVAILABLE_ROLES.find(r => r.value === roleVal)
@@ -144,6 +162,30 @@ export function UserTable({ users, currentUserId }: UserTableProps) {
 
   return (
     <>
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1', minWidth: '250px' }}>
+          <input
+            type="text"
+            className="input"
+            placeholder="Search by name, email, or username..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div style={{ width: '250px' }}>
+          <select 
+            className="select" 
+            value={roleFilter} 
+            onChange={(e) => setRoleFilter(e.target.value)}
+          >
+            <option value="">All Roles</option>
+            {AVAILABLE_ROLES.map(r => (
+              <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       <div className="table-wrapper">
         <table style={{ width: '100%', minWidth: '800px' }}>
           <thead>
@@ -158,7 +200,13 @@ export function UserTable({ users, currentUserId }: UserTableProps) {
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => (
+            {filteredUsers.length === 0 ? (
+              <tr>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                  No users found matching your filters.
+                </td>
+              </tr>
+            ) : filteredUsers.map((u) => (
               <tr key={u.id}>
                 <td style={{ fontWeight: 500 }}>
                   {u.first_name} {u.last_name}
