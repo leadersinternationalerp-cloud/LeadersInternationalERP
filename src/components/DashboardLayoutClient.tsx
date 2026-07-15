@@ -107,16 +107,22 @@ export default function DashboardLayoutClient({
   const SectionHeader = ({ children: label }: { children: React.ReactNode }) => (
     <div
       className="nav-section"
+      title={collapsed ? String(label) : undefined}
       style={{
-        opacity: collapsed ? 0 : 1,
-        height: collapsed ? '0.5rem' : 'auto',
+        opacity: collapsed ? 0.6 : 1,
+        height: 'auto',
         overflow: 'hidden',
-        padding: collapsed ? '0' : '0.35rem 0.85rem',
+        padding: collapsed ? '0.35rem 0' : '0.35rem 0.85rem',
         marginTop: collapsed ? '0.5rem' : '0.85rem',
+        textAlign: collapsed ? 'center' : 'left',
+        fontSize: collapsed ? '0.55rem' : '0.68rem',
         transition: 'all 0.2s ease',
+        borderBottom: collapsed ? '1px solid rgba(100, 116, 139, 0.2)' : 'none',
+        paddingBottom: collapsed ? '0.35rem' : '0',
+        letterSpacing: collapsed ? '0.1em' : '0.05em',
       }}
     >
-      {label}
+      {collapsed ? String(label).substring(0, 3).toUpperCase() : label}
     </div>
   )
 
