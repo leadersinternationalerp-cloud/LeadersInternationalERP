@@ -133,7 +133,7 @@ export default async function TeacherMarksPage({
           id,
           student_id,
           grade_level,
-          profiles:id (first_name, last_name)
+          profiles (first_name, last_name)
         `)
         .eq('class_id', selectedClassId)
 
