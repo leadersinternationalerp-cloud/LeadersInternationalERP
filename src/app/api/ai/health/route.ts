@@ -86,7 +86,7 @@ async function resolveGeminiApiKey(): Promise<{
 
 /**
  * Health diagnostic endpoint for AI configuration.
- * Staff-auth protected: only System Admin, Director, Principal can access.
+ * Auth protected: Teachers, System Admin, Director, Principal, Head of Section, Dean can access.
  * Never returns the actual API key - only presence status.
  */
 export async function GET() {
@@ -102,7 +102,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check user role - staff only
+    // Check user role - teachers and staff
     const { data: profile } = await supabase
       .from('profiles')
       .select('role, roles')
@@ -110,11 +110,11 @@ export async function GET() {
       .single();
 
     const roles = profile?.roles || (profile?.role ? [profile.role] : []);
-    const isStaff = roles.some((r: string) =>
-      ['System Admin', 'Director', 'Principal'].includes(r)
+    const isAuthorized = roles.some((r: string) =>
+      ['System Admin', 'Director', 'Principal', 'Teacher', 'Head of Section', 'Dean'].includes(r)
     );
 
-    if (!isStaff) {
+    if (!isAuthorized) {
       return NextResponse.json({ error: 'Forbidden: Staff access required' }, { status: 403 });
     }
 
