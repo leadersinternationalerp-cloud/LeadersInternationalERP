@@ -50,6 +50,16 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
   const [sourceBadge, setSourceBadge] = useState<'gemini' | 'fallback' | null>(null);
   const [generatedModel, setGeneratedModel] = useState<string | null>(null);
   const [fallbackReason, setFallbackReason] = useState<string | null>(null);
+  const [keySource, setKeySource] = useState<string | null>(null);
+  const [aiHealth, setAiHealth] = useState<{
+    healthy: boolean | null;
+    apiKey: string | null;
+    keySource: string | null;
+    message: string | null;
+    primaryModel?: string | null;
+    fallbackModel?: string | null;
+  }>({ healthy: null, apiKey: null, keySource: null, message: null });
+  const [aiHealthLoading, setAiHealthLoading] = useState(false);
 
   // Quiz state after generation
   const [quizTitle, setQuizTitle] = useState('');
@@ -129,6 +139,59 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
     };
   }, [selectedSubject, gradeLevel]);
 
+  // Lightweight AI config diagnostics for the builder badge (best-effort; 401/403 is fine for teachers)
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAiHealth = async () => {
+      setAiHealthLoading(true);
+      try {
+        const response = await fetch('/api/ai/health');
+        const payload = await response.json().catch(() => null);
+        if (cancelled) return;
+
+        if (response.ok && payload?.success) {
+          setAiHealth({
+            healthy: Boolean(payload.healthy),
+            apiKey: payload.apiKey || null,
+            keySource: payload.keySource || null,
+            message: payload.message || null,
+            primaryModel: payload.primaryModel?.model || null,
+            fallbackModel: payload.fallbackModel?.model || null,
+          });
+        } else {
+          // Staff-only endpoint may 403 for teachers — show a soft diagnostic instead of an error
+          setAiHealth({
+            healthy: null,
+            apiKey: null,
+            keySource: null,
+            message:
+              response.status === 403 || response.status === 401
+                ? 'AI health diagnostics available to System Admin / Director / Principal'
+                : payload?.error || 'Unable to load AI health diagnostics',
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('AI health diagnostic failed:', error);
+          setAiHealth({
+            healthy: null,
+            apiKey: null,
+            keySource: null,
+            message: 'Unable to reach AI health endpoint',
+          });
+        }
+      } finally {
+        if (!cancelled) setAiHealthLoading(false);
+      }
+    };
+
+    loadAiHealth();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     if (!selectedTopicId) {
       setSelectedTopicTitle('');
@@ -167,6 +230,7 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
     setSourceBadge(null);
     setGeneratedModel(null);
     setFallbackReason(null);
+    setKeySource(null);
 
     try {
       const selectedTopicItem = topicsList.find((item) => item.id === selectedTopicId);
@@ -195,9 +259,11 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
         if (result.source === 'gemini-api') {
           setSourceBadge('gemini');
           setGeneratedModel(result.model);
+          setKeySource(result.keySource || null);
         } else {
           setSourceBadge('fallback');
           setFallbackReason(result.reason || 'Local offline template used');
+          setKeySource(result.keySource || null);
         }
       } else {
         alert(result.error || 'Failed to generate quiz');
@@ -320,9 +386,56 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
   return (
     <div style={{ fontFamily: 'Inter, sans-serif' }}>
       <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)', marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-primary)' }}>
-          ✨ AI Cambridge MCQ Quiz Generator (Free Tier)
-        </h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+          <h2 style={{ fontSize: '1.25rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-primary)' }}>
+            ✨ AI Cambridge MCQ Quiz Generator (Free Tier)
+          </h2>
+
+          {/* AI configuration diagnostic badge */}
+          <div
+            title={
+              aiHealth.message ||
+              (aiHealthLoading
+                ? 'Checking AI configuration…'
+                : 'AI configuration status unknown')
+            }
+            style={{
+              fontSize: '0.72rem',
+              padding: '0.3rem 0.7rem',
+              borderRadius: '999px',
+              fontWeight: 600,
+              border: '1px solid',
+              cursor: 'help',
+              whiteSpace: 'nowrap',
+              backgroundColor:
+                aiHealth.healthy === true
+                  ? 'rgba(34, 197, 94, 0.1)'
+                  : aiHealth.healthy === false
+                    ? 'rgba(239, 68, 68, 0.1)'
+                    : 'rgba(148, 163, 184, 0.12)',
+              color:
+                aiHealth.healthy === true
+                  ? '#16a34a'
+                  : aiHealth.healthy === false
+                    ? '#dc2626'
+                    : '#64748b',
+              borderColor:
+                aiHealth.healthy === true
+                  ? 'rgba(34, 197, 94, 0.3)'
+                  : aiHealth.healthy === false
+                    ? 'rgba(239, 68, 68, 0.3)'
+                    : 'rgba(148, 163, 184, 0.35)',
+            }}
+          >
+            {aiHealthLoading
+              ? '⏳ Checking AI…'
+              : aiHealth.healthy === true
+                ? `✅ AI Ready${aiHealth.keySource ? ` (${aiHealth.keySource})` : ''}`
+                : aiHealth.healthy === false
+                  ? `⚠️ AI Config Issue${aiHealth.apiKey ? ` · key: ${aiHealth.apiKey}` : ''}`
+                  : 'ℹ️ AI Status N/A'}
+          </div>
+        </div>
 
         <form onSubmit={handleGenerate} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
           
@@ -499,18 +612,44 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
                 You can review, edit the questions and answer keys before publishing.
               </p>
             </div>
-            <div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem' }}>
               {sourceBadge === 'gemini' && (
-                <span style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', fontWeight: 600, border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                <span
+                  title={
+                    [
+                      generatedModel ? `Model: ${generatedModel}` : null,
+                      keySource ? `Key source: ${keySource}` : null,
+                      aiHealth.message || null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') || 'Generated via Google Gemini'
+                  }
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', fontWeight: 600, border: '1px solid rgba(59, 130, 246, 0.2)', cursor: 'help' }}
+                >
                   🤖 Google Gemini ({generatedModel || '2.0-flash'})
+                  {keySource ? ` · ${keySource}` : ''}
                 </span>
               )}
               {sourceBadge === 'fallback' && (
                 <span 
-                  title={fallbackReason || 'Local offline template used'} 
+                  title={
+                    [
+                      fallbackReason || 'Local offline template used',
+                      aiHealth.apiKey ? `API key status: ${aiHealth.apiKey}` : null,
+                      aiHealth.keySource ? `Key source: ${aiHealth.keySource}` : null,
+                      aiHealth.message || null,
+                    ]
+                      .filter(Boolean)
+                      .join('\n')
+                  }
                   style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', fontWeight: 600, border: '1px solid rgba(245, 158, 11, 0.2)', cursor: 'help' }}
                 >
                   🔌 Local Offline Template
+                </span>
+              )}
+              {sourceBadge === 'fallback' && fallbackReason && (
+                <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', maxWidth: '280px', textAlign: 'right', lineHeight: 1.35 }}>
+                  {fallbackReason.length > 120 ? `${fallbackReason.slice(0, 117)}…` : fallbackReason}
                 </span>
               )}
             </div>
