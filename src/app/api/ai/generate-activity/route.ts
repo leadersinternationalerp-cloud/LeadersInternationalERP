@@ -40,6 +40,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields: subject, gradeLevel, topic' }, { status: 400 });
     }
 
+    // Try to get API key from environment variable
     const apiKey = process.env.GEMINI_API_KEY;
     
     // If API Key is missing or invalid placeholder, fallback immediately to local templates

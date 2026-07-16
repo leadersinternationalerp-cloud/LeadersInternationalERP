@@ -3,6 +3,21 @@ import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request: Request) {
   try {
+    // Check API key for security
+    const apiKey = request.headers.get('x-api-key') || request.headers.get('authorization')
+    
+    // Get valid API key from environment variable
+    const validApiKey = process.env.BIOMETRIC_API_KEY
+    
+    if (!validApiKey) {
+      console.error('BIOMETRIC_API_KEY is not configured in environment variables');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+    }
+    
+    if (!apiKey || apiKey !== validApiKey) {
+      return NextResponse.json({ error: 'Unauthorized. Invalid or missing API key.' }, { status: 401 })
+    }
+
     // We use the Service Role key to bypass RLS since this is a server-to-server call from the biometric device
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL

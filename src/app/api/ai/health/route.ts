@@ -36,6 +36,7 @@ export async function GET() {
     }
 
     // 2. Check API key presence (never return the actual key)
+    // Try to get API key from environment variable
     const apiKey = process.env.GEMINI_API_KEY;
     const keyStatus: 'configured' | 'placeholder' | 'missing' = 
       !apiKey ? 'missing' :
