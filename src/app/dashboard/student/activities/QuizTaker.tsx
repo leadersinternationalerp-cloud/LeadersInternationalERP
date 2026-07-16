@@ -105,9 +105,9 @@ export default function QuizTaker({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (Object.keys(answers).length < questions.length) {
-      const confirmSubmit = window.confirm('You have unanswered questions. Are you sure you want to submit?');
-      if (!confirmSubmit) return;
+    if (!allAnswered) {
+      alert(`Please answer all questions before submitting. You have ${unansweredCount} unanswered question(s) remaining.`);
+      return;
     }
     submitQuiz(false);
   };
@@ -154,6 +154,10 @@ export default function QuizTaker({
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+
+  const answeredCount = Object.keys(answers).length;
+  const unansweredCount = questions.length - answeredCount;
+  const allAnswered = unansweredCount === 0;
 
   if (isLoadingReview) {
     return (
@@ -238,8 +242,18 @@ export default function QuizTaker({
             <button type="button" onClick={onCancel} className="btn btn-secondary">
               Cancel Quiz
             </button>
-            <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ padding: '0.5rem 2.5rem', fontWeight: 600 }}>
-              {isSubmitting ? 'Submitting...' : 'Submit Quiz · Auto-Mark Now'}
+            <button
+              type="submit"
+              disabled={isSubmitting || !allAnswered}
+              className="btn btn-primary"
+              style={{
+                padding: '0.5rem 2.5rem',
+                fontWeight: 600,
+                opacity: allAnswered ? 1 : 0.6,
+                cursor: allAnswered ? 'pointer' : 'not-allowed'
+              }}
+            >
+              {isSubmitting ? 'Submitting...' : allAnswered ? 'Submit Quiz · Auto-Mark Now' : `Answer All Questions (${answeredCount}/${questions.length})`}
             </button>
           </div>
         </form>

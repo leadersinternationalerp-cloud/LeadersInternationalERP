@@ -47,6 +47,7 @@ export async function GET(request: Request) {
         percentage,
         time_taken_seconds,
         submitted_at,
+        answers,
         profiles (
           first_name,
           last_name,
@@ -72,7 +73,8 @@ export async function GET(request: Request) {
         maxScore: attempt.max_score,
         percentage: attempt.percentage,
         timeTakenSeconds: attempt.time_taken_seconds,
-        submittedAt: attempt.submitted_at
+        submittedAt: attempt.submitted_at,
+        answers: attempt.answers
       };
     });
 

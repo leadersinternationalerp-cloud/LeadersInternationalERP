@@ -34,6 +34,7 @@ interface ScoreRecord {
   percentage: number;
   timeTakenSeconds: number;
   submittedAt: string;
+  answers?: any;
 }
 
 interface ClassActivitiesClientProps {
@@ -55,6 +56,7 @@ export default function ClassActivitiesClient({
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [scoreboardData, setScoreboardData] = useState<ScoreRecord[]>([]);
   const [isLoadingScores, setIsLoadingScores] = useState(false);
+  const [activeReviewStudent, setActiveReviewStudent] = useState<ScoreRecord | null>(null);
 
   // Standard non-MCQ Activity form state
   const [subject, setSubject] = useState(subjects[0]?.name || 'Mathematics');
@@ -85,6 +87,7 @@ export default function ClassActivitiesClient({
     setSelectedActivity(activity);
     setIsLoadingScores(true);
     setScoreboardData([]);
+    setActiveReviewStudent(null);
 
     try {
       const response = await fetch(`/api/activities/results?activity_id=${activity.id}`);
@@ -379,7 +382,7 @@ export default function ClassActivitiesClient({
                 </p>
               </div>
               <button
-                onClick={() => setSelectedActivity(null)}
+                onClick={() => { setSelectedActivity(null); setActiveReviewStudent(null); }}
                 style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.25rem', color: 'var(--color-text-muted)' }}
               >
                 ✕
@@ -390,7 +393,106 @@ export default function ClassActivitiesClient({
               <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
                 <p>Loading student scores...</p>
               </div>
+            ) : activeReviewStudent ? (
+              /* Quiz Review Sub-view */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, overflowY: 'auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px dashed var(--color-border)', paddingBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>
+                    Reviewing: <strong>{activeReviewStudent.studentName}</strong> (Score: {activeReviewStudent.score} / {activeReviewStudent.maxScore})
+                  </span>
+                  <button
+                    onClick={() => setActiveReviewStudent(null)}
+                    className="btn btn-secondary"
+                    style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem', fontWeight: 600 }}
+                  >
+                    ← Back to Scoreboard
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {((selectedActivity.questions as any[]) || []).map((q: any, idx: number) => {
+                    const studentChoice = activeReviewStudent.answers ? activeReviewStudent.answers[q.id] : undefined;
+                    const isCorrect = q.correctIndex === studentChoice;
+
+                    return (
+                      <div
+                        key={q.id || idx}
+                        style={{
+                          padding: '1rem',
+                          borderRadius: 'var(--radius-md)',
+                          border: '1px solid var(--color-border)',
+                          borderLeft: `4px solid ${isCorrect ? '#10b981' : '#ef4444'}`,
+                          backgroundColor: '#fff'
+                        }}
+                      >
+                        <h5 style={{ fontSize: '0.95rem', margin: '0 0 0.75rem 0', display: 'flex', gap: '0.5rem', alignItems: 'start' }}>
+                          <span style={{
+                            fontSize: '0.8rem', fontWeight: 700,
+                            backgroundColor: isCorrect ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                            color: isCorrect ? '#10b981' : '#ef4444',
+                            width: '24px', height: '24px', borderRadius: '50%',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                          }}>
+                            {idx + 1}
+                          </span>
+                          <span style={{ flex: 1, fontWeight: 600 }}>{q.question}</span>
+                        </h5>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingLeft: '2rem', marginBottom: '0.75rem' }}>
+                          {((q.options as string[]) || []).map((opt: string, oIdx: number) => {
+                            const isStudentChoice = studentChoice === oIdx;
+                            const isCorrectAnswer = q.correctIndex === oIdx;
+
+                            let bg = '#fff';
+                            let border = '1px solid var(--color-border)';
+                            let color = 'var(--color-text)';
+                            
+                            if (isCorrectAnswer) {
+                              bg = 'rgba(16, 185, 129, 0.08)';
+                              border = '1px solid #10b981';
+                              color = '#065f46';
+                            } else if (isStudentChoice && !isCorrectAnswer) {
+                              bg = 'rgba(239, 68, 68, 0.08)';
+                              border = '1px solid #ef4444';
+                              color = '#991b1b';
+                            }
+
+                            return (
+                              <div
+                                key={oIdx}
+                                style={{
+                                  padding: '0.5rem 0.75rem', border, backgroundColor: bg,
+                                  color, borderRadius: 'var(--radius-sm)', fontSize: '0.85rem',
+                                  display: 'flex', alignItems: 'center', gap: '0.5rem'
+                                }}
+                              >
+                                <span style={{ fontWeight: 600 }}>{String.fromCharCode(65 + oIdx)}.</span>
+                                <span style={{ flex: 1 }}>{opt}</span>
+                                {isCorrectAnswer && <span style={{ color: '#10b981', fontWeight: 700, fontSize: '0.75rem' }}>✓ Correct</span>}
+                                {isStudentChoice && !isCorrectAnswer && <span style={{ color: '#ef4444', fontWeight: 700, fontSize: '0.75rem' }}>✗ Student choice</span>}
+                                {isStudentChoice && isCorrectAnswer && <span style={{ color: '#10b981', fontWeight: 700, fontSize: '0.75rem' }}>✓ Student choice</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {q.explanation && (
+                          <div style={{ marginLeft: '2rem', padding: '0.75rem', backgroundColor: 'rgba(0,0,0,0.01)', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--color-border)' }}>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: '0.2rem' }}>
+                              EXPLANATION
+                            </div>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--color-text)', margin: 0, lineHeight: 1.4 }}>
+                              {q.explanation}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             ) : (
+              /* Table Scoreboard View */
               <div style={{ overflowY: 'auto', flex: 1 }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
                   <thead>
@@ -401,6 +503,7 @@ export default function ClassActivitiesClient({
                       <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'center' }}>Percentage</th>
                       <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'center' }}>Time Taken</th>
                       <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>Submitted At</th>
+                      <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>Review</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -428,11 +531,20 @@ export default function ClassActivitiesClient({
                         <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
                           {new Date(row.submittedAt).toLocaleString()}
                         </td>
+                        <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>
+                          <button
+                            onClick={() => setActiveReviewStudent(row)}
+                            className="btn btn-secondary"
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', fontWeight: 600 }}
+                          >
+                            👁 Review Answers
+                          </button>
+                        </td>
                       </tr>
                     ))}
                     {scoreboardData.length === 0 && (
                       <tr>
-                        <td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                        <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
                           No attempts recorded yet.
                         </td>
                       </tr>
@@ -443,7 +555,7 @@ export default function ClassActivitiesClient({
             )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
-              <button onClick={() => setSelectedActivity(null)} className="btn btn-secondary">
+              <button onClick={() => { setSelectedActivity(null); setActiveReviewStudent(null); }} className="btn btn-secondary">
                 Close
               </button>
             </div>
