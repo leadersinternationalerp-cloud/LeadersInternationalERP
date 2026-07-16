@@ -502,7 +502,7 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
             <div>
               {sourceBadge === 'gemini' && (
                 <span style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', fontWeight: 600, border: '1px solid rgba(59, 130, 246, 0.2)' }}>
-                  🤖 Google Gemini ({generatedModel || '2.5-flash'})
+                  🤖 Google Gemini ({generatedModel || '2.0-flash'})
                 </span>
               )}
               {sourceBadge === 'fallback' && (

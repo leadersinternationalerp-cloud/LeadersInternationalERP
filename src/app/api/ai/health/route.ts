@@ -36,16 +36,33 @@ export async function GET() {
     }
 
     // 2. Check API key presence (never return the actual key)
-    // Try to get API key from environment variable
-    const apiKey = process.env.GEMINI_API_KEY;
+    let apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey || apiKey.startsWith('YOUR_KEY') || apiKey.trim() === '') {
+      try {
+        const { data: dbConfig } = await supabase
+          .from('integration_config')
+          .select('api_key')
+          .eq('provider_type', 'GEMINI')
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (dbConfig?.api_key) {
+          apiKey = dbConfig.api_key;
+        }
+      } catch (dbError) {
+        console.warn('Health check failed to query integration_config for GEMINI key:', dbError);
+      }
+    }
+
     const keyStatus: 'configured' | 'placeholder' | 'missing' = 
       !apiKey ? 'missing' :
       apiKey.startsWith('YOUR_KEY') || apiKey === '' ? 'placeholder' :
       'configured';
 
     // 3. Get configured models
-    const primaryModel = process.env.GEMINI_PRIMARY_MODEL || 'gemini-2.5-flash';
-    const fallbackModel = process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.0-flash';
+    const primaryModel = process.env.GEMINI_PRIMARY_MODEL || 'gemini-2.0-flash';
+    const fallbackModel = process.env.GEMINI_FALLBACK_MODEL || 'gemini-1.5-flash';
 
     const modelValidation: {
       model: string;
@@ -57,48 +74,35 @@ export async function GET() {
     if (keyStatus === 'configured' && apiKey) {
       const genAI = new GoogleGenerativeAI(apiKey);
       
-      // Validate primary model
-      try {
-        const model = genAI.getGenerativeModel({ 
-          model: primaryModel,
-          generationConfig: { responseMimeType: 'application/json' }
-        });
-        await model.generateContent('Respond with exactly: {"ok": true}');
-        modelValidation.push({ model: primaryModel, status: 'available' });
-      } catch (error: any) {
-        const errorMsg = error?.message || String(error);
-        // Check for model not found (404) or quota exceeded
-        const isModelUnavailable = errorMsg.includes('404') || 
-          errorMsg.toLowerCase().includes('not found') ||
-          errorMsg.toLowerCase().includes('model not found');
-        
-        modelValidation.push({ 
-          model: primaryModel, 
-          status: isModelUnavailable ? 'unavailable' : 'unknown',
-          error: isModelUnavailable ? 'Model not available or retired' : 'Connection error'
-        });
-      }
+      const testModel = async (modelName: string) => {
+        try {
+          try {
+            const model = genAI.getGenerativeModel({ 
+              model: modelName,
+              generationConfig: { responseMimeType: 'application/json' }
+            });
+            await model.generateContent('Respond with exactly: {"ok": true}');
+          } catch (mimeErr) {
+            const model = genAI.getGenerativeModel({ model: modelName });
+            await model.generateContent('Respond with exactly: {"ok": true}');
+          }
+          modelValidation.push({ model: modelName, status: 'available' });
+        } catch (error: any) {
+          const errorMsg = error?.message || String(error);
+          const isModelUnavailable = errorMsg.includes('404') || 
+            errorMsg.toLowerCase().includes('not found') ||
+            errorMsg.toLowerCase().includes('model not found');
+          
+          modelValidation.push({ 
+            model: modelName, 
+            status: isModelUnavailable ? 'unavailable' : 'unknown',
+            error: isModelUnavailable ? 'Model not available or retired' : errorMsg || 'Connection error'
+          });
+        }
+      };
 
-      // Validate fallback model
-      try {
-        const model = genAI.getGenerativeModel({ 
-          model: fallbackModel,
-          generationConfig: { responseMimeType: 'application/json' }
-        });
-        await model.generateContent('Respond with exactly: {"ok": true}');
-        modelValidation.push({ model: fallbackModel, status: 'available' });
-      } catch (error: any) {
-        const errorMsg = error?.message || String(error);
-        const isModelUnavailable = errorMsg.includes('404') || 
-          errorMsg.toLowerCase().includes('not found') ||
-          errorMsg.toLowerCase().includes('model not found');
-        
-        modelValidation.push({ 
-          model: fallbackModel, 
-          status: isModelUnavailable ? 'unavailable' : 'unknown',
-          error: isModelUnavailable ? 'Model not available or retired' : 'Connection error'
-        });
-      }
+      await testModel(primaryModel);
+      await testModel(fallbackModel);
     } else {
       // Cannot validate without proper API key
       modelValidation.push({ model: primaryModel, status: 'unknown' });
@@ -107,7 +111,7 @@ export async function GET() {
 
     // 5. Build response (never expose API key)
     const healthy = keyStatus === 'configured' && 
-      modelValidation.every(m => m.status !== 'unavailable');
+      modelValidation.some(m => m.status === 'available');
 
     return NextResponse.json({
       success: true,
@@ -118,7 +122,7 @@ export async function GET() {
       message: healthy 
         ? 'AI configuration is healthy' 
         : keyStatus !== 'configured' 
-          ? 'GEMINI_API_KEY needs to be configured'
+          ? 'GEMINI_API_KEY needs to be configured in process.env or integration_config'
           : 'One or more models may be unavailable'
     });
 
