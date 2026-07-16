@@ -22,6 +22,7 @@ export interface ClassActivity {
     percentage: number;
     submittedAt: string;
   } | null;
+  reviewMode?: boolean;
 }
 
 export default function ActivitiesClient({ activities }: { activities: ClassActivity[] }) {
@@ -39,6 +40,7 @@ export default function ActivitiesClient({ activities }: { activities: ClassActi
         subject={activeQuiz.subject}
         timeLimitMinutes={activeQuiz.time_limit_minutes || 15}
         questions={activeQuiz.questions}
+        reviewMode={activeQuiz.reviewMode}
         onQuizFinished={() => {
           setActiveQuiz(null);
           window.location.reload(); // Refresh scores & state
@@ -155,11 +157,11 @@ export default function ActivitiesClient({ activities }: { activities: ClassActi
                     </button>
                   ) : (
                     <button
-                      disabled
+                      onClick={() => setActiveQuiz({ ...act, reviewMode: true })}
                       className="btn btn-secondary"
-                      style={{ width: '100%', cursor: 'not-allowed', color: 'var(--color-text-muted)', opacity: 0.7 }}
+                      style={{ width: '100%', fontWeight: 600, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
                     >
-                      Already Submitted
+                      🔍 Review Submitted Answers
                     </button>
                   )
                 ) : (

@@ -18,6 +18,7 @@ interface QuizTakerProps {
   questions: Question[];
   onQuizFinished: () => void;
   onCancel: () => void;
+  reviewMode?: boolean;
 }
 
 export default function QuizTaker({
@@ -27,11 +28,13 @@ export default function QuizTaker({
   timeLimitMinutes,
   questions,
   onQuizFinished,
-  onCancel
+  onCancel,
+  reviewMode = false
 }: QuizTakerProps) {
   const [answers, setAnswers] = useState<{ [qId: string]: number }>({});
   const [timeLeft, setTimeLeft] = useState(timeLimitMinutes * 60);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingReview, setIsLoadingReview] = useState(reviewMode);
   const [quizResult, setQuizResult] = useState<{
     score: number;
     maxScore: number;
@@ -46,6 +49,29 @@ export default function QuizTaker({
       explanation: string;
     }[];
   } | null>(null);
+
+  // Fetch submitted attempt if in reviewMode
+  useEffect(() => {
+    if (reviewMode) {
+      setIsLoadingReview(true);
+      fetch(`/api/activities/review?activity_id=${activityId}`)
+        .then(res => res.json())
+        .then(res => {
+          if (res.success && res.data) {
+            setQuizResult(res.data);
+          } else {
+            alert(res.error || 'Failed to load review data');
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          alert('Network error loading review data');
+        })
+        .finally(() => {
+          setIsLoadingReview(false);
+        });
+    }
+  }, [reviewMode, activityId]);
 
   // Timer Countdown Effect
   useEffect(() => {
@@ -128,6 +154,15 @@ export default function QuizTaker({
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+
+  if (isLoadingReview) {
+    return (
+      <div style={{ fontFamily: 'Inter, sans-serif', maxWidth: '750px', margin: '2rem auto', textAlign: 'center', padding: '3rem' }} className="glass-panel">
+        <h3 style={{ color: 'var(--color-primary)' }}>Loading Quiz Review...</h3>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>Please wait while we retrieve your submitted answers.</p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ fontFamily: 'Inter, sans-serif', maxWidth: '750px', margin: '0 auto' }}>
