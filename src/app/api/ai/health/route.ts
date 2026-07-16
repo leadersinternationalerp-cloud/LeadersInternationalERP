@@ -179,15 +179,12 @@ export async function GET() {
 
     // 5. Build response (never expose API key)
     const hasAvailableModel = modelValidation.some((m) => m.status === 'available');
-    const hasAttemptedModel = modelValidation.some((m) => m.status === 'available' || m.status === 'unavailable');
     const status: 'ready' | 'degraded' | 'offline' =
       keyStatus !== 'configured'
         ? 'offline'
         : hasAvailableModel
           ? 'ready'
-          : hasAttemptedModel
-            ? 'degraded'
-            : 'offline';
+          : 'degraded';
 
     const healthy = status === 'ready';
 
