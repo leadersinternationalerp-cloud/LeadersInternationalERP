@@ -29,16 +29,56 @@ export default async function TeacherMarksPage({
     )
   }
 
-  // Fetch classes and subjects for filter dropdowns
-  const { data: classes } = await supabase
-    .from('classes')
-    .select('*')
-    .order('name', { ascending: true })
+  // Determine if admin
+  const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
 
-  const { data: subjects } = await supabase
-    .from('subjects')
-    .select('*')
-    .order('name', { ascending: true })
+  let classes: any[] = []
+  let subjects: any[] = []
+
+  if (isAdmin) {
+    // Admins can see all classes and subjects
+    const { data: allClasses } = await supabase
+      .from('classes')
+      .select('*')
+      .order('name', { ascending: true })
+    
+    const { data: allSubjects } = await supabase
+      .from('subjects')
+      .select('*')
+      .order('name', { ascending: true })
+
+    classes = allClasses || []
+    subjects = allSubjects || []
+  } else {
+    // Teachers only see their assigned classes and subjects
+    const { data: teacherAllocations } = await supabase
+      .from('class_subjects')
+      .select(`
+        class_id,
+        subject_id,
+        classes(*),
+        subjects(*)
+      `)
+      .eq('teacher_id', user?.id)
+
+    // Deduplicate classes and subjects
+    const classMap = new Map()
+    const subjectMap = new Map()
+
+    teacherAllocations?.forEach((alloc: any) => {
+      const cls = Array.isArray(alloc.classes) ? alloc.classes[0] : alloc.classes
+      const subj = Array.isArray(alloc.subjects) ? alloc.subjects[0] : alloc.subjects
+      if (cls) {
+        classMap.set(cls.id, cls)
+      }
+      if (subj) {
+        subjectMap.set(subj.id, subj)
+      }
+    })
+
+    classes = Array.from(classMap.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    subjects = Array.from(subjectMap.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+  }
 
   // Fetch system settings for grading scale thresholds
   const { data: settingsData } = await supabase
@@ -66,6 +106,19 @@ export default async function TeacherMarksPage({
   const selectedAssessmentType = params.assessment_type || 'Test 1'
   const selectedTerm = params.term || 'Term 1'
 
+  // Safety assignment check for non-admin requests
+  if (!isAdmin && selectedClassId && selectedSubjectId) {
+    const isAssigned = classes.some(c => c.id === selectedClassId) && subjects.some(s => s.id === selectedSubjectId)
+    if (!isAssigned && (classes.length > 0 || subjects.length > 0)) {
+      return (
+        <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
+          <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>
+          <p style={{ color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>You are not assigned to this class and subject combination.</p>
+        </div>
+      )
+    }
+  }
+
   // Fetch students in selected class
   let classStudents: any[] = []
   let isLocked = false
@@ -80,7 +133,6 @@ export default async function TeacherMarksPage({
           id,
           student_id,
           grade_level,
-          section,
           profiles:id (first_name, last_name)
         `)
         .eq('class_id', selectedClassId)
