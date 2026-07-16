@@ -2,11 +2,11 @@
   "name": "Leaders International School ERP",
   "short_name": "Leaders ERP",
   "description": "School Management System for Leaders International School",
-  "start_url": "/dashboard",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#00264b",
+  "background_color": "#ffffff",
   "theme_color": "#00264b",
   "icons": [
     {
@@ -34,9 +34,24 @@
       "purpose": "maskable"
     }
   ],
+  "screenshots": [
+    {
+      "src": "/screenshot-dashboard.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "375x667",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
   "shortcuts": [
     {
       "name": "Dashboard",
+      "short_name": "Dashboard",
       "url": "/dashboard",
       "icons": [
         {
@@ -47,6 +62,7 @@
     },
     {
       "name": "Notifications",
+      "short_name": "Notifications",
       "url": "/dashboard/notifications",
       "icons": [
         {
@@ -55,5 +71,9 @@
         }
       ]
     }
-  ]
+  ],
+  "categories": ["education", "productivity", "business"],
+  "dir": "ltr",
+  "lang": "en-US",
+  "prefer_related_applications": false
 }
