@@ -34,7 +34,7 @@ export async function POST(request: Request) {
 
     // 2. Parse body parameters
     const body = await request.json();
-    const { subject, gradeLevel, topic, numQuestions = 5 } = body;
+    const { subject, gradeLevel, topic, numQuestions = 5, topicObjectives = [], topicNumber = '', unitTitle = '' } = body;
 
     if (!subject || !gradeLevel || !topic) {
       return NextResponse.json({ error: 'Missing required fields: subject, gradeLevel, topic' }, { status: 400 });
@@ -53,8 +53,8 @@ export async function POST(request: Request) {
       });
     }
 
-    // 3. Build prompt for Gemini
-    const prompt = getCambridgePrompt(subject, gradeLevel, topic, numQuestions);
+    // 3. Build prompt for Gemini, using explicit objectives when provided
+    const prompt = getCambridgePrompt(subject, gradeLevel, topic, numQuestions, Array.isArray(topicObjectives) ? topicObjectives : []);
 
     // Initialize Google GenAI
     const genAI = new GoogleGenerativeAI(apiKey);

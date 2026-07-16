@@ -2,7 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { Question } from '@/lib/cambridge-syllabus';
-import curriculumData from '@/lib/data/curriculum/all_subjects.json';
+
+interface TopicItem {
+  id: string;
+  topicNumber?: string;
+  topicTitle: string;
+  unitTitle?: string;
+  objectives: string[];
+  label: string;
+}
 
 interface ClassSubject {
   class_id: string;
@@ -29,9 +37,10 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
   const [selectedSubject, setSelectedSubject] = useState(subjects[0]?.name || 'Mathematics');
   const [gradeLevel, setGradeLevel] = useState('Grade 1');
   const [topic, setTopic] = useState('');
-  const [topicsList, setTopicsList] = useState<string[]>([]);
+  const [topicsList, setTopicsList] = useState<TopicItem[]>([]);
   const [subtopicsList, setSubtopicsList] = useState<string[]>([]);
-  const [selectedTopic, setSelectedTopic] = useState('');
+  const [selectedTopicId, setSelectedTopicId] = useState('');
+  const [selectedTopicTitle, setSelectedTopicTitle] = useState('');
   const [selectedSubtopic, setSelectedSubtopic] = useState('');
   const [numQuestions, setNumQuestions] = useState(5);
   const [timeLimit, setTimeLimit] = useState(15);
@@ -46,72 +55,99 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
   const [cambridgeObjective, setCambridgeObjective] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
 
-  // Derive topics and subtopics from curriculum JSON when subject/grade change
-  useEffect(() => {
-    try {
-      const data: any = curriculumData as any;
-      const normalizedSubject = (selectedSubject || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const subjKey = Object.keys(data).find((k: string) => {
-        const normK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
-        return normK === normalizedSubject || (normalizedSubject.includes('english') && normK === 'english') || (normalizedSubject.includes('art') && normK.includes('art'));
-      });
+  const fetchTopics = async (subjectName: string, grade: string): Promise<TopicItem[]> => {
+    const response = await fetch(
+      `/api/syllabus/topics?subjectName=${encodeURIComponent(subjectName)}&gradeLevel=${encodeURIComponent(grade)}`
+    );
 
-      const stageNumMatch = (gradeLevel || '').match(/\d+/);
-      const stKey = stageNumMatch ? `Stage ${stageNumMatch[0]}` : 'Stage 1';
-
-      const topicsArr = subjKey && data[subjKey] && data[subjKey][stKey] ? data[subjKey][stKey] : [];
-      const tList = (topicsArr || []).map((t: any) => (t.topic || '').replace(/\t.*$/, '').trim()).filter((x: string) => x.length > 0);
-      setTopicsList(tList);
-      setSelectedTopic(tList[0] || '');
-      // populate subtopics for initial selection
-      const firstTopicObj = (topicsArr || []).find((t: any) => ((t.topic || '').replace(/\t.*$/, '').trim()) === (tList[0] || ''));
-      if (firstTopicObj && firstTopicObj.content) {
-        const subs = String(firstTopicObj.content).split(/\r?\n|Unit/).map((s: string) => s.trim()).filter((s: string) => s.length > 0 && !s.toLowerCase().includes('sample lesson') && !s.toLowerCase().includes('changes to this'));
-        setSubtopicsList(subs);
-      } else {
-        setSubtopicsList([]);
-      }
-      setSelectedSubtopic('');
-    } catch (e) {
-      console.error('Error deriving topics from curriculum', e);
-      setTopicsList([]);
-      setSubtopicsList([]);
-      setSelectedTopic('');
-      setSelectedSubtopic('');
+    if (!response.ok) {
+      throw new Error('Failed to load syllabus topics');
     }
+
+    const payload = await response.json();
+    if (!payload.success) {
+      throw new Error(payload.error || 'Unable to load syllabus topics');
+    }
+
+    return (payload.topics || []).map((topicItem: any) => ({
+      id: String(topicItem.id),
+      topicNumber: topicItem.topicNumber || '',
+      topicTitle: String(topicItem.topicTitle || ''),
+      unitTitle: String(topicItem.unitTitle || ''),
+      objectives: Array.isArray(topicItem.objectives) ? topicItem.objectives.filter(Boolean) : [],
+      label: topicItem.topicNumber ? `${topicItem.topicNumber}. ${topicItem.topicTitle}` : String(topicItem.topicTitle || '')
+    }));
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTopics = async () => {
+      if (!selectedSubject) {
+        setTopicsList([]);
+        setSelectedTopicId('');
+        setSelectedTopicTitle('');
+        setSubtopicsList([]);
+        setSelectedSubtopic('');
+        return;
+      }
+
+      try {
+        const items = await fetchTopics(selectedSubject, gradeLevel);
+        if (cancelled) return;
+        setTopicsList(items);
+
+        if (!items.some((item) => item.id === selectedTopicId)) {
+          setSelectedTopicId('');
+          setSelectedTopicTitle('');
+          setSubtopicsList([]);
+          setSelectedSubtopic('');
+        }
+      } catch (error) {
+        console.error('Error loading syllabus topics', error);
+        setTopicsList([]);
+        setSelectedTopicId('');
+        setSelectedTopicTitle('');
+        setSubtopicsList([]);
+        setSelectedSubtopic('');
+      }
+    };
+
+    loadTopics();
+    return () => {
+      cancelled = true;
+    };
   }, [selectedSubject, gradeLevel]);
 
-  // Update subtopics when topic selection changes
   useEffect(() => {
-    try {
-      const data: any = curriculumData as any;
-      const normalizedSubject = (selectedSubject || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const subjKey = Object.keys(data).find((k: string) => {
-        const normK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
-        return normK === normalizedSubject || (normalizedSubject.includes('english') && normK === 'english') || (normalizedSubject.includes('art') && normK.includes('art'));
-      });
-      const stageNumMatch = (gradeLevel || '').match(/\d+/);
-      const stKey = stageNumMatch ? `Stage ${stageNumMatch[0]}` : 'Stage 1';
-      const topicsArr = subjKey && data[subjKey] && data[subjKey][stKey] ? data[subjKey][stKey] : [];
-      const topicObj = (topicsArr || []).find((t: any) => ((t.topic || '').replace(/\t.*$/, '').trim()) === selectedTopic);
-      if (topicObj && topicObj.content) {
-        const subs = String(topicObj.content).split(/\r?\n|Unit/).map((s: string) => s.trim()).filter((s: string) => s.length > 0 && !s.toLowerCase().includes('sample lesson') && !s.toLowerCase().includes('changes to this'));
-        setSubtopicsList(subs);
-      } else {
-        setSubtopicsList([]);
-      }
-      setSelectedSubtopic('');
-    } catch (e) {
-      console.error('Error deriving subtopics', e);
+    if (!selectedTopicId) {
+      setSelectedTopicTitle('');
       setSubtopicsList([]);
       setSelectedSubtopic('');
+      return;
     }
-  }, [selectedTopic, selectedSubject, gradeLevel]);
+
+    const topicItem = topicsList.find((item) => item.id === selectedTopicId);
+    if (!topicItem) {
+      setSelectedTopicTitle('');
+      setSubtopicsList([]);
+      setSelectedSubtopic('');
+      return;
+    }
+
+    setSelectedTopicTitle(topicItem.topicTitle);
+    setSubtopicsList(topicItem.objectives || []);
+    setSelectedSubtopic('');
+  }, [selectedTopicId, topicsList]);
 
   // Generation step trigger
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const effectiveTopic = selectedSubtopic ? `${selectedTopic} - ${selectedSubtopic}` : selectedTopic || topic;
+    const selectedTopicItem = topicsList.find((item) => item.id === selectedTopicId);
+    const effectiveTopic = selectedSubtopic
+      ? `${selectedTopicItem?.label || selectedTopicTitle} - ${selectedSubtopic}`
+      : selectedTopicItem?.label || selectedTopicTitle || topic;
+
     if (!effectiveTopic) {
       alert('Please select a topic (and subtopic if available) to guide the AI!');
       return;
@@ -122,6 +158,7 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
     setGeneratedModel(null);
 
     try {
+      const selectedTopicItem = topicsList.find((item) => item.id === selectedTopicId);
       const response = await fetch('/api/ai/generate-activity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -129,7 +166,10 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
           subject: selectedSubject,
           gradeLevel,
           topic: effectiveTopic,
-          numQuestions
+          numQuestions,
+          topicNumber: selectedTopicItem?.topicNumber || '',
+          unitTitle: selectedTopicItem?.unitTitle || '',
+          topicObjectives: selectedTopicItem?.objectives || []
         })
       });
 
@@ -222,7 +262,11 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
   };
 
   // Publish final quiz to backend
-  const getEffectiveTopic = () => selectedSubtopic ? `${selectedTopic} - ${selectedSubtopic}` : selectedTopic || topic;
+  const getEffectiveTopic = () => {
+    const selectedTopicItem = topicsList.find((item) => item.id === selectedTopicId);
+    const topicLabel = selectedTopicItem?.label || selectedTopicTitle || topic;
+    return selectedSubtopic ? `${topicLabel} - ${selectedSubtopic}` : topicLabel;
+  };
 
   const handlePublish = async () => {
     if (!quizTitle || questions.length === 0) {
@@ -359,15 +403,15 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <select
-                  value={selectedTopic}
-                  onChange={e => { setSelectedTopic(e.target.value); setSelectedSubtopic(''); }}
+                  value={selectedTopicId}
+                  onChange={e => { setSelectedTopicId(e.target.value); setSelectedSubtopic(''); }}
                   className="input-field"
                   style={{ flex: 1, minWidth: '220px' }}
                   required
                 >
                   <option value="">-- Select Topic --</option>
-                  {topicsList.map(t => (
-                    <option key={t} value={t}>{t}</option>
+                  {topicsList.map((t) => (
+                    <option key={t.id} value={t.id}>{t.label}</option>
                   ))}
                 </select>
 
@@ -378,12 +422,24 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
                   style={{ minWidth: '220px' }}
                   disabled={subtopicsList.length === 0}
                 >
-                  <option value="">-- Select Subtopic (optional) --</option>
-                  {subtopicsList.map(s => (
+                  <option value="">-- Select Objective / Subtopic (optional) --</option>
+                  {subtopicsList.map((s) => (
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
               </div>
+
+              {selectedTopicId && (
+                <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', padding: '0.75rem', backgroundColor: 'rgba(248, 250, 252, 0.9)' }}>
+                  <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--color-text-muted)' }}><strong>Selected topic metadata</strong></p>
+                  <p style={{ margin: '0.4rem 0 0 0', fontSize: '0.95rem' }}>
+                    <strong>Topic number:</strong> {topicsList.find((item) => item.id === selectedTopicId)?.topicNumber || 'N/A'}
+                  </p>
+                  <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.95rem' }}>
+                    <strong>Unit title:</strong> {topicsList.find((item) => item.id === selectedTopicId)?.unitTitle || 'N/A'}
+                  </p>
+                </div>
+              )}
 
               {topicsList.length === 0 && (
                 <input

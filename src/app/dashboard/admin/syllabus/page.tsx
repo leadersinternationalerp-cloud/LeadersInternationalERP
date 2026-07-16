@@ -16,8 +16,8 @@ export default async function SyllabusAdminPage() {
   const { data: topics } = await supabase.from('cambridge_topics').select(`
     *,
     subject:subject_id(name, code),
-    stage:stage_id(name, code),
-    objectives:cambridge_objectives(count)
+    stage:stage_id(stage_name),
+    objectives:cambridge_learning_objectives(count)
   `).order('created_at', { ascending: false })
 
   async function uploadSyllabusAction(formData: FormData) {
@@ -38,17 +38,16 @@ export default async function SyllabusAdminPage() {
     const { data: topic } = await supabase.from('cambridge_topics').insert({
       subject_id,
       stage_id,
-      topic_code: 'NEW-TOPIC',
-      title: 'Automatically Extracted Topic',
-      description: text_content.substring(0, 100) + '...'
+      topic_number: 'NEW-TOPIC',
+      topic_title: 'Automatically Extracted Topic'
     }).select().single()
     
     if (topic) {
       // Mock objective
-      await supabase.from('cambridge_objectives').insert({
+      await supabase.from('cambridge_learning_objectives').insert({
         topic_id: topic.id,
         objective_code: 'OBJ-1',
-        description: 'Understand ' + text_content.substring(0, 50)
+        objective_text: 'Understand ' + text_content.substring(0, 50)
       })
     }
 
@@ -85,11 +84,11 @@ export default async function SyllabusAdminPage() {
                 <tr key={topic.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                   <td style={{ padding: '1rem' }}>
                     <div style={{ fontWeight: 600 }}>{topic.subject?.name}</div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{topic.stage?.name}</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{topic.stage?.stage_name}</div>
                   </td>
                   <td style={{ padding: '1rem' }}>
-                    <div style={{ fontWeight: 600, fontFamily: 'monospace' }}>{topic.topic_code}</div>
-                    <div style={{ fontSize: '0.9rem' }}>{topic.title}</div>
+                    <div style={{ fontWeight: 600, fontFamily: 'monospace' }}>{topic.topic_number}</div>
+                    <div style={{ fontSize: '0.9rem' }}>{topic.topic_title}</div>
                   </td>
                   <td style={{ padding: '1rem', textAlign: 'center', fontWeight: 600 }}>
                     {topic.objectives?.[0]?.count || 0}

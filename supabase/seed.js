@@ -135,6 +135,154 @@ async function getOrCreateSubject(name, department) {
   return data;
 }
 
+const curriculumData = require('../src/lib/data/curriculum/all_subjects.json');
+const CAMBRIDGE_SUBJECT_CODE_MAP = {
+  'Art and Craft': 'ART',
+  'Computing': 'COMP',
+  'Digital Literacy': 'DIGI',
+  'English Language': 'ENG',
+  'Global Perspectives': 'GLOB',
+  'Mathematics': 'MATH',
+  'Music': 'MUS',
+  'Science': 'SCI'
+};
+
+async function getOrCreateCambridgeStage(stageName) {
+  const { data: existing } = await supabase.from('cambridge_stages').select('*').eq('stage_name', stageName).maybeSingle();
+  if (existing) return existing;
+
+  const { data, error } = await supabase.from('cambridge_stages').insert({
+    stage_name: stageName,
+    description: `Cambridge syllabus content for ${stageName}`
+  }).select().single();
+
+  if (error) {
+    console.error(`Error creating cambridge stage ${stageName}:`, error.message);
+    throw error;
+  }
+
+  console.log(`Created stage '${stageName}' (${data.id})`);
+  return data;
+}
+
+async function getOrCreateCambridgeSubject(stageId, subjectName) {
+  const { data: existing } = await supabase.from('cambridge_subjects').select('*')
+    .eq('stage_id', stageId)
+    .eq('subject_name', subjectName)
+    .maybeSingle();
+  if (existing) return existing;
+
+  const subjectCode = CAMBRIDGE_SUBJECT_CODE_MAP[subjectName] || null;
+  const { data, error } = await supabase.from('cambridge_subjects').insert({
+    stage_id: stageId,
+    subject_name: subjectName,
+    subject_code: subjectCode,
+    name: subjectName,
+    code: subjectCode
+  }).select().single();
+
+  if (error) {
+    console.error(`Error creating cambridge subject ${subjectName} for stage ${stageId}:`, error.message);
+    throw error;
+  }
+
+  console.log(`Created cambridge subject '${subjectName}' for stage ${stageId}`);
+  return data;
+}
+
+async function getOrCreateCambridgeUnit(cambridgeSubjectId, unitNumber, unitTitle) {
+  const { data: existing } = await supabase.from('cambridge_units').select('*')
+    .eq('cambridge_subject_id', cambridgeSubjectId)
+    .eq('unit_number', unitNumber)
+    .maybeSingle();
+  if (existing) return existing;
+
+  const { data, error } = await supabase.from('cambridge_units').insert({
+    cambridge_subject_id: cambridgeSubjectId,
+    unit_number: unitNumber,
+    unit_title: unitTitle
+  }).select().single();
+
+  if (error) {
+    console.error(`Error creating cambridge unit ${unitTitle}:`, error.message);
+    throw error;
+  }
+
+  return data;
+}
+
+async function getOrCreateCambridgeTopic(unitId, topicNumber, topicTitle) {
+  const { data: existing } = await supabase.from('cambridge_topics').select('*')
+    .eq('unit_id', unitId)
+    .eq('topic_title', topicTitle)
+    .maybeSingle();
+  if (existing) return existing;
+
+  const { data, error } = await supabase.from('cambridge_topics').insert({
+    unit_id: unitId,
+    topic_number: topicNumber,
+    topic_title: topicTitle
+  }).select().single();
+
+  if (error) {
+    console.error(`Error creating cambridge topic ${topicTitle}:`, error.message);
+    throw error;
+  }
+
+  return data;
+}
+
+async function createCambridgeLearningObjectives(topicId, content) {
+  const lines = String(content).split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  if (!lines.length) return;
+
+  const { error: deleteError } = await supabase.from('cambridge_learning_objectives').delete().eq('topic_id', topicId);
+  if (deleteError) {
+    console.error(`Error clearing existing objectives for topic ${topicId}:`, deleteError.message);
+  }
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const objectiveText = lines[i];
+    const objectiveCode = `OBJ-${i + 1}`;
+    const { error } = await supabase.from('cambridge_learning_objectives').insert({
+      topic_id: topicId,
+      objective_code: objectiveCode,
+      objective_text: objectiveText
+    });
+    if (error) {
+      console.error(`Error creating objective for topic ${topicId}:`, error.message);
+    }
+  }
+}
+
+async function seedCambridgeSyllabus() {
+  console.log('\n--- Seeding Cambridge syllabus tables ---');
+
+  const stageNames = ['Stage 1', 'Stage 2', 'Stage 3', 'Stage 4', 'Stage 5', 'Stage 6'];
+
+  for (const stageName of stageNames) {
+    const stage = await getOrCreateCambridgeStage(stageName);
+
+    for (const subjectName of Object.keys(curriculumData)) {
+      const subjectEntry = await getOrCreateCambridgeSubject(stage.id, subjectName);
+      const unitTitle = `${subjectName} ${stageName}`;
+      const unit = await getOrCreateCambridgeUnit(subjectEntry.id, 1, unitTitle);
+
+      const topics = curriculumData[subjectName][stageName] || [];
+      for (let idx = 0; idx < topics.length; idx += 1) {
+        const topicItem = topics[idx];
+        const topicTitle = (topicItem.topic || '').trim();
+        if (!topicTitle) continue;
+        const topicNumber = `T${idx + 1}`;
+        const topicRow = await getOrCreateCambridgeTopic(unit.id, topicNumber, topicTitle);
+        if (topicItem.content && String(topicItem.content).trim()) {
+          await createCambridgeLearningObjectives(topicRow.id, topicItem.content);
+        }
+      }
+    }
+  }
+}
+
 async function seed() {
   console.log('\n--- Seeding academic years & terms ---');
   const acYear = await getOrCreateAcademicYear('2025-2026', '2025-08-01', '2026-06-30');
@@ -357,6 +505,8 @@ async function seed() {
       }
     }
   }
+
+  await seedCambridgeSyllabus();
   
   console.log('\nSeeding completed successfully!');
 }

@@ -26,29 +26,36 @@ def parse_docx_topics(doc_path: Path):
     stage = None
     topics = []
 
+    file_stage_match = STAGE_PATTERN.search(doc_path.name)
+    if file_stage_match:
+        stage = f"Stage {file_stage_match.group(1)}"
+
     for para in doc.paragraphs:
         text = para.text.strip()
         if not text:
             continue
 
         stage_match = STAGE_PATTERN.search(text)
-        if stage_match and 'Stage' in text:
+        if stage_match and 'Stage' in text and not text.lower().startswith('unit'):
             stage = f"Stage {stage_match.group(1)}"
             continue
 
         if text.lower().startswith('unit'):
-            line = text
-            if 'topic' in line.lower():
-                topic_text = line
-            else:
-                topic_text = line
-            cleaned = TOPIC_LINE_PATTERN.match(topic_text)
+            cleaned = TOPIC_LINE_PATTERN.match(text)
             if cleaned:
                 topic_name = cleaned.group(1).strip()
                 if topic_name and not topic_name.lower().startswith('contents') and not topic_name.lower().startswith('sample') and 'changes to' not in topic_name.lower():
                     topics.append(topic_name)
 
-    return stage, topics
+    unique_topics = []
+    seen = set()
+    for topic in topics:
+        normalized = topic.lower().strip()
+        if normalized not in seen:
+            seen.add(normalized)
+            unique_topics.append(topic)
+
+    return stage, unique_topics
 
 
 def build_subject_json():

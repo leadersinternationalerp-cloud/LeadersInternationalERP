@@ -16,22 +16,6 @@
       {
         "topic": "Painting: Processes and movements",
         "content": ""
-      },
-      {
-        "topic": "Sculpting with clay",
-        "content": ""
-      },
-      {
-        "topic": "Drawing with purpose",
-        "content": ""
-      },
-      {
-        "topic": "Introduction to printing",
-        "content": ""
-      },
-      {
-        "topic": "Painting: Processes and movements",
-        "content": ""
       }
     ],
     "Stage 2": [],
@@ -53,39 +37,11 @@
         "content": ""
       },
       {
-        "topic": "Drawing from encounter",
-        "content": ""
-      },
-      {
         "topic": "Mosaic",
-        "content": ""
-      },
-      {
-        "topic": "Painting from encounter",
-        "content": ""
-      },
-      {
-        "topic": "Exploring structure",
         "content": ""
       }
     ],
     "Stage 4": [
-      {
-        "topic": "Printing for a purpose",
-        "content": ""
-      },
-      {
-        "topic": "Approaches to painting",
-        "content": ""
-      },
-      {
-        "topic": "Drawing with perspective and dynamism",
-        "content": ""
-      },
-      {
-        "topic": "Exploring architecture through 3D art",
-        "content": ""
-      },
       {
         "topic": "Printing for a purpose",
         "content": ""
@@ -119,45 +75,9 @@
       {
         "topic": "Painting for purpose and expression",
         "content": ""
-      },
-      {
-        "topic": "Exploring drawing processes",
-        "content": ""
-      },
-      {
-        "topic": "Sculpting animals",
-        "content": ""
-      },
-      {
-        "topic": "Exploring fabric and other crafts",
-        "content": ""
-      },
-      {
-        "topic": "Painting for purpose and expression",
-        "content": ""
       }
     ],
     "Stage 6": [
-      {
-        "topic": "Combining printing approaches",
-        "content": ""
-      },
-      {
-        "topic": "Drawing humour and perspective",
-        "content": ""
-      },
-      {
-        "topic": "Painting creatively from encounters",
-        "content": ""
-      },
-      {
-        "topic": "a Sculpting with wire (optional)",
-        "content": ""
-      },
-      {
-        "topic": "b Project: Concept to final outcome (optional)",
-        "content": ""
-      },
       {
         "topic": "Combining printing approaches",
         "content": ""
@@ -205,30 +125,6 @@
       {
         "topic": "End of stage projects",
         "content": ""
-      },
-      {
-        "topic": "Have you ever wondered…?",
-        "content": ""
-      },
-      {
-        "topic": "Let’s create",
-        "content": ""
-      },
-      {
-        "topic": "Party time",
-        "content": ""
-      },
-      {
-        "topic": "Dance like a dinosaur",
-        "content": ""
-      },
-      {
-        "topic": "Let’s investigate",
-        "content": ""
-      },
-      {
-        "topic": "End of stage projects",
-        "content": ""
       }
     ],
     "Stage 2": [],
@@ -256,57 +152,9 @@
       {
         "topic": "End of stage projects",
         "content": ""
-      },
-      {
-        "topic": "Computational thinking",
-        "content": ""
-      },
-      {
-        "topic": "What is a computer?",
-        "content": ""
-      },
-      {
-        "topic": "Secret codes",
-        "content": ""
-      },
-      {
-        "topic": "Data café",
-        "content": ""
-      },
-      {
-        "topic": "Further coding",
-        "content": ""
-      },
-      {
-        "topic": "End of stage projects",
-        "content": ""
       }
     ],
     "Stage 4": [
-      {
-        "topic": "Input, process, output",
-        "content": ""
-      },
-      {
-        "topic": "Data handling",
-        "content": ""
-      },
-      {
-        "topic": "Programming loops",
-        "content": ""
-      },
-      {
-        "topic": "Let’s get physical!",
-        "content": ""
-      },
-      {
-        "topic": "Networks and communication",
-        "content": ""
-      },
-      {
-        "topic": "End of stage projects",
-        "content": ""
-      },
       {
         "topic": "Input, process, output",
         "content": ""
@@ -356,57 +204,9 @@
       {
         "topic": "End of Stage Projects",
         "content": ""
-      },
-      {
-        "topic": "Binary decision making",
-        "content": ""
-      },
-      {
-        "topic": "Coding with numbers",
-        "content": ""
-      },
-      {
-        "topic": "Data collection and analysis",
-        "content": ""
-      },
-      {
-        "topic": "Networking",
-        "content": ""
-      },
-      {
-        "topic": "Internet of smart things",
-        "content": ""
-      },
-      {
-        "topic": "End of Stage Projects",
-        "content": ""
       }
     ],
     "Stage 6": [
-      {
-        "topic": "Comical coding",
-        "content": ""
-      },
-      {
-        "topic": "Humans think, computers obey",
-        "content": ""
-      },
-      {
-        "topic": "Quiz time",
-        "content": ""
-      },
-      {
-        "topic": "Weather data management system",
-        "content": ""
-      },
-      {
-        "topic": "Seeing through the clouds",
-        "content": ""
-      },
-      {
-        "topic": "End of stage projects",
-        "content": ""
-      },
       {
         "topic": "Comical coding",
         "content": ""
@@ -446,37 +246,9 @@
       {
         "topic": "How a computer can help us",
         "content": ""
-      },
-      {
-        "topic": "Safe and secure",
-        "content": ""
-      },
-      {
-        "topic": "What is a computer?",
-        "content": ""
-      },
-      {
-        "topic": "How a computer can help us",
-        "content": ""
       }
     ],
     "Stage 2": [
-      {
-        "topic": "Research and create",
-        "content": ""
-      },
-      {
-        "topic": "Who are you?",
-        "content": ""
-      },
-      {
-        "topic": "The digital world",
-        "content": ""
-      },
-      {
-        "topic": "Animation",
-        "content": ""
-      },
       {
         "topic": "Research and create",
         "content": ""
@@ -510,41 +282,9 @@
       {
         "topic": "The history of computers",
         "content": ""
-      },
-      {
-        "topic": "Document creation",
-        "content": ""
-      },
-      {
-        "topic": "Written online communication",
-        "content": ""
-      },
-      {
-        "topic": "Safe digital research",
-        "content": ""
-      },
-      {
-        "topic": "The history of computers",
-        "content": ""
       }
     ],
     "Stage 4": [
-      {
-        "topic": "Presenting information on screen",
-        "content": ""
-      },
-      {
-        "topic": "Documentary makers",
-        "content": ""
-      },
-      {
-        "topic": "Critical internet research",
-        "content": ""
-      },
-      {
-        "topic": "Online communities",
-        "content": ""
-      },
       {
         "topic": "Presenting information on screen",
         "content": ""
@@ -612,63 +352,11 @@
       {
         "topic": "Digital resilience",
         "content": ""
-      },
-      {
-        "topic": "Malware",
-        "content": ""
-      },
-      {
-        "topic": "Intellectual property",
-        "content": ""
-      },
-      {
-        "topic": "Disruptive technologies",
-        "content": ""
-      },
-      {
-        "topic": "Digital resilience",
-        "content": ""
       }
     ]
   },
   "English Language": {
     "Stage 1": [
-      {
-        "topic": "Stories with repetitive language",
-        "content": ""
-      },
-      {
-        "topic": "Recounts of personal experiences",
-        "content": ""
-      },
-      {
-        "topic": "Traditional rhymes",
-        "content": ""
-      },
-      {
-        "topic": "Instructions",
-        "content": ""
-      },
-      {
-        "topic": "Simple rhyming poems",
-        "content": ""
-      },
-      {
-        "topic": "Traditional tales",
-        "content": ""
-      },
-      {
-        "topic": "Poems on similar themes",
-        "content": ""
-      },
-      {
-        "topic": "Stories with familiar settings",
-        "content": ""
-      },
-      {
-        "topic": "Information texts",
-        "content": ""
-      },
       {
         "topic": "Stories with repetitive language",
         "content": ""
@@ -742,81 +430,9 @@
       {
         "topic": "Information texts: reports about a subject",
         "content": ""
-      },
-      {
-        "topic": "Information texts: personal information",
-        "content": ""
-      },
-      {
-        "topic": "Traditional tales from different cultures",
-        "content": ""
-      },
-      {
-        "topic": "Poems with patterns in sounds",
-        "content": ""
-      },
-      {
-        "topic": "Stories with familiar themes",
-        "content": ""
-      },
-      {
-        "topic": "Poems with patterns in structure",
-        "content": ""
-      },
-      {
-        "topic": "Explanations",
-        "content": ""
-      },
-      {
-        "topic": "Poems to perform",
-        "content": ""
-      },
-      {
-        "topic": "Stories by well-known writers",
-        "content": ""
-      },
-      {
-        "topic": "Information texts: reports about a subject",
-        "content": ""
       }
     ],
     "Stage 3": [
-      {
-        "topic": "Different stories by the same writer",
-        "content": ""
-      },
-      {
-        "topic": "Formal and informal letters",
-        "content": ""
-      },
-      {
-        "topic": "Poems from different cultures",
-        "content": ""
-      },
-      {
-        "topic": "Information texts",
-        "content": ""
-      },
-      {
-        "topic": "Myths and legends: narratives",
-        "content": ""
-      },
-      {
-        "topic": "Myths and legends: playscripts",
-        "content": ""
-      },
-      {
-        "topic": "Poems with different structures",
-        "content": ""
-      },
-      {
-        "topic": "Adventure stories",
-        "content": ""
-      },
-      {
-        "topic": "Instructions",
-        "content": ""
-      },
       {
         "topic": "Different stories by the same writer",
         "content": ""
@@ -890,42 +506,6 @@
       {
         "topic": "Persuasive texts",
         "content": ""
-      },
-      {
-        "topic": "Historical stories",
-        "content": ""
-      },
-      {
-        "topic": "Recounts",
-        "content": ""
-      },
-      {
-        "topic": "Poems from different times and cultures",
-        "content": ""
-      },
-      {
-        "topic": "Explanations",
-        "content": ""
-      },
-      {
-        "topic": "Fantasy stories",
-        "content": ""
-      },
-      {
-        "topic": "Playscripts that show a range of dramatic conventions",
-        "content": ""
-      },
-      {
-        "topic": "A range of poetry, including free verse, on a common theme",
-        "content": ""
-      },
-      {
-        "topic": "Stories about issues and dilemmas",
-        "content": ""
-      },
-      {
-        "topic": "Persuasive texts",
-        "content": ""
       }
     ],
     "Stage 5": [
@@ -964,81 +544,9 @@
       {
         "topic": "Persuasive texts",
         "content": ""
-      },
-      {
-        "topic": "Stories from different cultures",
-        "content": ""
-      },
-      {
-        "topic": "Recounts",
-        "content": ""
-      },
-      {
-        "topic": "Narrative poetry",
-        "content": ""
-      },
-      {
-        "topic": "Explain it to me",
-        "content": ""
-      },
-      {
-        "topic": "Poems by significant poets",
-        "content": ""
-      },
-      {
-        "topic": "Classic literature",
-        "content": ""
-      },
-      {
-        "topic": "A playscript, book and film of the same story",
-        "content": ""
-      },
-      {
-        "topic": "Stories developed into films",
-        "content": ""
-      },
-      {
-        "topic": "Persuasive texts",
-        "content": ""
       }
     ],
     "Stage 6": [
-      {
-        "topic": "Stories with flashbacks",
-        "content": ""
-      },
-      {
-        "topic": "Historical recounts",
-        "content": ""
-      },
-      {
-        "topic": "Poetic language",
-        "content": ""
-      },
-      {
-        "topic": "The environment",
-        "content": ""
-      },
-      {
-        "topic": "Nature poetry",
-        "content": ""
-      },
-      {
-        "topic": "Science fiction",
-        "content": ""
-      },
-      {
-        "topic": "Plays by a significant writer",
-        "content": ""
-      },
-      {
-        "topic": "Stories by significant children’s writers",
-        "content": ""
-      },
-      {
-        "topic": "Advertising",
-        "content": ""
-      },
       {
         "topic": "Stories with flashbacks",
         "content": ""
@@ -1193,34 +701,6 @@
       {
         "topic": "Conducting tests",
         "content": ""
-      },
-      {
-        "topic": "Number",
-        "content": ""
-      },
-      {
-        "topic": "2D and 3D shape",
-        "content": ""
-      },
-      {
-        "topic": "Calculation",
-        "content": ""
-      },
-      {
-        "topic": "Statistical methods",
-        "content": ""
-      },
-      {
-        "topic": "Fractions, percentages, decimals and proportion",
-        "content": ""
-      },
-      {
-        "topic": "The coordinate grid",
-        "content": ""
-      },
-      {
-        "topic": "Probability",
-        "content": ""
       }
     ],
     "Stage 5": [],
@@ -1249,51 +729,11 @@
         "content": ""
       },
       {
-        "topic": "We can sing",
-        "content": ""
-      },
-      {
-        "topic": "Fun with sound",
-        "content": ""
-      },
-      {
-        "topic": "Musical journeys",
-        "content": ""
-      },
-      {
-        "topic": "Travel",
-        "content": ""
-      },
-      {
-        "topic": "Celebration",
-        "content": ""
-      },
-      {
         "topic": "Units include some additional activities and teaching notes to support teachers and learners.",
         "content": ""
       }
     ],
     "Stage 2": [
-      {
-        "topic": "Rhythm and pulse",
-        "content": ""
-      },
-      {
-        "topic": "Soundscapes, layering sounds and rounds",
-        "content": ""
-      },
-      {
-        "topic": "Ostinato and texture",
-        "content": ""
-      },
-      {
-        "topic": "The hummingbird sings",
-        "content": ""
-      },
-      {
-        "topic": "Celebration",
-        "content": ""
-      },
       {
         "topic": "Rhythm and pulse",
         "content": ""
@@ -1342,51 +782,11 @@
         "content": ""
       },
       {
-        "topic": "The power of rhythm",
-        "content": ""
-      },
-      {
-        "topic": "The sound of the rainforest",
-        "content": ""
-      },
-      {
-        "topic": "Creating characters",
-        "content": ""
-      },
-      {
-        "topic": "How does the music tell a story?",
-        "content": ""
-      },
-      {
-        "topic": "Celebration",
-        "content": ""
-      },
-      {
         "topic": "Units include some additional activities and teaching notes to support teachers and learners.",
         "content": ""
       }
     ],
     "Stage 5": [
-      {
-        "topic": "Building a pop song",
-        "content": ""
-      },
-      {
-        "topic": "Creating music in response to art",
-        "content": ""
-      },
-      {
-        "topic": "Singing to sleep",
-        "content": ""
-      },
-      {
-        "topic": "Space-scape",
-        "content": ""
-      },
-      {
-        "topic": "Celebration",
-        "content": ""
-      },
       {
         "topic": "Building a pop song",
         "content": ""
@@ -1436,56 +836,12 @@
       {
         "topic": "Variety show",
         "content": ""
-      },
-      {
-        "topic": "I’ve got rhythm",
-        "content": ""
-      },
-      {
-        "topic": "Special occasions",
-        "content": ""
-      },
-      {
-        "topic": "All about the bass",
-        "content": ""
-      },
-      {
-        "topic": "Word variation",
-        "content": ""
-      },
-      {
-        "topic": "Variety show",
-        "content": ""
       }
     ]
   },
   "Science": {
     "Stage 1": [],
     "Stage 2": [
-      {
-        "topic": "Materials in our world",
-        "content": ""
-      },
-      {
-        "topic": "Living things in different places",
-        "content": ""
-      },
-      {
-        "topic": "Light from different sources",
-        "content": ""
-      },
-      {
-        "topic": "Growing and keeping healthy",
-        "content": ""
-      },
-      {
-        "topic": "Make a change",
-        "content": ""
-      },
-      {
-        "topic": "Polar explorer",
-        "content": ""
-      },
       {
         "topic": "Materials in our world",
         "content": ""
@@ -1535,57 +891,9 @@
       {
         "topic": "On Earth and beyond",
         "content": ""
-      },
-      {
-        "topic": "Living things and plants",
-        "content": ""
-      },
-      {
-        "topic": "Forces and magnetism",
-        "content": ""
-      },
-      {
-        "topic": "States of matter",
-        "content": ""
-      },
-      {
-        "topic": "Animals",
-        "content": ""
-      },
-      {
-        "topic": "Light and shadows",
-        "content": ""
-      },
-      {
-        "topic": "On Earth and beyond",
-        "content": ""
       }
     ],
     "Stage 4": [
-      {
-        "topic": "Skeletons",
-        "content": ""
-      },
-      {
-        "topic": "On Earth and beyond",
-        "content": ""
-      },
-      {
-        "topic": "Materials: properties and changes",
-        "content": ""
-      },
-      {
-        "topic": "Energy and Light",
-        "content": ""
-      },
-      {
-        "topic": "Life processes and ecosystems",
-        "content": ""
-      },
-      {
-        "topic": "Electricity",
-        "content": ""
-      },
       {
         "topic": "Skeletons",
         "content": ""
@@ -1635,61 +943,9 @@
       {
         "topic": "Planet Earth",
         "content": ""
-      },
-      {
-        "topic": "Plants",
-        "content": ""
-      },
-      {
-        "topic": "Materials",
-        "content": ""
-      },
-      {
-        "topic": "Forces",
-        "content": ""
-      },
-      {
-        "topic": "Animals",
-        "content": ""
-      },
-      {
-        "topic": "Waves",
-        "content": ""
-      },
-      {
-        "topic": "Planet Earth",
-        "content": ""
       }
     ],
     "Stage 6": [
-      {
-        "topic": "Forces and movement, on Earth and beyond",
-        "content": ""
-      },
-      {
-        "topic": "Human health and disease",
-        "content": ""
-      },
-      {
-        "topic": "Materials, including rocks, and physical change",
-        "content": ""
-      },
-      {
-        "topic": "Electricity, conductors and light",
-        "content": ""
-      },
-      {
-        "topic": "Chemical changes and mixtures",
-        "content": ""
-      },
-      {
-        "topic": "Ecosystems",
-        "content": ""
-      },
-      {
-        "topic": "Puberty",
-        "content": ""
-      },
       {
         "topic": "Forces and movement, on Earth and beyond",
         "content": ""
