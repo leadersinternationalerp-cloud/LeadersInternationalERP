@@ -518,13 +518,24 @@ async function seed() {
       console.error(`Skipping student record for ${s.email} - Profile not found.`);
       continue;
     }
-    
+
+    // Fetch class ID matching grade level and section
+    const { data: cls } = await supabase
+      .from('classes')
+      .select('id')
+      .eq('name', s.grade_level)
+      .eq('section', s.section)
+      .maybeSingle();
+
+    const classId = cls?.id || null;
+
     console.log(`Upserting Student: ${s.email} (${s.student_id})`);
     const { error: studErr } = await supabase.from('students').upsert({
       id: profile.id,
       student_id: s.student_id,
       grade_level: s.grade_level,
       section: s.section,
+      class_id: classId,
       dob: s.dob,
       gender: s.gender,
       nationality: 'Tanzanian',
@@ -533,6 +544,16 @@ async function seed() {
     
     if (studErr) {
       console.error(`Failed to upsert student ${s.email}:`, studErr.message);
+    }
+
+    if (classId) {
+      const { error: junctionErr } = await supabase.from('student_classes').upsert({
+        student_id: profile.id,
+        class_id: classId
+      });
+      if (junctionErr) {
+        console.error(`Failed to insert student_classes record for ${s.email}:`, junctionErr.message);
+      }
     }
   }
   

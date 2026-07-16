@@ -26,46 +26,46 @@ export default async function StudentHomeworkPage() {
   }
 
   // 1. Fetch student class details
-  const { data: stud } = await supabase
+  const { data: student } = await supabase
     .from('students')
-    .select('grade_level, section')
+    .select('class_id')
     .eq('id', user?.id)
     .single()
 
   let homeworkList: any[] = []
   let submissions: any[] = []
+  let classId = student?.class_id
 
-  if (stud) {
-    // Find class matching student grade & section
-    const { data: cls } = await supabase
-      .from('classes')
-      .select('id')
-      .eq('name', stud.grade_level)
-      .eq('section', stud.section)
-      .single()
+  if (!classId) {
+    const { data: junction } = await supabase
+      .from('student_classes')
+      .select('class_id')
+      .eq('student_id', user?.id)
+      .maybeSingle()
+    classId = junction?.class_id
+  }
 
-    if (cls) {
-      // Fetch homework for this class
-      const { data: hw } = await supabase
-        .from('homework')
-        .select(`
-          *,
-          subjects(name),
-          teacher:created_by (first_name, last_name)
-        `)
-        .eq('class_id', cls.id)
-        .order('due_date', { ascending: true })
+  if (classId) {
+    // Fetch homework for this class
+    const { data: hw } = await supabase
+      .from('homework')
+      .select(`
+        *,
+        subjects(name),
+        teacher:created_by (first_name, last_name)
+      `)
+      .eq('class_id', classId)
+      .order('due_date', { ascending: true })
 
-      homeworkList = hw || []
+    homeworkList = hw || []
 
-      // Fetch student's submissions
-      const { data: subs } = await supabase
-        .from('homework_submissions')
-        .select('*')
-        .eq('student_id', user?.id)
+    // Fetch student's submissions
+    const { data: subs } = await supabase
+      .from('homework_submissions')
+      .select('*')
+      .eq('student_id', user?.id)
 
-      submissions = subs || []
-    }
+    submissions = subs || []
   }
 
   // Server Action to submit homework

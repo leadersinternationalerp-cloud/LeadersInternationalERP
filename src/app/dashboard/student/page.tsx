@@ -42,16 +42,18 @@ export default async function StudentDashboardPage() {
   let submissions: any[] = []
 
   if (studentRecord) {
-    const { data: cls } = await supabase
-      .from('classes')
-      .select('id')
-      .eq('name', studentRecord.grade_level)
-      .eq('section', studentRecord.section)
-      .single()
+    let classId = studentRecord.class_id
 
-    if (cls) {
-      const classId = cls.id
+    if (!classId) {
+      const { data: junction } = await supabase
+        .from('student_classes')
+        .select('class_id')
+        .eq('student_id', user?.id)
+        .maybeSingle()
+      classId = junction?.class_id
+    }
 
+    if (classId) {
       // Fetch active homework
       const { data: homework } = await supabase
         .from('homework')
@@ -77,6 +79,7 @@ export default async function StudentDashboardPage() {
         .from('class_activities')
         .select('*')
         .eq('class_id', classId)
+        .eq('is_published', true)
         .gte('date', now.toISOString())
         .lte('date', nextWeek.toISOString())
         .order('date', { ascending: true })

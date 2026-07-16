@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { createServiceClient } from '@/utils/supabase/service';
 import { markQuiz } from '@/lib/cambridge-syllabus';
 
 export async function POST(request: Request) {
@@ -82,6 +83,83 @@ export async function POST(request: Request) {
         );
       }
       throw insertError;
+    }
+
+    // 6.5 Record the score in the marks table for report cards
+    try {
+      const serviceClient = createServiceClient();
+
+      // Resolve subject_id by searching subjects matching activity.subject
+      const { data: subjectRecord } = await supabase
+        .from('subjects')
+        .select('id')
+        .eq('name', activity.subject)
+        .maybeSingle();
+
+      const subjectId = subjectRecord?.id;
+
+      if (subjectId) {
+        // Fetch current active term
+        const { data: activeTerm } = await supabase
+          .from('terms')
+          .select('name, academic_year_id')
+          .eq('is_current', true)
+          .maybeSingle();
+
+        let termName = activeTerm?.name || 'Term 3';
+        let academicYearName = '2025-2026';
+
+        if (activeTerm?.academic_year_id) {
+          const { data: activeYear } = await supabase
+            .from('academic_years')
+            .select('name')
+            .eq('id', activeTerm.academic_year_id)
+            .maybeSingle();
+          if (activeYear) {
+            academicYearName = activeYear.name;
+          }
+        }
+
+        // Upsert score into marks table using elevated serviceClient privileges to bypass student write RLS
+        const { data: existingMark } = await serviceClient
+          .from('marks')
+          .select('id')
+          .eq('student_id', user.id)
+          .eq('class_id', activity.class_id)
+          .eq('subject_id', subjectId)
+          .eq('remarks', `Quiz: ${activity.title} (Auto-marked)`)
+          .maybeSingle();
+
+        const markData: any = {
+          student_id: user.id,
+          class_id: activity.class_id,
+          subject_id: subjectId,
+          assessment_type: 'CA',
+          term: termName,
+          academic_year: academicYearName,
+          score: evaluation.percentage,
+          remarks: `Quiz: ${activity.title} (Auto-marked)`,
+          grading_scale: 'Percentage',
+          graded_by: activity.created_by,
+          is_released: false
+        };
+
+        if (existingMark) {
+          markData.id = existingMark.id;
+        }
+
+        const { error: markError } = await serviceClient
+          .from('marks')
+          .upsert(markData);
+
+        if (markError) {
+          console.error('Failed to save quiz mark in marks table:', markError.message);
+        }
+      } else {
+        console.warn(`Subject matching name '${activity.subject}' not found. Cannot record quiz mark in marks table.`);
+      }
+    } catch (markRecordError) {
+      console.error('Error during quiz mark recording:', markRecordError);
     }
 
     // 7. Return evaluation results

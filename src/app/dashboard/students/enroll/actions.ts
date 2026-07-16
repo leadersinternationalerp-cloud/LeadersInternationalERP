@@ -70,6 +70,16 @@ export async function enrollStudentAction(formData: any) {
   const nextId = (count || 0) + 1
   const studentIdStr = `STUD-${nextId.toString().padStart(4, '0')}`
 
+  // Find class ID matching grade level and section
+  const { data: cls } = await supabaseService
+    .from('classes')
+    .select('id')
+    .eq('name', formData.grade_level)
+    .eq('section', formData.section || null)
+    .maybeSingle()
+
+  const classId = cls?.id || null
+
   // 4. Insert Student Record
   const { error: studentError } = await supabaseService
     .from('students')
@@ -78,6 +88,7 @@ export async function enrollStudentAction(formData: any) {
       student_id: studentIdStr,
       grade_level: formData.grade_level,
       section: formData.section || null,
+      class_id: classId,
       dob: formData.dob || null,
       gender: formData.gender || null,
       nationality: formData.nationality || null
@@ -86,6 +97,19 @@ export async function enrollStudentAction(formData: any) {
   if (studentError) {
     await supabaseService.auth.admin.deleteUser(userId)
     return { error: `Failed to create student record: ${studentError.message}` }
+  }
+
+  // Insert into student_classes junction table if classId is found
+  if (classId) {
+    const { error: junctionError } = await supabaseService
+      .from('student_classes')
+      .insert({
+        student_id: userId,
+        class_id: classId
+      })
+    if (junctionError) {
+      console.error('Failed to insert student_classes record:', junctionError.message)
+    }
   }
 
   // 5. Link Parent

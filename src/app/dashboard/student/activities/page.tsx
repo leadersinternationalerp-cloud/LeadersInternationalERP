@@ -37,32 +37,33 @@ export default async function StudentActivitiesPage() {
   // 2. Fetch student class details
   const { data: student } = await supabase
     .from('students')
-    .select('grade_level, section')
+    .select('class_id')
     .eq('id', user.id)
     .single();
 
   let activities: any[] = [];
   let attempts: any[] = [];
+  let classId = student?.class_id;
 
-  if (student) {
-    // Get class_id matching student's grade level and section
-    const { data: cls } = await supabase
-      .from('classes')
-      .select('id')
-      .eq('name', student.grade_level)
-      .eq('section', student.section)
-      .single();
+  if (!classId) {
+    const { data: junction } = await supabase
+      .from('student_classes')
+      .select('class_id')
+      .eq('student_id', user.id)
+      .maybeSingle();
+    classId = junction?.class_id;
+  }
 
-    if (cls) {
-      // Fetch published class activities for the class
-      const { data: acts } = await supabase
-        .from('class_activities')
-        .select('*')
-        .eq('class_id', cls.id)
-        .order('date', { ascending: false });
-      
-      activities = acts || [];
-    }
+  if (classId) {
+    // Fetch published class activities for the class
+    const { data: acts } = await supabase
+      .from('class_activities')
+      .select('*')
+      .eq('class_id', classId)
+      .eq('is_published', true)
+      .order('date', { ascending: false });
+    
+    activities = acts || [];
   }
 
   // 3. Fetch current student's quiz attempts
