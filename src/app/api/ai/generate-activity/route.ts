@@ -7,6 +7,14 @@ import { createServiceClient } from '@/utils/supabase/service';
 
 export const maxDuration = 60; // Allow Vercel to run up to 60 seconds for AI generation
 
+const ACTIVE_FREE_TIER_MODELS = [
+  'gemini-3-flash-preview',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-pro',
+] as const;
+
 /**
  * Resolve a Google/Gemini API key from common env var names, then
  * fall back to the active GEMINI row in integration_config.
@@ -171,18 +179,13 @@ export async function POST(request: Request) {
     // Sequence of models to attempt (prioritizing current stable & fast Gemini models)
     const primaryEnv = process.env.GEMINI_PRIMARY_MODEL;
     const fallbackEnv = process.env.GEMINI_FALLBACK_MODEL;
+    const allowedModels = new Set(ACTIVE_FREE_TIER_MODELS);
 
     const candidateModels = Array.from(
       new Set(
-        [
-          primaryEnv,
-          fallbackEnv,
-          'gemini-2.0-flash',
-          'gemini-1.5-flash',
-          'gemini-2.0-flash-lite',
-          'gemini-1.5-pro',
-          'gemini-2.5-flash',
-        ].filter((m): m is string => Boolean(m && m.trim()))
+        [primaryEnv, fallbackEnv, ...ACTIVE_FREE_TIER_MODELS].filter(
+          (m): m is string => Boolean(m && m.trim()) && allowedModels.has(m as (typeof ACTIVE_FREE_TIER_MODELS)[number])
+        )
       )
     );
 

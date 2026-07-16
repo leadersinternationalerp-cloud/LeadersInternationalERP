@@ -14,6 +14,12 @@ const ENV_KEY_CANDIDATES = [
 ] as const;
 
 /**
+ * Models probed during health check.
+ * Uses stable free-tier workhorses — preview models can be flaky.
+ */
+const HEALTH_CHECK_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'] as const;
+
+/**
  * Resolve a Google/Gemini API key from common env var names, then
  * fall back to the active GEMINI row in integration_config.
  * Never returns the actual key to clients — only presence status.
@@ -122,8 +128,8 @@ export async function GET() {
     const { apiKey, keyStatus, keySource, envChecked } = await resolveGeminiApiKey();
 
     // 3. Get configured models
-    const primaryModel = process.env.GEMINI_PRIMARY_MODEL || 'gemini-2.0-flash';
-    const fallbackModel = process.env.GEMINI_FALLBACK_MODEL || 'gemini-1.5-flash';
+    const primaryModel = process.env.GEMINI_PRIMARY_MODEL || HEALTH_CHECK_MODELS[0];
+    const fallbackModel = process.env.GEMINI_FALLBACK_MODEL || HEALTH_CHECK_MODELS[1];
 
     const modelValidation: {
       model: string;
@@ -172,22 +178,34 @@ export async function GET() {
     }
 
     // 5. Build response (never expose API key)
-    const healthy =
-      keyStatus === 'configured' && modelValidation.some((m) => m.status === 'available');
+    const hasAvailableModel = modelValidation.some((m) => m.status === 'available');
+    const hasAttemptedModel = modelValidation.some((m) => m.status !== 'unknown');
+    const status: 'ready' | 'degraded' | 'offline' =
+      keyStatus !== 'configured'
+        ? 'offline'
+        : hasAvailableModel
+          ? 'ready'
+          : hasAttemptedModel
+            ? 'degraded'
+            : 'offline';
+
+    const healthy = status === 'ready';
 
     return NextResponse.json({
       success: true,
       healthy,
+      status,
       apiKey: keyStatus,
       keySource,
       envChecked,
       primaryModel: modelValidation[0],
       fallbackModel: modelValidation[1],
-      message: healthy
-        ? 'AI configuration is healthy'
-        : keyStatus !== 'configured'
-          ? `Google/Gemini API key needs to be configured (checked: ${envChecked.join(', ')}, or integration_config)`
-          : 'One or more models may be unavailable',
+      message:
+        status === 'ready'
+          ? 'AI configuration is healthy'
+          : status === 'degraded'
+            ? 'AI is configured but one or more stable models are unavailable'
+            : `Google/Gemini API key needs to be configured (checked: ${envChecked.join(', ')}, or integration_config)`,
     });
   } catch (error: any) {
     console.error('AI Health Check Error:', error);

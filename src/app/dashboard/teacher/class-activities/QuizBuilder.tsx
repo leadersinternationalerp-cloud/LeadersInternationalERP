@@ -53,12 +53,13 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
   const [keySource, setKeySource] = useState<string | null>(null);
   const [aiHealth, setAiHealth] = useState<{
     healthy: boolean | null;
+    status: 'ready' | 'degraded' | 'offline' | null;
     apiKey: string | null;
     keySource: string | null;
     message: string | null;
     primaryModel?: string | null;
     fallbackModel?: string | null;
-  }>({ healthy: null, apiKey: null, keySource: null, message: null });
+  }>({ healthy: null, status: null, apiKey: null, keySource: null, message: null });
   const [aiHealthLoading, setAiHealthLoading] = useState(false);
 
   // Quiz state after generation
@@ -153,6 +154,7 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
         if (response.ok && payload?.success) {
           setAiHealth({
             healthy: Boolean(payload.healthy),
+            status: payload.status || (payload.healthy ? 'ready' : 'offline'),
             apiKey: payload.apiKey || null,
             keySource: payload.keySource || null,
             message: payload.message || null,
@@ -163,6 +165,7 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
           // Staff-only endpoint may 403 for teachers — show a soft diagnostic instead of an error
           setAiHealth({
             healthy: null,
+            status: 'offline',
             apiKey: null,
             keySource: null,
             message:
@@ -176,6 +179,7 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
           console.warn('AI health diagnostic failed:', error);
           setAiHealth({
             healthy: null,
+            status: 'offline',
             apiKey: null,
             keySource: null,
             message: 'Unable to reach AI health endpoint',
@@ -383,6 +387,8 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
     }
   };
 
+  const badgeState = aiHealth.status ?? (aiHealth.healthy === true ? 'ready' : aiHealth.healthy === false ? 'offline' : null);
+
   return (
     <div style={{ fontFamily: 'Inter, sans-serif' }}>
       <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)', marginBottom: '2rem' }}>
@@ -408,32 +414,40 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
               cursor: 'help',
               whiteSpace: 'nowrap',
               backgroundColor:
-                aiHealth.healthy === true
+                badgeState === 'ready'
                   ? 'rgba(34, 197, 94, 0.1)'
-                  : aiHealth.healthy === false
-                    ? 'rgba(239, 68, 68, 0.1)'
-                    : 'rgba(148, 163, 184, 0.12)',
+                  : badgeState === 'degraded'
+                    ? 'rgba(245, 158, 11, 0.12)'
+                    : badgeState === 'offline'
+                      ? 'rgba(239, 68, 68, 0.1)'
+                      : 'rgba(148, 163, 184, 0.12)',
               color:
-                aiHealth.healthy === true
+                badgeState === 'ready'
                   ? '#16a34a'
-                  : aiHealth.healthy === false
-                    ? '#dc2626'
-                    : '#64748b',
+                  : badgeState === 'degraded'
+                    ? '#d97706'
+                    : badgeState === 'offline'
+                      ? '#dc2626'
+                      : '#64748b',
               borderColor:
-                aiHealth.healthy === true
+                badgeState === 'ready'
                   ? 'rgba(34, 197, 94, 0.3)'
-                  : aiHealth.healthy === false
-                    ? 'rgba(239, 68, 68, 0.3)'
-                    : 'rgba(148, 163, 184, 0.35)',
+                  : badgeState === 'degraded'
+                    ? 'rgba(245, 158, 11, 0.3)'
+                    : badgeState === 'offline'
+                      ? 'rgba(239, 68, 68, 0.3)'
+                      : 'rgba(148, 163, 184, 0.35)',
             }}
           >
             {aiHealthLoading
               ? '⏳ Checking AI…'
-              : aiHealth.healthy === true
+              : badgeState === 'ready'
                 ? `✅ AI Ready${aiHealth.keySource ? ` (${aiHealth.keySource})` : ''}`
-                : aiHealth.healthy === false
-                  ? `⚠️ AI Config Issue${aiHealth.apiKey ? ` · key: ${aiHealth.apiKey}` : ''}`
-                  : 'ℹ️ AI Status N/A'}
+                : badgeState === 'degraded'
+                  ? `⚠️ AI Degraded${aiHealth.apiKey ? ` · key: ${aiHealth.apiKey}` : ''}`
+                  : badgeState === 'offline'
+                    ? '🔌 AI Offline'
+                    : 'ℹ️ AI Status N/A'}
           </div>
         </div>
 
