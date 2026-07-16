@@ -38,6 +38,7 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
   const [gradeLevel, setGradeLevel] = useState('Grade 1');
   const [topic, setTopic] = useState('');
   const [topicsList, setTopicsList] = useState<TopicItem[]>([]);
+  const [topicSource, setTopicSource] = useState<'database' | 'local' | ''>('');
   const [subtopicsList, setSubtopicsList] = useState<string[]>([]);
   const [selectedTopicId, setSelectedTopicId] = useState('');
   const [selectedTopicTitle, setSelectedTopicTitle] = useState('');
@@ -55,7 +56,7 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
   const [cambridgeObjective, setCambridgeObjective] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
 
-  const fetchTopics = async (subjectName: string, grade: string): Promise<TopicItem[]> => {
+  const fetchTopics = async (subjectName: string, grade: string): Promise<{ topics: TopicItem[]; source: 'database' | 'local' }> => {
     const response = await fetch(
       `/api/syllabus/topics?subjectName=${encodeURIComponent(subjectName)}&gradeLevel=${encodeURIComponent(grade)}`
     );
@@ -63,23 +64,26 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
     if (!response.ok) {
       const payload = await response.json().catch(() => null);
       console.error('Failed to load syllabus topics:', payload?.error || response.statusText || response.status);
-      return [];
+      return { topics: [], source: 'local' };
     }
 
     const payload = await response.json();
     if (!payload.success) {
       console.error('Unable to load syllabus topics:', payload.error);
-      return [];
+      return { topics: [], source: 'local' };
     }
 
-    return (payload.topics || []).map((topicItem: any) => ({
-      id: String(topicItem.id),
-      topicNumber: topicItem.topicNumber || '',
-      topicTitle: String(topicItem.topicTitle || ''),
-      unitTitle: String(topicItem.unitTitle || ''),
-      objectives: Array.isArray(topicItem.objectives) ? topicItem.objectives.filter(Boolean) : [],
-      label: topicItem.topicNumber ? `${topicItem.topicNumber}. ${topicItem.topicTitle}` : String(topicItem.topicTitle || '')
-    }));
+    return {
+      topics: (payload.topics || []).map((topicItem: any) => ({
+        id: String(topicItem.id),
+        topicNumber: topicItem.topicNumber || '',
+        topicTitle: String(topicItem.topicTitle || ''),
+        unitTitle: String(topicItem.unitTitle || ''),
+        objectives: Array.isArray(topicItem.objectives) ? topicItem.objectives.filter(Boolean) : [],
+        label: topicItem.topicNumber ? `${topicItem.topicNumber}. ${topicItem.topicTitle}` : String(topicItem.topicTitle || '')
+      })),
+      source: payload.source === 'database' ? 'database' : 'local'
+    };
   };
 
   useEffect(() => {
@@ -96,17 +100,19 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
       }
 
       try {
-        const items = await fetchTopics(selectedSubject, gradeLevel);
+        const { topics, source } = await fetchTopics(selectedSubject, gradeLevel);
         if (cancelled) return;
-        setTopicsList(items);
+        setTopicsList(topics);
+        setTopicSource(source);
 
-        if (!items.some((item) => item.id === selectedTopicId)) {
+        if (!topics.some((item) => item.id === selectedTopicId)) {
           setSelectedTopicId('');
           setSelectedTopicTitle('');
           setSubtopicsList([]);
           setSelectedSubtopic('');
         }
       } catch (error) {
+        setTopicSource('');
         console.error('Error loading syllabus topics', error);
         setTopicsList([]);
         setSelectedTopicId('');

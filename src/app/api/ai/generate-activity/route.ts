@@ -53,8 +53,16 @@ export async function POST(request: Request) {
       });
     }
 
-    // 3. Build prompt for Gemini, using explicit objectives when provided
-    const prompt = getCambridgePrompt(subject, gradeLevel, topic, numQuestions, Array.isArray(topicObjectives) ? topicObjectives : []);
+    // 3. Build prompt for Gemini, using explicit objectives and topic metadata when provided
+    const prompt = getCambridgePrompt(
+      subject,
+      gradeLevel,
+      topic,
+      numQuestions,
+      Array.isArray(topicObjectives) ? topicObjectives : [],
+      String(topicNumber || ''),
+      String(unitTitle || '')
+    );
 
     // Initialize Google GenAI
     const genAI = new GoogleGenerativeAI(apiKey);

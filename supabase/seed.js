@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // Parse .env file
 const envPath = path.join(__dirname, '..', '.env');
@@ -26,6 +27,7 @@ envContent.split('\n').forEach(line => {
 
 const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
+const geminiApiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 
 if (!supabaseUrl || !serviceKey) {
   console.error('Error: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing in .env');
@@ -255,6 +257,86 @@ async function createCambridgeLearningObjectives(topicId, content) {
   }
 }
 
+function normalizeTextKey(value) {
+  return (value || '').toString().trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+}
+
+function buildDefaultObjectives(subjectName, stageName, topicTitle) {
+  const cleanSubject = normalizeTextKey(subjectName);
+  const cleanTopic = topicTitle.trim();
+  const gradeText = stageName.replace(/Stage/gi, 'Grade').trim();
+  const objectives = [];
+
+  if (cleanSubject.includes('mathematics') || cleanSubject === 'math') {
+    objectives.push(`Understand the key idea behind ${cleanTopic}.`);
+    objectives.push(`Use simple examples to explain ${cleanTopic} in a real-world context.`);
+    objectives.push(`Solve a basic problem or question related to ${cleanTopic}.`);
+  } else if (cleanSubject.includes('science')) {
+    objectives.push(`Describe what ${cleanTopic} is and why it matters in science.`);
+    objectives.push(`Identify one or two important facts or features about ${cleanTopic}.`);
+    objectives.push(`Use a local example to explain ${cleanTopic} in Tanzania.`);
+  } else if (cleanSubject.includes('english')) {
+    objectives.push(`Read and understand the language ideas in ${cleanTopic}.`);
+    objectives.push(`Use correct words or sentences related to ${cleanTopic}.`);
+    objectives.push(`Answer simple questions about ${cleanTopic}.`);
+  } else if (cleanSubject.includes('computing') || cleanSubject.includes('digital literacy')) {
+    objectives.push(`Explain the main concept of ${cleanTopic} in simple terms.`);
+    objectives.push(`Recognize how ${cleanTopic} is used in everyday technology.`);
+    objectives.push(`Apply a basic idea from ${cleanTopic} to a small activity or example.`);
+  } else if (cleanSubject.includes('art') || cleanSubject.includes('craft')) {
+    objectives.push(`Understand the materials and process used in ${cleanTopic}.`);
+    objectives.push(`Describe how ${cleanTopic} can show ideas, feelings, or local culture.`);
+    objectives.push(`Create or imagine a simple art activity based on ${cleanTopic}.`);
+  } else if (cleanSubject.includes('music')) {
+    objectives.push(`Recognize the sound, rhythm, or instrument related to ${cleanTopic}.`);
+    objectives.push(`Explain one basic idea about ${cleanTopic} in a simple sentence.`);
+    objectives.push(`Use a local or cultural example to describe ${cleanTopic}.`);
+  } else if (cleanSubject.includes('global') || cleanSubject.includes('perspectives')) {
+    objectives.push(`Explain why ${cleanTopic} is important for the community or environment.`);
+    objectives.push(`Identify one local connection for ${cleanTopic} in Zanzibar.`);
+    objectives.push(`Share a simple idea about how ${cleanTopic} helps people learn about the world.`);
+  } else {
+    objectives.push(`Understand the main idea of ${cleanTopic}.`);
+    objectives.push(`Name one important fact or example about ${cleanTopic}.`);
+    objectives.push(`Use ${cleanTopic} in a simple real-world sentence or example.`);
+  }
+
+  return objectives.join('\n');
+}
+
+async function generateLearningObjectivesWithGemini(subjectName, stageName, topicTitle) {
+  if (!geminiApiKey) {
+    return null;
+  }
+
+  try {
+    const prompt = `Create three concise Cambridge Primary learning objectives for ${subjectName} ${stageName} on the topic '${topicTitle}'. Each objective should be simple enough for ${stageName.replace(/Stage/gi, 'Grade')} students in Zanzibar, Tanzania. Return one objective per line with no extra explanation.`;
+    const genAI = new GoogleGenerativeAI(geminiApiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().trim();
+    const lines = text
+      .split(/\r?\n/)
+      .map(line => line.replace(/^\d+\.|^-\s*/, '').trim())
+      .filter(Boolean);
+    if (lines.length) {
+      return lines.join('\n');
+    }
+  } catch (err) {
+    console.warn('Gemini objective generation failed:', err?.message || err);
+  }
+
+  return null;
+}
+
+async function resolveLearningObjectives(subjectName, stageName, topicTitle) {
+  const geminiResult = await generateLearningObjectivesWithGemini(subjectName, stageName, topicTitle);
+  if (geminiResult) {
+    return geminiResult;
+  }
+  return buildDefaultObjectives(subjectName, stageName, topicTitle);
+}
+
 async function seedCambridgeSyllabus() {
   console.log('\n--- Seeding Cambridge syllabus tables ---');
 
@@ -275,10 +357,12 @@ async function seedCambridgeSyllabus() {
         if (!topicTitle) continue;
         const topicNumber = `T${idx + 1}`;
         const topicRow = await getOrCreateCambridgeTopic(unit.id, topicNumber, topicTitle);
-        if (topicItem.content && String(topicItem.content).trim()) {
-          await createCambridgeLearningObjectives(topicRow.id, topicItem.content);
-        }
-      }
+      const hasContent = String(topicItem.content || '').trim();
+      const objectivesSource = hasContent
+        ? topicItem.content
+        : await resolveLearningObjectives(subjectName, stageName, topicTitle);
+
+      await createCambridgeLearningObjectives(topicRow.id, objectivesSource);
     }
   }
 }
