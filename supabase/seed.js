@@ -312,7 +312,7 @@ async function generateLearningObjectivesWithGemini(subjectName, stageName, topi
   try {
     const prompt = `Create three concise Cambridge Primary learning objectives for ${subjectName} ${stageName} on the topic '${topicTitle}'. Each objective should be simple enough for ${stageName.replace(/Stage/gi, 'Grade')} students in Zanzibar, Tanzania. Return one objective per line with no extra explanation.`;
     const genAI = new GoogleGenerativeAI(geminiApiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
     const lines = text

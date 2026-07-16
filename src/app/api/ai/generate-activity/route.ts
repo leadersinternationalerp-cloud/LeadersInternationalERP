@@ -60,36 +60,46 @@ export async function POST(request: Request) {
       topic,
       numQuestions,
       Array.isArray(topicObjectives) ? topicObjectives : [],
-      String(topicNumber || ''),
-      String(unitTitle || '')
+      topicNumber,
+      unitTitle
     );
 
     // Initialize Google GenAI
     const genAI = new GoogleGenerativeAI(apiKey);
+    // NOTE: gemini-1.5-flash and gemini-1.5-flash-8b were retired by Google (API returns 404).
+    // Current free-tier models. Primary/fallback can be overridden via env without a code change.
+    const PRIMARY_MODEL = process.env.GEMINI_PRIMARY_MODEL || 'gemini-2.5-flash';
+    const FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.0-flash';
     
     let quizData = null;
-    let usedModel = 'gemini-1.5-flash';
+    let usedModel = PRIMARY_MODEL;
 
     // Try primary model
     try {
-      console.log('Attempting quiz generation with model: gemini-1.5-flash');
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      console.log(`Attempting quiz generation with model: ${PRIMARY_MODEL}`);
+      const model = genAI.getGenerativeModel({
+        model: PRIMARY_MODEL,
+        generationConfig: { responseMimeType: 'application/json' }
+      });
       const result = await model.generateContent(prompt);
       const text = result.response.text();
       quizData = parseGenAIResponse(text);
     } catch (primaryError: any) {
-      console.error('Primary gemini-1.5-flash failed:', primaryError.message || primaryError);
+      console.error(`Quiz generation with model ${PRIMARY_MODEL} failed:`, primaryError.message || primaryError);
       
       // Fallback model
       try {
-        usedModel = 'gemini-1.5-flash-8b';
-        console.log('Attempting quiz generation with fallback model: gemini-1.5-flash-8b');
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-8b' });
+        usedModel = FALLBACK_MODEL;
+        console.log(`Attempting quiz generation with fallback model: ${FALLBACK_MODEL}`);
+        const model = genAI.getGenerativeModel({
+          model: FALLBACK_MODEL,
+          generationConfig: { responseMimeType: 'application/json' }
+        });
         const result = await model.generateContent(prompt);
         const text = result.response.text();
         quizData = parseGenAIResponse(text);
       } catch (fallbackError: any) {
-        console.error('Fallback gemini-1.5-flash-8b failed:', fallbackError.message || fallbackError);
+        console.error(`Quiz generation with fallback model ${FALLBACK_MODEL} failed:`, fallbackError.message || fallbackError);
       }
     }
 
