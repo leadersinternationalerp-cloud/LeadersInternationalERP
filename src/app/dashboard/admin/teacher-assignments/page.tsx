@@ -5,18 +5,20 @@ export default async function TeacherAssignmentsPage() {
   const supabase = await createClient()
 
   const { data: teachers } = await supabase.from('profiles').select('id, first_name, last_name').eq('role', 'Teacher').order('first_name', { ascending: true })
-  const { data: classes } = await supabase.from('classes').select('*').order('class_name', { ascending: true })
+  const { data: classes } = await supabase.from('classes').select('*').order('name', { ascending: true })
   const { data: subjects } = await supabase.from('subjects').select('*').order('name', { ascending: true })
 
-  // Assume table `teacher_allocations(id, teacher_id, class_id, subject_id)` exists from initial setup
-  // We'll catch errors gracefully if the table is slightly differently named.
   const { data: allocations, error: allocError } = await supabase
-    .from('teacher_allocations')
+    .from('class_subjects')
     .select(`
       id,
-      teacher:teacher_id(first_name, last_name),
-      class:class_id(class_name),
-      subject:subject_id(subject_name)
+      teacher_id,
+      class_id,
+      subject_id,
+      created_at,
+      profiles(first_name, last_name),
+      classes(name, section),
+      subjects(name)
     `)
     .order('created_at', { ascending: false })
 
@@ -31,7 +33,7 @@ export default async function TeacherAssignmentsPage() {
     if (!teacher_id || !class_id || !subject_id) return
 
     // Insert allocation
-    await supabase.from('teacher_allocations').insert({
+    await supabase.from('class_subjects').insert({
       teacher_id,
       class_id,
       subject_id
@@ -46,7 +48,7 @@ export default async function TeacherAssignmentsPage() {
     const id = formData.get('allocation_id') as string
     
     if (id) {
-      await supabase.from('teacher_allocations').delete().eq('id', id)
+      await supabase.from('class_subjects').delete().eq('id', id)
       revalidatePath('/dashboard/admin/teacher-assignments')
     }
   }
@@ -71,7 +73,11 @@ export default async function TeacherAssignmentsPage() {
             <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Class</label>
             <select name="class_id" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
               <option value="">Select Class...</option>
-              {(classes || []).map(c => <option key={c.id} value={c.id}>{c.class_name}</option>)}
+              {(classes || []).map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.name || c.class_name || 'Unknown'}{c.section ? ` (${c.section})` : ''}
+                </option>
+              ))}
             </select>
           </div>
           <div style={{ flex: 1 }}>
@@ -94,7 +100,7 @@ export default async function TeacherAssignmentsPage() {
         
         {allocError ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-error)' }}>
-            Error loading allocations: {allocError.message}. Make sure `teacher_allocations` table exists.
+            Error loading allocations: {allocError.message}. Make sure `class_subjects` table exists.
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -109,9 +115,9 @@ export default async function TeacherAssignmentsPage() {
             <tbody>
               {(allocations || []).map((alloc: any) => (
                 <tr key={alloc.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                  <td style={{ padding: '1rem', fontWeight: 600 }}>{alloc.teacher?.first_name} {alloc.teacher?.last_name}</td>
-                  <td style={{ padding: '1rem' }}>{alloc.class?.class_name}</td>
-                  <td style={{ padding: '1rem' }}>{alloc.subject?.subject_name}</td>
+                  <td style={{ padding: '1rem', fontWeight: 600 }}>{alloc.profiles?.first_name} {alloc.profiles?.last_name}</td>
+                  <td style={{ padding: '1rem' }}>{alloc.classes?.name || alloc.classes?.class_name || 'Unknown'}{alloc.classes?.section ? ` (${alloc.classes.section})` : ''}</td>
+                  <td style={{ padding: '1rem' }}>{alloc.subjects?.name || alloc.subjects?.subject_name}</td>
                   <td style={{ padding: '1rem', textAlign: 'right' }}>
                     <form action={removeAllocationAction}>
                       <input type="hidden" name="allocation_id" value={alloc.id} />
