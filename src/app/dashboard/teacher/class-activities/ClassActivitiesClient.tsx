@@ -58,6 +58,9 @@ export default function ClassActivitiesClient({
   const [isLoadingScores, setIsLoadingScores] = useState(false);
   const [activeReviewStudent, setActiveReviewStudent] = useState<ScoreRecord | null>(null);
 
+  // Quiz question preview modal
+  const [previewQuiz, setPreviewQuiz] = useState<Activity | null>(null);
+
   // Standard non-MCQ Activity form state
   const [subject, setSubject] = useState(subjects[0]?.name || 'Mathematics');
   const [gradeLevel, setGradeLevel] = useState('Grade 1');
@@ -345,13 +348,22 @@ export default function ClassActivitiesClient({
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '0.75rem', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
                     <span>Published: {new Date(act.date).toLocaleDateString()}</span>
                     {act.activity_type === 'quiz' && (
-                      <button
-                        onClick={() => openScoreboard(act)}
-                        className="btn btn-secondary"
-                        style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', fontWeight: 600 }}
-                      >
-                        📊 View Student Scores
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          onClick={() => setPreviewQuiz(act)}
+                          className="btn btn-secondary"
+                          style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', fontWeight: 600 }}
+                        >
+                          👁 Preview
+                        </button>
+                        <button
+                          onClick={() => openScoreboard(act)}
+                          className="btn btn-secondary"
+                          style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', fontWeight: 600 }}
+                        >
+                          📊 View Student Scores
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -557,6 +569,107 @@ export default function ClassActivitiesClient({
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
               <button onClick={() => { setSelectedActivity(null); setActiveReviewStudent(null); }} className="btn btn-secondary">
                 Close
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Quiz Preview Modal */}
+      {previewQuiz && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '2rem' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '750px', backgroundColor: '#fff', borderRadius: 'var(--radius-lg)', padding: '2rem', display: 'flex', flexDirection: 'column', maxHeight: '90%' }}>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--color-primary)' }}>
+                  👁 Quiz Preview
+                </h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: '0.25rem 0 0 0' }}>
+                  Previewing: <strong>{previewQuiz.title}</strong>
+                </p>
+              </div>
+              <button
+                onClick={() => setPreviewQuiz(null)}
+                style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.25rem', color: 'var(--color-text-muted)' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {((previewQuiz.questions as any[]) || []).map((q: any, idx: number) => (
+                <div
+                  key={q.id || idx}
+                  style={{
+                    padding: '1rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-border)',
+                    backgroundColor: '#fff'
+                  }}
+                >
+                  <h5 style={{ fontSize: '0.95rem', margin: '0 0 0.75rem 0', display: 'flex', gap: '0.5rem', alignItems: 'start' }}>
+                    <span style={{
+                      fontSize: '0.8rem', fontWeight: 700,
+                      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                      color: '#3b82f6',
+                      width: '24px', height: '24px', borderRadius: '50%',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                    }}>
+                      {idx + 1}
+                    </span>
+                    <span style={{ flex: 1, fontWeight: 600 }}>{q.question}</span>
+                  </h5>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingLeft: '2rem', marginBottom: '0.75rem' }}>
+                    {((q.options as string[]) || []).map((opt: string, oIdx: number) => {
+                      const isCorrectAnswer = q.correctIndex === oIdx;
+
+                      let bg = '#fff';
+                      let border = '1px solid var(--color-border)';
+                      let color = 'var(--color-text)';
+                      
+                      if (isCorrectAnswer) {
+                        bg = 'rgba(16, 185, 129, 0.08)';
+                        border = '1px solid #10b981';
+                        color = '#065f46';
+                      }
+
+                      return (
+                        <div
+                          key={oIdx}
+                          style={{
+                            padding: '0.5rem 0.75rem', border, backgroundColor: bg,
+                            color, borderRadius: 'var(--radius-sm)', fontSize: '0.85rem',
+                            display: 'flex', alignItems: 'center', gap: '0.5rem'
+                          }}
+                        >
+                          <span style={{ fontWeight: 600 }}>{String.fromCharCode(65 + oIdx)}.</span>
+                          <span style={{ flex: 1 }}>{opt}</span>
+                          {isCorrectAnswer && <span style={{ color: '#10b981', fontWeight: 700, fontSize: '0.75rem' }}>✓ Correct Option</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {q.explanation && (
+                    <div style={{ marginLeft: '2rem', padding: '0.75rem', backgroundColor: 'rgba(0,0,0,0.01)', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--color-border)' }}>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: '0.2rem' }}>
+                        EXPLANATION
+                      </div>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--color-text)', margin: 0, lineHeight: 1.4 }}>
+                        {q.explanation}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
+              <button onClick={() => setPreviewQuiz(null)} className="btn btn-secondary">
+                Close Preview
               </button>
             </div>
 
