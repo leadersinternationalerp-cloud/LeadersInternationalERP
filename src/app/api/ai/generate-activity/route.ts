@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getCambridgePrompt } from '@/lib/cambridge-syllabus';
 import { getFallbackQuiz } from '@/lib/quiz-fallback';
 import { createClient } from '@/utils/supabase/server';
+import { createServiceClient } from '@/utils/supabase/service';
 
 export const maxDuration = 60; // Allow Vercel to run up to 60 seconds for AI generation
 
@@ -11,9 +12,7 @@ export const maxDuration = 60; // Allow Vercel to run up to 60 seconds for AI ge
  * fall back to the active GEMINI row in integration_config.
  * Never returns placeholder / empty values.
  */
-async function resolveGeminiApiKey(
-  supabase: Awaited<ReturnType<typeof createClient>>
-): Promise<{ apiKey: string | null; source: string | null }> {
+async function resolveGeminiApiKey(): Promise<{ apiKey: string | null; source: string | null }> {
   const envCandidates: Array<{ name: string; value: string | undefined }> = [
     { name: 'GEMINI_API_KEY', value: process.env.GEMINI_API_KEY },
     { name: 'GOOGLE_API_KEY', value: process.env.GOOGLE_API_KEY },
@@ -30,7 +29,8 @@ async function resolveGeminiApiKey(
   }
 
   try {
-    const { data: dbConfig, error: dbError } = await supabase
+    const serviceClient = createServiceClient();
+    const { data: dbConfig, error: dbError } = await serviceClient
       .from('integration_config')
       .select('api_key')
       .eq('provider_type', 'GEMINI')
@@ -137,7 +137,7 @@ export async function POST(request: Request) {
     }
 
     // Resolve Google/Gemini API key from expanded env list or DB
-    const { apiKey, source: keySource } = await resolveGeminiApiKey(supabase);
+    const { apiKey, source: keySource } = await resolveGeminiApiKey();
 
     // If API Key is missing or invalid placeholder, fallback immediately to local templates
     if (!apiKey) {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@/utils/supabase/server';
+import { createServiceClient } from '@/utils/supabase/service';
 
 export const maxDuration = 30; // Health check should be fast
 
@@ -17,9 +18,7 @@ const ENV_KEY_CANDIDATES = [
  * fall back to the active GEMINI row in integration_config.
  * Never returns the actual key to clients — only presence status.
  */
-async function resolveGeminiApiKey(
-  supabase: Awaited<ReturnType<typeof createClient>>
-): Promise<{
+async function resolveGeminiApiKey(): Promise<{
   apiKey: string | null;
   keyStatus: 'configured' | 'placeholder' | 'missing';
   keySource: string | null;
@@ -52,7 +51,8 @@ async function resolveGeminiApiKey(
   });
 
   try {
-    const { data: dbConfig, error: dbError } = await supabase
+    const serviceClient = createServiceClient();
+    const { data: dbConfig, error: dbError } = await serviceClient
       .from('integration_config')
       .select('api_key')
       .eq('provider_type', 'GEMINI')
@@ -119,7 +119,7 @@ export async function GET() {
     }
 
     // 2. Check API key presence across expanded Google/Gemini env names (never return the actual key)
-    const { apiKey, keyStatus, keySource, envChecked } = await resolveGeminiApiKey(supabase);
+    const { apiKey, keyStatus, keySource, envChecked } = await resolveGeminiApiKey();
 
     // 3. Get configured models
     const primaryModel = process.env.GEMINI_PRIMARY_MODEL || 'gemini-2.0-flash';
