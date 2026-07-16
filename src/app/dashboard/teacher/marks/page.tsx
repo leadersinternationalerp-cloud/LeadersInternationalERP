@@ -83,8 +83,7 @@ export default async function TeacherMarksPage({
           section,
           profiles:id (first_name, last_name)
         `)
-        .eq('grade_level', selectedClass.name)
-        .eq('section', selectedClass.section)
+        .eq('class_id', selectedClassId)
 
       classStudents = students || []
 
