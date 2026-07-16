@@ -40,11 +40,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields: subject, gradeLevel, topic' }, { status: 400 });
     }
 
-    // Try to get API key from environment variable
-    const apiKey = process.env.GEMINI_API_KEY;
-    
+    // Try to get API key from environment variable or database integration config
+    let apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey || apiKey.startsWith('YOUR_KEY') || apiKey.trim() === '') {
+      try {
+        const { data: dbConfig } = await supabase
+          .from('integration_config')
+          .select('api_key')
+          .eq('provider_type', 'GEMINI')
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (dbConfig?.api_key) {
+          apiKey = dbConfig.api_key;
+        }
+      } catch (dbError) {
+        console.warn('Failed to fetch GEMINI api_key from integration_config:', dbError);
+      }
+    }
+
     // If API Key is missing or invalid placeholder, fallback immediately to local templates
-    if (!apiKey || apiKey.startsWith('YOUR_KEY') || apiKey === '') {
+    if (!apiKey || apiKey.startsWith('YOUR_KEY') || apiKey.trim() === '') {
       console.log('Gemini API key is not configured. Falling back to local offline quiz templates.');
       const localQuiz = getFallbackQuiz(subject, gradeLevel, topic, numQuestions);
       return NextResponse.json({ 
@@ -68,45 +85,61 @@ export async function POST(request: Request) {
 
     // Initialize Google GenAI
     const genAI = new GoogleGenerativeAI(apiKey);
-    // NOTE: gemini-1.5-flash and gemini-1.5-flash-8b were retired by Google (API returns 404).
-    // Current free-tier models. Primary/fallback can be overridden via env without a code change.
-    const PRIMARY_MODEL = process.env.GEMINI_PRIMARY_MODEL || 'gemini-2.5-flash';
-    const FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.0-flash';
-    
-    let quizData = null;
-    let usedModel = PRIMARY_MODEL;
 
-    // Try primary model
-    try {
-      console.log(`Attempting quiz generation with model: ${PRIMARY_MODEL}`);
-      const model = genAI.getGenerativeModel({
-        model: PRIMARY_MODEL,
-        generationConfig: { responseMimeType: 'application/json' }
-      });
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      quizData = parseGenAIResponse(text);
-    } catch (primaryError: any) {
-      console.error(`Quiz generation with model ${PRIMARY_MODEL} failed:`, primaryError.message || primaryError);
-      
-      // Fallback model
+    // Sequence of models to attempt (prioritizing current stable & fast Gemini models)
+    const primaryEnv = process.env.GEMINI_PRIMARY_MODEL;
+    const fallbackEnv = process.env.GEMINI_FALLBACK_MODEL;
+
+    const candidateModels = Array.from(new Set([
+      primaryEnv,
+      fallbackEnv,
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-2.0-flash-lite',
+      'gemini-1.5-pro',
+      'gemini-2.5-flash'
+    ].filter((m): m is string => Boolean(m && m.trim()))));
+
+    let quizData: any = null;
+    let usedModel: string | null = null;
+    let lastErrorDetails: string | null = null;
+
+    // Try each model candidate sequentially
+    for (const modelName of candidateModels) {
       try {
-        usedModel = FALLBACK_MODEL;
-        console.log(`Attempting quiz generation with fallback model: ${FALLBACK_MODEL}`);
-        const model = genAI.getGenerativeModel({
-          model: FALLBACK_MODEL,
-          generationConfig: { responseMimeType: 'application/json' }
-        });
-        const result = await model.generateContent(prompt);
-        const text = result.response.text();
-        quizData = parseGenAIResponse(text);
-      } catch (fallbackError: any) {
-        console.error(`Quiz generation with fallback model ${FALLBACK_MODEL} failed:`, fallbackError.message || fallbackError);
+        console.log(`Attempting quiz generation with model: ${modelName}`);
+        
+        // Attempt 1: With application/json response format
+        try {
+          const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: 'application/json' }
+          });
+          const result = await model.generateContent(prompt);
+          const text = result.response.text();
+          quizData = parseGenAIResponse(text);
+        } catch (jsonMimeErr: any) {
+          console.warn(`Model ${modelName} JSON mime attempt failed: ${jsonMimeErr?.message || jsonMimeErr}. Retrying standard generation...`);
+          // Attempt 2: Standard generation without explicit responseMimeType
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const result = await model.generateContent(prompt);
+          const text = result.response.text();
+          quizData = parseGenAIResponse(text);
+        }
+
+        if (quizData && Array.isArray(quizData.questions) && quizData.questions.length > 0) {
+          usedModel = modelName;
+          console.log(`Successfully generated quiz with model: ${modelName}`);
+          break;
+        }
+      } catch (err: any) {
+        lastErrorDetails = err?.message || String(err);
+        console.error(`Quiz generation with model ${modelName} failed:`, lastErrorDetails);
       }
     }
 
     // 4. If AI generation succeeded, return the parsed JSON
-    if (quizData) {
+    if (quizData && Array.isArray(quizData.questions) && quizData.questions.length > 0) {
       return NextResponse.json({
         success: true,
         source: 'gemini-api',
@@ -115,13 +148,13 @@ export async function POST(request: Request) {
       });
     }
 
-    // 5. If both models failed, fallback to local offline MCQ templates
-    console.log('Both Gemini AI attempts failed. Using local offline MCQ templates.');
+    // 5. If all Gemini model attempts failed, fallback to local offline MCQ templates
+    console.log('All Gemini AI model attempts failed. Using local offline MCQ templates.');
     const localQuiz = getFallbackQuiz(subject, gradeLevel, topic, numQuestions);
     return NextResponse.json({
       success: true,
       source: 'local-fallback',
-      reason: `Both ${PRIMARY_MODEL} and ${FALLBACK_MODEL} failed`,
+      reason: `All Gemini models failed. Last error: ${lastErrorDetails || 'Unknown error'}`,
       data: localQuiz
     });
 
@@ -135,14 +168,17 @@ export async function POST(request: Request) {
  * Robust JSON extraction from the GenAI response string
  */
 function parseGenAIResponse(responseStr: string) {
+  if (!responseStr || typeof responseStr !== 'string') return null;
+
   let cleaned = responseStr.trim();
   
   // Strip markdown code block wrappers if present
-  if (cleaned.startsWith('```')) {
-    cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
-  }
+  cleaned = cleaned
+    .replace(/^```[a-z]*\s*/i, '')
+    .replace(/```\s*$/, '')
+    .trim();
   
-  // Find first '{' and last '}' to strip any garbage text
+  // Find first '{' and last '}' to strip any surrounding commentary
   const startIdx = cleaned.indexOf('{');
   const endIdx = cleaned.lastIndexOf('}');
   
@@ -150,5 +186,13 @@ function parseGenAIResponse(responseStr: string) {
     cleaned = cleaned.substring(startIdx, endIdx + 1);
   }
 
-  return JSON.parse(cleaned);
+  // Sanitize common LLM JSON errors: trailing commas before closing braces or brackets
+  cleaned = cleaned.replace(/,\s*([\}\]])/g, '$1');
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (parseErr) {
+    console.error('Failed to parse GenAI response as JSON:', parseErr, 'Raw string:', responseStr);
+    return null;
+  }
 }
