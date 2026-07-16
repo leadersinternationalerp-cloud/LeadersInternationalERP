@@ -346,19 +346,19 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
           </div>
 
           <div className="form-group">
-            <label className="form-label">Grade Level</label>
+            <label className="form-label">Grade Level (Cambridge Stage)</label>
             <select 
               value={gradeLevel} 
               onChange={e => setGradeLevel(e.target.value)} 
               className="input-field" 
               required
             >
-              <option value="Grade 1">Grade 1</option>
-              <option value="Grade 2">Grade 2</option>
-              <option value="Grade 3">Grade 3</option>
-              <option value="Grade 4">Grade 4</option>
-              <option value="Grade 5">Grade 5</option>
-              <option value="Grade 6">Grade 6</option>
+              <option value="Grade 1">Grade 1 (Stage 1)</option>
+              <option value="Grade 2">Grade 2 (Stage 2)</option>
+              <option value="Grade 3">Grade 3 (Stage 3)</option>
+              <option value="Grade 4">Grade 4 (Stage 4)</option>
+              <option value="Grade 5">Grade 5 (Stage 5)</option>
+              <option value="Grade 6">Grade 6 (Stage 6)</option>
             </select>
           </div>
 
