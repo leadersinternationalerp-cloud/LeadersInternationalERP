@@ -222,6 +222,8 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
   };
 
   // Publish final quiz to backend
+  const getEffectiveTopic = () => selectedSubtopic ? `${selectedTopic} - ${selectedSubtopic}` : selectedTopic || topic;
+
   const handlePublish = async () => {
     if (!quizTitle || questions.length === 0) {
       alert('Please generate the quiz first!');
@@ -236,7 +238,7 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
           class_id: selectedClassId,
           title: quizTitle,
           subject: selectedSubject,
-          topic,
+          topic: getEffectiveTopic(),
           grade_level: gradeLevel,
           activity_type: 'quiz',
           description: quizDescription + ` [Cambridge Objective: ${cambridgeObjective}]`,
@@ -353,22 +355,51 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
           </div>
 
           <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label">Activity Topic (Be descriptive for better AI context)</label>
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <input 
-                type="text" 
-                value={topic} 
-                onChange={e => setTopic(e.target.value)} 
-                placeholder="e.g. Halves and Quarters using Stone Town fruit market examples" 
-                className="input-field" 
-                style={{ flex: 1 }}
-                required 
-              />
-              <button 
-                type="submit" 
-                disabled={isGenerating} 
+            <label className="form-label">Activity Topic (choose from scheme of work)</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <select
+                  value={selectedTopic}
+                  onChange={e => { setSelectedTopic(e.target.value); setSelectedSubtopic(''); }}
+                  className="input-field"
+                  style={{ flex: 1, minWidth: '220px' }}
+                  required
+                >
+                  <option value="">-- Select Topic --</option>
+                  {topicsList.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={selectedSubtopic}
+                  onChange={e => setSelectedSubtopic(e.target.value)}
+                  className="input-field"
+                  style={{ minWidth: '220px' }}
+                  disabled={subtopicsList.length === 0}
+                >
+                  <option value="">-- Select Subtopic (optional) --</option>
+                  {subtopicsList.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              {topicsList.length === 0 && (
+                <input
+                  type="text"
+                  value={topic}
+                  onChange={e => setTopic(e.target.value)}
+                  placeholder="No topics found for this subject/grade. Enter a topic manually."
+                  className="input-field"
+                />
+              )}
+
+              <button
+                type="submit"
+                disabled={isGenerating}
                 className="btn btn-primary"
-                style={{ minWidth: '150px' }}
+                style={{ minWidth: '150px', alignSelf: 'flex-start' }}
               >
                 {isGenerating ? 'Generating...' : '✨ Create with AI'}
               </button>
