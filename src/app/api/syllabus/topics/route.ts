@@ -36,10 +36,12 @@ export async function GET(request: Request) {
     .maybeSingle()
 
   if (stageError) {
-    return NextResponse.json({ success: false, error: stageError.message }, { status: 500 })
+    console.error('Syllabus topics route stage error:', stageError.message)
+    return NextResponse.json({ success: true, topics: [] })
   }
   if (!stage) {
-    return NextResponse.json({ success: false, error: `Stage not found: ${stageName}` }, { status: 404 })
+    console.warn(`Syllabus stage not found: ${stageName}`)
+    return NextResponse.json({ success: true, topics: [] })
   }
 
   const { data: subjects, error: subjectsError } = await supabase
@@ -48,7 +50,8 @@ export async function GET(request: Request) {
     .eq('stage_id', stage.id)
 
   if (subjectsError) {
-    return NextResponse.json({ success: false, error: subjectsError.message }, { status: 500 })
+    console.error('Syllabus topics route subjects error:', subjectsError.message)
+    return NextResponse.json({ success: true, topics: [] })
   }
   if (!subjects || !subjects.length) {
     return NextResponse.json({ success: true, topics: [] })

@@ -61,12 +61,15 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
     );
 
     if (!response.ok) {
-      throw new Error('Failed to load syllabus topics');
+      const payload = await response.json().catch(() => null);
+      console.error('Failed to load syllabus topics:', payload?.error || response.statusText || response.status);
+      return [];
     }
 
     const payload = await response.json();
     if (!payload.success) {
-      throw new Error(payload.error || 'Unable to load syllabus topics');
+      console.error('Unable to load syllabus topics:', payload.error);
+      return [];
     }
 
     return (payload.topics || []).map((topicItem: any) => ({
