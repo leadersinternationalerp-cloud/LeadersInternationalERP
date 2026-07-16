@@ -49,6 +49,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ 
         success: true, 
         source: 'local-fallback', 
+        reason: 'GEMINI_API_KEY not configured or is a placeholder',
         data: localQuiz 
       });
     }
@@ -119,6 +120,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       source: 'local-fallback',
+      reason: `Both ${PRIMARY_MODEL} and ${FALLBACK_MODEL} failed`,
       data: localQuiz
     });
 

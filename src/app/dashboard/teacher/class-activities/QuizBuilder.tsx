@@ -49,6 +49,7 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
   const [isGenerating, setIsGenerating] = useState(false);
   const [sourceBadge, setSourceBadge] = useState<'gemini' | 'fallback' | null>(null);
   const [generatedModel, setGeneratedModel] = useState<string | null>(null);
+  const [fallbackReason, setFallbackReason] = useState<string | null>(null);
 
   // Quiz state after generation
   const [quizTitle, setQuizTitle] = useState('');
@@ -165,6 +166,7 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
     setIsGenerating(true);
     setSourceBadge(null);
     setGeneratedModel(null);
+    setFallbackReason(null);
 
     try {
       const selectedTopicItem = topicsList.find((item) => item.id === selectedTopicId);
@@ -195,6 +197,7 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
           setGeneratedModel(result.model);
         } else {
           setSourceBadge('fallback');
+          setFallbackReason(result.reason || 'Local offline template used');
         }
       } else {
         alert(result.error || 'Failed to generate quiz');
@@ -503,7 +506,10 @@ export default function QuizBuilder({ classes, subjects, onQuizPublished, onCanc
                 </span>
               )}
               {sourceBadge === 'fallback' && (
-                <span style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', fontWeight: 600, border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                <span 
+                  title={fallbackReason || 'Local offline template used'} 
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', fontWeight: 600, border: '1px solid rgba(245, 158, 11, 0.2)', cursor: 'help' }}
+                >
                   🔌 Local Offline Template
                 </span>
               )}
