@@ -1,0 +1,152 @@
+/* src/app/dashboard/accountant/reports/page.module.css */
+/* Global dark mode container */
+.dashboardContainer {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  min-height: 100vh;
+  padding: 2rem;
+  color: var(--color-text);
+
+  /* Local theme variables */
+  --color-primary: #0d6efd; /* vibrant blue */
+  --color-success: #28a745;
+  --color-error: #dc3545;
+  --color-accent: #ffc107;
+  --color-border: rgba(255,255,255,0.15);
+  --color-bg: #0e0e10; /* dark background */
+  --color-text: #f5f5f5;
+  --color-text-muted: #b0b0b0;
+  --radius-lg: 1rem;
+  --radius-md: 0.5rem;
+  --radius-sm: 0.25rem;
+}
+
+.title {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: var(--color-primary);
+  text-align: center;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.exportButtons {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+}
+
+.exportLink {
+  background: var(--color-primary);
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+.exportLink:hover {
+  background: var(--color-accent);
+}
+
+/* Glass panel style used throughout */
+.glass-panel {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.kpiGrid h3 {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.kpiGrid p {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.twoColumnGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.progressBarWrapper {
+  position: relative;
+  height: 24px;
+  background: var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+
+.progressBar {
+  height: 100%;
+  transition: width 1s ease-in-out;
+}
+
+.progressLabel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.listContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.listItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+/* Filter component styling */
+.filtersContainer {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.filterInput, .filterSelect {
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: rgba(255,255,255,0.05);
+  color: var(--color-text);
+}
+
+.applyButton {
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.applyButton:hover {
+  background: var(--color-accent);
+}

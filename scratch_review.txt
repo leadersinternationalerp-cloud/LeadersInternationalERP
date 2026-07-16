@@ -1,0 +1,500 @@
+LEADERS INTERNATIONAL SCHOOL ERP
+Progress Review & Suggested Improvements
+Against Requirements Plan v2.2  ·  Fresh GitHub Audit  ·  12 July 2026
+
+Document type
+Progress review + improvement proposals for your approval
+Source of truth
+GitHub: leadersinternationalerp-cloud/LeadersInternationalERP (fresh clone)
+Requirements baseline
+ERP Plan v2.2 (70 pages) — 8 roles, 13 modules, 30 notification triggers
+Previous audit estimate
+Audit 3: ~80–85% complete
+Current estimate
+~92–95% feature-complete (major Sprint 2–5 items now present)
+AI feature
+Gemini free MCQ auto-marked quizzes — coded on GitHub
+Your Gemini key
+You have the key — still needs .env + migration + deploy config
+Action for you
+Review suggested improvements below and approve which to implement
+
+1. Executive Snapshot
+OVERALL PROGRESS: ~92–95%
+The ERP has moved far beyond the last formal audit. Role dashboards, enrollment, leave config, advance disbursement, grading config, PWA shell, notification UI, profile photo, payroll advance deduction, SMTP email, and Gemini free MCQ quizzes are now in the GitHub codebase.Remaining work is mostly: (A) go-live configuration, (B) wiring quality/polish, (C) live SMS provider, (D) broader notification trigger coverage, (E) hardening security & QA.
+
+Progress over time:
+Checkpoint
+Estimated completion
+Focus
+Audit 1
+~25–30%
+Core scaffolding & auth
+Audit 2
+~55–60%
+Finance + teacher/student portals
+Audit 3
+~80–85%
+Sprint 1 portals; AI planned
+This review (Jul 2026)
+~92–95%
+Sprints 2–5 bulk landed + MCQ AI
+
+2. What Is Now Complete (Major Wins)
+2.1 Role portals & dashboards
+Area
+Evidence on GitHub
+Status
+Director dashboard
+dashboard/director/page.tsx — metrics, fees, pending leave/advances
+DONE
+Principal dashboard
+dashboard/principal/page.tsx — students, staff, lesson plans, leave
+DONE
+Accountant dashboard
+dashboard/accountant/page.tsx — fees billed/collected/outstanding
+DONE
+Dean dashboard
+dashboard/dean/page.tsx — students, discipline, events, attendance %
+DONE
+HOS dashboard + marks
+dashboard/hos/page.tsx + hos/marks/
+DONE
+Teacher dashboard cards
+dashboard/teacher/page.tsx — classes, plans, notifications
+DONE
+Student portal pages
+attendance, activities/quizzes, results, homework
+DONE
+Parent portal pages
+dashboard, attendance, billing, activities, reports, discipline
+DONE
+Dean students / submissions / marks overview
+dean/students, dean/submissions, dean/marks-overview
+DONE
+
+2.2 Finance, HR & admin (former Sprint 4 gaps)
+Area
+Evidence
+Status
+Advance disbursement UI
+accountant/advances/
+DONE
+Payroll auto-deduct advances
+payroll/actions.ts — Disbursed advances + repayments
+DONE
+Leave config UI
+accountant/leave-config/
+DONE
+Grade scale config UI
+admin/settings/grading/
+DONE
+Student enrollment form
+students/enroll/ (client + actions)
+DONE
+Fee balances color coding
+invoices/InvoicesClient — green/amber/red by balance
+DONE
+Fee reminders (email/SMS hooks)
+accountant/fee-reminders/
+DONE
+
+2.3 UX / platform (former Sprint 5 gaps)
+Area
+Evidence
+Status
+PWA manifest + next-pwa
+public/manifest.json + next.config.ts withPWA
+DONE
+Notification bell dropdown
+DashboardLayoutClient — recent notifications
+DONE
+Notification tabs (all/unread/read)
+notifications/NotificationsClient.tsx
+DONE
+Active nav highlight
+isActive() + left border in layout client
+DONE
+Dynamic page titles
+getPageTitle() in layout client
+DONE
+Collapsible / mobile sidebar
+sidebarOpen state in DashboardLayoutClient
+DONE
+Profile photo upload
+profile page → storage bucket logos
+DONE
+DOB / gender / created date
+profile page fields
+DONE
+Audit log helper
+utils/audit.ts → audit_logs insert
+DONE
+SMTP email (real)
+nodemailer in notifications.ts when SMTP_* set
+DONE
+SMS framework
+sendSMS() — needs real Tanzanian provider URL
+PARTIAL
+
+2.4 Gemini free AI MCQ quizzes
+Area
+Evidence
+Status
+AI generate API (Gemini free)
+api/ai/generate-activity — auth + gemini-2.5-flash
+DONE
+Model fallback chain
+2.5-flash → 2.5-flash-lite → local templates
+DONE
+Teacher auth on generate
+401/403 if not staff
+DONE
+Publish / submit / results APIs
+api/activities/*
+DONE
+Teacher QuizBuilder UI
+class-activities/QuizBuilder.tsx
+DONE
+Student QuizTaker + auto-mark
+student/activities/QuizTaker.tsx
+DONE
+SQL migration for quizzes
+20260712000000_quiz_activities.sql
+DONE
+GEMINI_API_KEY in production env
+You have key; host/.env not verified here
+CONFIG
+Migration applied on Supabase
+Must be run on your project
+CONFIG
+.env.example documenting key
+Missing on GitHub
+GAP
+
+3. Page Inventory (GitHub)
+Area
+# page.tsx routes
+Notes
+Director
+10
+Dashboard + finance, staff, leave, advances, payroll, reports…
+Principal
+10
+Dashboard + lesson plans, leave, advances, payroll, payments…
+Accountant
+11
+Dashboard + fees, invoices, payroll, advances, leave-config…
+Dean
+6
+Dashboard, discipline, students, submissions, marks views
+Head of Section
+4
+Dashboard, students, lesson plans, marks
+Teacher
+7
+Dashboard, attendance, marks, homework, lesson plans, quizzes
+Student
+5
+Dashboard, attendance, homework, results, quizzes
+Parent
+6
+Dashboard, billing, attendance, activities, reports, discipline
+Admin + shared
+users, profile, calendar, notifications, settings, backups…
+Core ops present
+
+4. Remaining Gaps (Honest)
+These are the main incomplete or weak areas versus the full 70-page plan and production readiness. Not all are blockers for a pilot go-live.
+Gap
+Why it matters
+Severity
+Live SMS provider not connected
+sendSMS still points at example gateway URL
+HIGH
+SMTP env not confirmed on host
+Email only works when SMTP_* secrets set
+HIGH
+Quiz migration may be unapplied
+Publish/submit will fail without SQL
+HIGH
+GEMINI_API_KEY may be unset on host
+AI falls back to local templates only
+HIGH
+Not all 30 notification triggers wired
+Many helpers exist; not every business event calls them
+MEDIUM
+Simplified fee metrics on dashboards
+Partial payments often approximated (e.g. 50%)
+MEDIUM
+RLS policies still loose in places
+class_activities historically USING (true)
+MEDIUM
+No automated test suite
+Regressions caught only by manual QA
+MEDIUM
+PWA icons reuse single logo.png
+Works but not ideal install branding
+LOW
+Parent cannot see child quiz scores
+Parent sees quiz cards only (read-only)
+LOW
+Audit logging not universal
+Helper exists; not every action calls logAuditAction
+MEDIUM
+Role field inconsistency
+Some pages use role string only, some roles[] array
+MEDIUM
+.env.example missing on GitHub
+Harder onboarding for new deployers
+LOW
+AI_INTEGRATION_GUIDE not on GitHub
+Docs lag code
+LOW
+
+5. Suggested Improvements (For Your Review)
+Below are recommended next steps, grouped by priority. Nothing below will be implemented until you approve which items you want. 
+5.1 Priority A — Go-live blockers (do first)
+#
+Suggestion
+Priority
+A1
+Add GEMINI_API_KEY to .env.local and production host secrets
+HIGH
+A2
+Run quiz SQL migration on Supabase (dev + prod)
+HIGH
+A3
+Configure SMTP_* env vars and send a test fee-reminder email
+HIGH
+A4
+Pick Tanzanian SMS provider (Beem / NextSMS / Africa's Talking) and replace example URL in sendSMS()
+HIGH
+A5
+End-to-end pilot: Teacher generate quiz → Student take → Teacher scores; plus fee payment + leave flow
+HIGH
+A6
+Confirm PWA install on Android Chrome with live domain + HTTPS
+MEDIUM
+
+5.2 Priority B — Product quality (recommended soon)
+#
+Suggestion
+Priority
+B1
+Fix fee dashboard math: use paid_amount/net_amount instead of 50% Partial approximation
+HIGH
+B2
+Standardize role checks: always prefer profiles.roles[] with fallback to role string
+MEDIUM
+B3
+Tighten RLS on class_activities / activity_attempts (class membership based)
+HIGH
+B4
+Wire remaining notification triggers (homework publish, marks locked, quiz published, etc.)
+MEDIUM
+B5
+Call logAuditAction on critical writes: payments, payroll finalize, enrollment, role changes
+MEDIUM
+B6
+Parent portal: show child quiz scores (read-only table from activity_attempts)
+MEDIUM
+B7
+AI route rate limit (e.g. 10 gens/user/hour) to protect free Gemini quota
+MEDIUM
+B8
+Add .env.example + short DEPLOY.md (Gemini, SMTP, SMS, Supabase)
+QUICK WIN
+
+5.3 Priority C — AI quiz enhancements (optional)
+#
+Suggestion
+Priority
+C1
+Allow practice retakes (max_attempts > 1) with best-score or latest-score policy
+LOW
+C2
+Expand Cambridge syllabus data to Grades 4–6
+LOW
+C3
+Teacher export quiz results to CSV/PDF
+LOW
+C4
+Shuffle options per student to reduce copying
+LOW
+C5
+Save AI generation history (who generated what topic/when)
+OPTIONAL
+C6
+Question bank reuse: save good quizzes as templates for next term
+OPTIONAL
+
+5.4 Priority D — UX / polish
+#
+Suggestion
+Priority
+D1
+Generate proper PWA icons (192 + 512) instead of single logo.png
+LOW
+D2
+Loading skeletons on heavy dashboards (Director/Accountant)
+LOW
+D3
+Empty states with clear CTAs on all list pages
+LOW
+D4
+Consistent date/currency formatting via shared helpers school-wide
+QUICK WIN
+D5
+Mobile QA pass on Teacher quiz builder + Student quiz taker
+MEDIUM
+D6
+In-app “How to create a quiz” help drawer for teachers
+LOW
+
+5.5 Priority E — Engineering hygiene
+#
+Suggestion
+Priority
+E1
+Add Playwright smoke tests: login roles + quiz generate + submit
+MEDIUM
+E2
+CI on GitHub Actions: npm run build on every push
+QUICK WIN
+E3
+Remove dead/duplicate activity UI paths if any remain after ClassActivitiesClient merge
+LOW
+E4
+Document seed accounts + demo script for school training
+QUICK WIN
+E5
+Review Supabase storage policies for logos/photo uploads
+MEDIUM
+E6
+Node 22 upgrade path (Supabase JS warns Node 20 deprecated)
+LOW
+
+6. Recommended Sequence (If You Approve A + B Basics)
+A1–A2: Gemini key + quiz migration (same afternoon).
+A5: Pilot MCQ flow with one teacher + one student class.
+A3–A4: SMTP + SMS provider (communications go live).
+B1 + B3: Accurate fees + tighter RLS (trust & correctness).
+B8 + E2 + E4: Docs and CI (cheap insurance).
+B4–B6: Notification coverage + parent quiz scores.
+C/D items as polish after first school week of use.
+SUGGESTED PILOT SCOPE (1 WEEK)
+Roles: Teacher, Student, Parent, Accountant, PrincipalFlows: Login/PIN → Attendance → Marks → Homework → AI MCQ Quiz → Fee invoice/payment reminderSuccess: No blocker bugs; Gemini generates usable quizzes; scores store correctly; fee reminder email delivers.
+
+7. Gemini Free Go-Live Mini-Checklist (You Have the Key)
+#
+Action
+Status
+1
+Put GEMINI_API_KEY in .env.local
+CONFIG
+2
+Put GEMINI_API_KEY in production secrets
+CONFIG
+3
+Run 20260712000000_quiz_activities.sql on Supabase
+CONFIG
+4
+Teacher generate quiz — badge shows Gemini
+TODO
+5
+Student submit — auto score saved
+TODO
+6
+Teacher view scores table
+TODO
+
+Model in code: gemini-2.5-flash (free). Cost: $0. Offline templates work if key missing.
+8. Risk Register
+Risk
+Impact
+Mitigation
+Gemini free daily quota exhausted
+AI falls back to local templates
+Rate limit (B7); monitor AI Studio
+SMS provider not configured
+Parents miss urgent alerts
+Prioritize A4; keep in-app notifications
+Loose RLS
+Cross-class data visibility
+Prioritize B3 before full school launch
+Partial fee math
+Wrong management decisions
+Prioritize B1 before board reporting
+No automated tests
+Regressions on deploy
+E1 smoke tests before term start
+Key leaked in client bundle
+Quota abuse / billing risk
+Keep key server-only (already designed)
+
+9. Decision Sheet (Please Mark What You Want)
+Use this section as your approval list. Reply with the IDs you want implemented (e.g. “Do A1–A5, B1, B3, B6, B8”).
+ID
+Item
+Your decision (Yes / No / Later)
+A1
+Set Gemini API key (local + prod)
+yes
+A2
+Run quiz SQL migration
+yes
+A3
+Configure real SMTP email
+yes
+A4
+Connect live Tanzanian SMS provider
+later
+A5
+Run full pilot QA script
+later
+A6
+PWA install check on phone
+later
+B1
+Accurate fee dashboard calculations
+yes
+B2
+Standardize roles[] checks
+yes
+B3
+Tighten quiz/activity RLS
+yes
+B4
+Wire more notification triggers
+yes
+B5
+Expand audit logging coverage
+yes
+B6
+Parent view of child quiz scores
+yes
+B7
+AI generation rate limit
+no
+B8
+.env.example + DEPLOY.md
+yes
+C1–C6
+AI quiz enhancements pack
+yes
+D1–D6
+UX polish pack
+yes
+E1–E6
+Engineering hygiene pack
+yes
+
+10. Summary Judgment
+The system is no longer “mid-build” — it is near production-ready for a controlled pilot.
+Biggest remaining value is configuration (Gemini, SMTP, SMS, migrations) not greenfield coding.
+Biggest remaining quality risks: fee math approximations, SMS placeholder, RLS looseness, incomplete notification wiring.
+AI MCQ quizzes are a differentiator and already implemented with free Gemini — activate with your key.
+Recommended immediate path: A1–A5 this week, then B1/B3/B8, then expand notifications and parent scores.
+
+Leaders International School ERP  ·  Progress Review & Improvements v1.0  ·  12 July 2026Source: Fresh GitHub clone  ·  Baseline: Requirements Plan v2.2Overall estimate: ~92–95% complete  ·  Next: your approval on A/B/C/D/E items
