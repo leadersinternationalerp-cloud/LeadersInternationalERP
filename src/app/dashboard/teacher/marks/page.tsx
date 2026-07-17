@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import MarksForm from './MarksForm'
+import MarksFilters from './MarksFilters'
 import { parseGradingLevels } from '@/utils/grading'
 
 export default async function TeacherMarksPage({
@@ -139,7 +140,7 @@ export default async function TeacherMarksPage({
         .eq('term', selectedTerm)
 
       existingMarks = marksLogs || []
-      isLocked = existingMarks.some(m => m.is_locked === true)
+      isLocked = existingMarks.some(m => m.is_locked === true || m.is_released === true)
     }
   }
 
@@ -225,50 +226,14 @@ export default async function TeacherMarksPage({
         </Link>
       </div>
 
-      {/* Filter Header */}
-      <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)', marginBottom: '2rem' }}>
-        <form method="GET" action="/dashboard/teacher/marks" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
-          <div className="form-group">
-            <label className="form-label">Class</label>
-            <select name="class_id" defaultValue={selectedClassId} className="input-field" required>
-              {classes?.map(c => (
-                <option key={c.id} value={c.id}>{c.name} {c.section ? `(${c.section})` : ''}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Subject</label>
-            <select name="subject_id" defaultValue={selectedSubjectId} className="input-field" required>
-              {subjects?.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Assessment</label>
-            <select name="assessment_type" defaultValue={selectedAssessmentType} className="input-field" required>
-              <option value="Test 1">Test 1</option>
-              <option value="Test 2">Test 2</option>
-              <option value="Mid-Term">Mid-Term</option>
-              <option value="Terminal">Terminal</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Term</label>
-            <select name="term" defaultValue={selectedTerm} className="input-field" required>
-              <option value="Term 1">Term 1</option>
-              <option value="Term 2">Term 2</option>
-            </select>
-          </div>
-
-          <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem' }}>
-            Load Marks Form
-          </button>
-        </form>
-      </div>
+      <MarksFilters
+        classes={classes}
+        subjects={subjects}
+        selectedClassId={selectedClassId}
+        selectedSubjectId={selectedSubjectId}
+        selectedAssessmentType={selectedAssessmentType}
+        selectedTerm={selectedTerm}
+      />
 
       {/* Marks Form */}
       {classStudents.length > 0 ? (
