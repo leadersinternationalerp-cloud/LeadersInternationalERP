@@ -5,10 +5,36 @@ import MarksForm from './MarksForm'
 import MarksFilters from './MarksFilters'
 import { parseGradingLevels } from '@/utils/grading'
 
+interface AllocationRecord {
+  class_id: string
+  subject_id: string
+  classes: { id: string; name: string; section?: string } | { id: string; name: string; section?: string }[] | null
+  subjects: { id: string; name: string } | { id: string; name: string }[] | null
+}
+
+interface StudentRecord {
+  id: string
+  student_id: string
+  grade_level: string
+  profiles: {
+    first_name: string
+    last_name: string
+  }
+}
+
+interface MarkRecord {
+  student_id: string
+  score: number
+  remarks: string
+  grading_scale?: string
+  is_locked?: boolean
+  is_released?: boolean
+}
+
 export default async function TeacherMarksPage({
   searchParams
 }: {
-  searchParams: Promise<{ class_id?: string; subject_id?: string; assessment_type?: string; term?: string }>
+  searchParams: Promise<{ class_id?: string; class?: string; subject_id?: string; subject?: string; assessment_type?: string; term?: string }>
 }) {
   const supabase = await createClient()
 
@@ -34,52 +60,78 @@ export default async function TeacherMarksPage({
   // Determine if admin
   const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
 
-  let classes: any[] = []
-  let subjects: any[] = []
-
+  let allocations: AllocationRecord[] = []
   if (isAdmin) {
-    // Admins can see all classes and subjects
-    const { data: allClasses } = await supabase
-      .from('classes')
-      .select('*')
-      .order('name', { ascending: true })
-    
-    const { data: allSubjects } = await supabase
-      .from('subjects')
-      .select('*')
-      .order('name', { ascending: true })
-
-    classes = allClasses || []
-    subjects = allSubjects || []
+    // Admins can see all allocations
+    const { data: allAllocations } = await supabase
+      .from('class_subjects')
+      .select(`
+        class_id,
+        subject_id,
+        classes (id, name, section),
+        subjects (id, name)
+      `)
+    allocations = (allAllocations as unknown as AllocationRecord[]) || []
   } else {
-    // Teachers only see their assigned classes and subjects
+    // Teachers only see their assigned class-subject combinations
     const { data: teacherAllocations } = await supabase
       .from('class_subjects')
       .select(`
         class_id,
         subject_id,
-        classes(*),
-        subjects(*)
+        classes (id, name, section),
+        subjects (id, name)
       `)
       .eq('teacher_id', user?.id)
+    allocations = (teacherAllocations as unknown as AllocationRecord[]) || []
+  }
 
-    // Deduplicate classes and subjects
-    const classMap = new Map()
-    const subjectMap = new Map()
+  // Derive class options from allocations
+  const classMap = new Map<string, { id: string; name: string; section?: string }>()
+  allocations.forEach(alloc => {
+    const cls = Array.isArray(alloc.classes) ? alloc.classes[0] : alloc.classes
+    if (cls) {
+      classMap.set(cls.id, { id: cls.id, name: cls.name, section: cls.section })
+    }
+  })
+  const classes = Array.from(classMap.values()).sort((a, b) => a.name.localeCompare(b.name))
 
-    teacherAllocations?.forEach((alloc: any) => {
-      const cls = Array.isArray(alloc.classes) ? alloc.classes[0] : alloc.classes
+  // Normalize query parameters
+  const params = await searchParams
+  const rawClassId = params.class_id || params.class
+  const rawSubjectId = params.subject_id || params.subject
+
+  const selectedClassId = rawClassId || (classes.length > 0 ? classes[0].id : '')
+
+  // Derive subject options based on the selected class
+  const classSubjects = allocations
+    .filter(alloc => alloc.class_id === selectedClassId)
+    .map(alloc => {
       const subj = Array.isArray(alloc.subjects) ? alloc.subjects[0] : alloc.subjects
-      if (cls) {
-        classMap.set(cls.id, cls)
-      }
-      if (subj) {
-        subjectMap.set(subj.id, subj)
-      }
+      return subj ? { id: subj.id, name: subj.name } : null
     })
+    .filter(Boolean) as { id: string; name: string }[]
 
-    classes = Array.from(classMap.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-    subjects = Array.from(subjectMap.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+  // Deduplicate subjects
+  const subjectMap = new Map<string, { id: string; name: string }>()
+  classSubjects.forEach(s => subjectMap.set(s.id, s))
+  const subjects = Array.from(subjectMap.values()).sort((a, b) => a.name.localeCompare(b.name))
+
+  const selectedSubjectId = rawSubjectId || (subjects.length > 0 ? subjects[0].id : '')
+  const selectedAssessmentType = params.assessment_type || 'Test 1'
+  const selectedTerm = params.term || 'Term 1'
+
+  // Safety assignment check for non-admin requests
+  if (!isAdmin && selectedClassId && selectedSubjectId) {
+    const isAssigned = allocations.some(alloc => alloc.class_id === selectedClassId && alloc.subject_id === selectedSubjectId)
+    if (!isAssigned) {
+      return (
+        <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
+          <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>
+          <p style={{ color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>You are not assigned to this class and subject combination.</p>
+        </div>
+      )
+    }
   }
 
   // Fetch system settings for grading scale
@@ -91,58 +143,45 @@ export default async function TeacherMarksPage({
 
   const gradingLevels = parseGradingLevels(settingData?.value)
 
-  const params = await searchParams
-  const selectedClassId = params.class_id || (classes && classes.length > 0 ? classes[0].id : '')
-  const selectedSubjectId = params.subject_id || (subjects && subjects.length > 0 ? subjects[0].id : '')
-  const selectedAssessmentType = params.assessment_type || 'Test 1'
-  const selectedTerm = params.term || 'Term 1'
-
-  // Safety assignment check for non-admin requests
-  if (!isAdmin && selectedClassId && selectedSubjectId) {
-    const isAssigned = classes.some(c => c.id === selectedClassId) && subjects.some(s => s.id === selectedSubjectId)
-    if (!isAssigned && (classes.length > 0 || subjects.length > 0)) {
-      return (
-        <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
-          <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>
-          <p style={{ color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>You are not assigned to this class and subject combination.</p>
-        </div>
-      )
-    }
-  }
-
   // Fetch students in selected class
-  let classStudents: any[] = []
+  let classStudents: StudentRecord[] = []
   let isLocked = false
-  let existingMarks: any[] = []
+  let existingMarks: MarkRecord[] = []
 
   if (selectedClassId) {
-    const selectedClass = classes?.find(c => c.id === selectedClassId)
-    if (selectedClass) {
-      const { data: students } = await supabase
-        .from('students')
-        .select(`
-          id,
-          student_id,
-          grade_level,
-          profiles (first_name, last_name)
-        `)
-        .eq('class_id', selectedClassId)
+    const { data: students } = await supabase
+      .from('students')
+      .select(`
+        id,
+        student_id,
+        grade_level,
+        profiles (first_name, last_name)
+      `)
+      .eq('class_id', selectedClassId)
 
-      classStudents = students || []
+    classStudents = (students as unknown as StudentRecord[]) || []
 
-      // Fetch existing marks
-      const { data: marksLogs } = await supabase
-        .from('marks')
-        .select('*')
-        .eq('class_id', selectedClassId)
-        .eq('subject_id', selectedSubjectId)
-        .eq('assessment_type', selectedAssessmentType)
-        .eq('term', selectedTerm)
+    // Fetch existing marks
+    const { data: marksLogs } = await supabase
+      .from('marks')
+      .select('*')
+      .eq('class_id', selectedClassId)
+      .eq('subject_id', selectedSubjectId)
+      .eq('assessment_type', selectedAssessmentType)
+      .eq('term', selectedTerm)
 
-      existingMarks = marksLogs || []
-      isLocked = existingMarks.some(m => m.is_locked === true || m.is_released === true)
-    }
+    existingMarks = (marksLogs as unknown as MarkRecord[]) || []
+    isLocked = existingMarks.some(m => m.is_locked === true || m.is_released === true)
   }
+
+  const cleanAllocations = allocations.map(alloc => {
+    const subj = Array.isArray(alloc.subjects) ? alloc.subjects[0] : alloc.subjects
+    return {
+      class_id: alloc.class_id,
+      subject_id: alloc.subject_id,
+      subject_name: subj?.name || 'Unknown'
+    }
+  })
 
   // Server Action to save marks
   async function handleSaveMarks(formData: FormData) {
@@ -157,8 +196,71 @@ export default async function TeacherMarksPage({
     if (!classId || !subjectId) return
 
     const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
 
-    const updates: any[] = []
+    // Verify user is allowed to edit selected class-subject allocation
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, roles')
+      .eq('id', user.id)
+      .single()
+    const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+      ? profile.roles
+      : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+
+    const isAdminUser = userRoles.includes('System Admin') || userRoles.includes('Director')
+
+    if (!isAdminUser) {
+      const { data: allocation } = await supabase
+        .from('class_subjects')
+        .select('id')
+        .eq('teacher_id', user.id)
+        .eq('class_id', classId)
+        .eq('subject_id', subjectId)
+        .maybeSingle()
+
+      if (!allocation) {
+        throw new Error('Unauthorized: You are not assigned to this class-subject combination.')
+      }
+    }
+
+    // Fetch existing marks to check lock status and preserve is_released status
+    const { data: existingMarks } = await supabase
+      .from('marks')
+      .select('student_id, is_locked, is_released')
+      .eq('class_id', classId)
+      .eq('subject_id', subjectId)
+      .eq('assessment_type', assessmentType)
+      .eq('term', term)
+
+    const isAlreadyReadOnly = existingMarks?.some(m => m.is_locked === true || m.is_released === true)
+    if (isAlreadyReadOnly && !isAdminUser) {
+      throw new Error('Forbidden: Marks are already submitted/locked or published and cannot be modified.')
+    }
+
+    // Map student to their released status to preserve it
+    const releasedMap = new Map<string, boolean>()
+    existingMarks?.forEach(m => {
+      releasedMap.set(m.student_id, m.is_released || false)
+    })
+
+    interface MarkUpdate {
+      id?: string
+      student_id: string
+      class_id: string
+      subject_id: string
+      assessment_type: string
+      term: string
+      academic_year: string
+      score: number
+      remarks: string
+      grading_scale: string
+      graded_by?: string
+      is_locked: boolean
+      is_released: boolean
+    }
+
+    const updates: MarkUpdate[] = []
 
     formData.forEach((value, key) => {
       if (key.startsWith('score_')) {
@@ -168,6 +270,7 @@ export default async function TeacherMarksPage({
         const gradingScale = formData.get(`grade_${studentId}`) as string
 
         if (!isNaN(score)) {
+          const wasReleased = releasedMap.get(studentId) || false
           updates.push({
             student_id: studentId,
             class_id: classId,
@@ -180,7 +283,7 @@ export default async function TeacherMarksPage({
             grading_scale: gradingScale || 'Standard',
             graded_by: user?.id,
             is_locked: lock,
-            is_released: false // default false until officially released by HOS/Dean
+            is_released: wasReleased
           })
         }
       }
@@ -188,7 +291,6 @@ export default async function TeacherMarksPage({
 
     // Upsert records
     for (const update of updates) {
-      // Find matching existing mark ID to update, or let upsert match
       const { data: existing } = await supabase
         .from('marks')
         .select('id')
@@ -228,7 +330,7 @@ export default async function TeacherMarksPage({
 
       <MarksFilters
         classes={classes}
-        subjects={subjects}
+        allocations={cleanAllocations}
         selectedClassId={selectedClassId}
         selectedSubjectId={selectedSubjectId}
         selectedAssessmentType={selectedAssessmentType}
@@ -238,9 +340,11 @@ export default async function TeacherMarksPage({
       {/* Marks Form */}
       {classStudents.length > 0 ? (
         <MarksForm
+          key={`${selectedClassId}_${selectedSubjectId}_${selectedAssessmentType}_${selectedTerm}`}
           students={classStudents}
           existingMarks={existingMarks}
           isLocked={isLocked}
+          isReleased={existingMarks.some(m => m.is_released === true)}
           classId={selectedClassId}
           subjectId={selectedSubjectId}
           assessmentType={selectedAssessmentType}

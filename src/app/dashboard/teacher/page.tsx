@@ -6,6 +6,19 @@ import {
 } from 'lucide-react'
 import { formatDate } from '@/utils/date'
 
+interface ClassSubjectRow {
+  id: string
+  classes: {
+    id: string
+    name: string
+    section: string | null
+  } | null
+  subjects: {
+    id: string
+    name: string
+  } | null
+}
+
 export default async function TeacherDashboard() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -153,16 +166,16 @@ export default async function TeacherDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {classSubjects.map((cs: any) => (
+                {(classSubjects as unknown as ClassSubjectRow[] || []).map((cs) => (
                   <tr key={cs.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <td style={{ padding: '1rem 0', fontWeight: 600 }}>{cs.classes?.name} <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginLeft: 4 }}>{cs.classes?.section}</span></td>
                     <td style={{ padding: '1rem 0', color: 'var(--color-text)' }}>{cs.subjects?.name}</td>
                     <td style={{ padding: '1rem 0' }}>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <Link href={`/dashboard/teacher/attendance?class=${cs.classes?.id}`} className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: 'transparent', border: '1px solid var(--color-border)' }}>
+                        <Link href={`/dashboard/teacher/attendance?class_id=${cs.classes?.id}`} className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: 'transparent', border: '1px solid var(--color-border)' }}>
                           Attendance
                         </Link>
-                        <Link href={`/dashboard/teacher/marks?class=${cs.classes?.id}&subject=${cs.subjects?.id}`} className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: 'transparent', border: '1px solid var(--color-border)' }}>
+                        <Link href={`/dashboard/teacher/marks?class_id=${cs.classes?.id}&subject_id=${cs.subjects?.id}`} className="btn" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: 'transparent', border: '1px solid var(--color-border)' }}>
                           Marks
                         </Link>
                       </div>
@@ -181,7 +194,7 @@ export default async function TeacherDashboard() {
             <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--color-text)' }}>Recent Notifications</h3>
           </div>
           {(!notifications || notifications.length === 0) ? (
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2rem 0' }}>You're all caught up!</p>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2rem 0' }}>You&apos;re all caught up!</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {notifications.map(note => (

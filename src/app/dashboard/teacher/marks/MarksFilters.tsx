@@ -2,27 +2,28 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 
+export interface Allocation {
+  class_id: string
+  subject_id: string
+  subject_name: string
+}
+
 interface ClassRecord {
   id: string
   name: string
   section?: string
 }
 
-interface SubjectRecord {
-  id: string
-  name: string
-}
-
 export default function MarksFilters({
   classes,
-  subjects,
+  allocations,
   selectedClassId,
   selectedSubjectId,
   selectedAssessmentType,
   selectedTerm
 }: {
   classes: ClassRecord[]
-  subjects: SubjectRecord[]
+  allocations: Allocation[]
   selectedClassId: string
   selectedSubjectId: string
   selectedAssessmentType: string
@@ -32,10 +33,49 @@ export default function MarksFilters({
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  const handleSelectChange = (name: string, value: string) => {
+  // Get subjects for selected class
+  const classSubjects = allocations
+    .filter(alloc => alloc.class_id === selectedClassId)
+    .map(alloc => ({ id: alloc.subject_id, name: alloc.subject_name }))
+
+  // Deduplicate
+  const subjectsMap = new Map<string, { id: string; name: string }>()
+  classSubjects.forEach(s => subjectsMap.set(s.id, s))
+  const subjects = Array.from(subjectsMap.values()).sort((a, b) => a.name.localeCompare(b.name))
+
+  const updateUrl = (updatedParams: Record<string, string>) => {
     const params = new URLSearchParams(searchParams.toString())
-    params.set(name, value)
-    router.push(`${pathname}?${params.toString()}`)
+    Object.entries(updatedParams).forEach(([name, value]) => {
+      params.set(name, value)
+    })
+    // Remove legacy keys if present
+    params.delete('class')
+    params.delete('subject')
+    router.replace(`${pathname}?${params.toString()}`)
+  }
+
+  const handleClassChange = (classId: string) => {
+    // Find valid subjects for this new class
+    const newSubjects = allocations
+      .filter(alloc => alloc.class_id === classId)
+      .map(alloc => ({ id: alloc.subject_id, name: alloc.subject_name }))
+    
+    // Deduplicate
+    const newSubjectsMap = new Map<string, string>()
+    newSubjects.forEach(s => newSubjectsMap.set(s.id, s.name))
+    const firstSubjectId = newSubjects.length > 0 ? newSubjects[0].id : ''
+
+    const isCurrentSubjectValid = newSubjectsMap.has(selectedSubjectId)
+    const targetSubjectId = isCurrentSubjectValid ? selectedSubjectId : firstSubjectId
+
+    updateUrl({
+      class_id: classId,
+      subject_id: targetSubjectId
+    })
+  }
+
+  const handleSelectChange = (name: string, value: string) => {
+    updateUrl({ [name]: value })
   }
 
   return (
@@ -46,7 +86,7 @@ export default function MarksFilters({
           <select
             name="class_id"
             value={selectedClassId}
-            onChange={(e) => handleSelectChange('class_id', e.target.value)}
+            onChange={(e) => handleClassChange(e.target.value)}
             className="input-field"
             required
           >

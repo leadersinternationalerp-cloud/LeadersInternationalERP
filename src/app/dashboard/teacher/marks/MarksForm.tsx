@@ -23,6 +23,7 @@ export default function MarksForm({
   students,
   existingMarks,
   isLocked,
+  isReleased,
   classId,
   subjectId,
   assessmentType,
@@ -33,6 +34,7 @@ export default function MarksForm({
   students: Student[]
   existingMarks: Mark[]
   isLocked: boolean
+  isReleased: boolean
   classId: string
   subjectId: string
   assessmentType: string
@@ -40,6 +42,7 @@ export default function MarksForm({
   gradingLevels: GradeLevel[]
   saveAction: (formData: FormData) => Promise<void>
 }) {
+  const isReadOnly = isLocked || isReleased
   // Initialize Out Of from existing marks if present
   const [outOf, setOutOf] = useState<string>(() => {
     const firstMark = existingMarks[0]
@@ -152,7 +155,7 @@ export default function MarksForm({
             type="number"
             min="1"
             value={outOf}
-            disabled={isLocked || saving}
+            disabled={isReadOnly || saving}
             onChange={(e) => {
               const val = e.target.value
               if (val === '' || (parseInt(val) > 0 && /^\d+$/.test(val))) {
@@ -173,17 +176,33 @@ export default function MarksForm({
           borderLeft: '4px solid var(--color-error)', borderRadius: '4px',
           color: 'var(--color-error)', fontSize: '0.85rem', marginBottom: '1.5rem', fontWeight: 600
         }}>
-          ⚠️ Please enter a valid "Out Of" value greater than 0 to enter student scores.
+          ⚠️ Please enter a valid &quot;Out Of&quot; value greater than 0 to enter student scores.
         </div>
       )}
 
-      {isLocked && (
+      {isReleased ? (
+        <div style={{
+          padding: '0.75rem 1rem', backgroundColor: 'rgba(16, 185, 129, 0.08)',
+          borderLeft: '4px solid var(--color-success)', borderRadius: '4px',
+          color: 'var(--color-success)', fontSize: '0.85rem', marginBottom: '1.5rem', fontWeight: 600
+        }}>
+          🟢 Marks are Published. Read-only mode active.
+        </div>
+      ) : isLocked ? (
         <div style={{
           padding: '0.75rem 1rem', backgroundColor: 'rgba(245, 158, 11, 0.08)',
           borderLeft: '4px solid var(--color-warning)', borderRadius: '4px',
           color: 'var(--color-warning)', fontSize: '0.85rem', marginBottom: '1.5rem', fontWeight: 600
         }}>
           ⚠️ Marks are submitted & locked. Read-only mode active.
+        </div>
+      ) : (
+        <div style={{
+          padding: '0.75rem 1rem', backgroundColor: 'rgba(59, 130, 246, 0.08)',
+          borderLeft: '4px solid var(--color-primary)', borderRadius: '4px',
+          color: 'var(--color-primary)', fontSize: '0.85rem', marginBottom: '1.5rem', fontWeight: 600
+        }}>
+          📝 Draft Mode. Marks are editable.
         </div>
       )}
 
@@ -212,7 +231,7 @@ export default function MarksForm({
                     <input
                       type="text"
                       value={currentScore}
-                      disabled={isLocked || saving || isOutOfInvalid}
+                      disabled={isReadOnly || saving || isOutOfInvalid}
                       onChange={(e) => handleScoreChange(stud.id, e.target.value)}
                       placeholder={isOutOfInvalid ? "Set Out Of" : `e.g. ${Math.min(outOfVal, 85)}`}
                       className="input-field"
@@ -231,7 +250,7 @@ export default function MarksForm({
                     <input
                       type="text"
                       value={remarks[stud.id]}
-                      disabled={isLocked || saving}
+                      disabled={isReadOnly || saving}
                       onChange={(e) => handleRemarksChange(stud.id, e.target.value)}
                       placeholder="e.g. Very active student"
                       className="input-field"
@@ -245,12 +264,12 @@ export default function MarksForm({
         </table>
       </div>
 
-      {!isLocked && (
+      {!isReadOnly && (
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
           <button
             type="button"
             disabled={saving || isOutOfInvalid}
-            onClick={(e: any) => handleSubmit(e, false)}
+            onClick={(e) => handleSubmit(e, false)}
             className="btn"
             style={{ padding: '0.6rem 2rem', background: 'transparent', border: '1px solid var(--color-border)', cursor: isOutOfInvalid ? 'not-allowed' : 'pointer' }}
           >
@@ -259,7 +278,7 @@ export default function MarksForm({
           <button
             type="button"
             disabled={saving || isOutOfInvalid}
-            onClick={(e: any) => handleSubmit(e, true)}
+            onClick={(e) => handleSubmit(e, true)}
             className="btn btn-primary"
             style={{ padding: '0.6rem 2.5rem', cursor: isOutOfInvalid ? 'not-allowed' : 'pointer' }}
           >
