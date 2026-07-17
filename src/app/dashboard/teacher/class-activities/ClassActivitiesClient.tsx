@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import QuizBuilder from './QuizBuilder';
+import { getGradeColor } from '@/utils/grading';
 
 interface Activity {
   id: string;
@@ -32,6 +33,7 @@ interface ScoreRecord {
   score: number;
   maxScore: number;
   percentage: number;
+  grade?: string;
   timeTakenSeconds: number;
   submittedAt: string;
   answers?: any;
@@ -513,6 +515,7 @@ export default function ClassActivitiesClient({
                       <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600 }}>Email</th>
                       <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'center' }}>Score</th>
                       <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'center' }}>Percentage</th>
+                      <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'center' }}>Grade</th>
                       <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'center' }}>Time Taken</th>
                       <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>Submitted At</th>
                       <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>Review</th>
@@ -537,6 +540,18 @@ export default function ClassActivitiesClient({
                             {row.percentage}%
                           </span>
                         </td>
+                        <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                          <span
+                            style={{
+                              padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700,
+                              backgroundColor: 'rgba(0,0,0,0.03)',
+                              color: getGradeColor(row.grade),
+                              border: `1px solid ${getGradeColor(row.grade)}`
+                            }}
+                          >
+                            {row.grade || '-'}
+                          </span>
+                        </td>
                         <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                           {row.timeTakenSeconds ? `${Math.floor(row.timeTakenSeconds / 60)}m ${row.timeTakenSeconds % 60}s` : 'N/A'}
                         </td>
@@ -556,7 +571,7 @@ export default function ClassActivitiesClient({
                     ))}
                     {scoreboardData.length === 0 && (
                       <tr>
-                        <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                        <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
                           No attempts recorded yet.
                         </td>
                       </tr>

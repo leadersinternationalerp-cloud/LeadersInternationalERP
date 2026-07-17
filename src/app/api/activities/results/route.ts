@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { parseGradingLevels, getGradeForPercentage } from '@/utils/grading';
 
 export async function GET(request: Request) {
   try {
@@ -35,6 +36,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Missing required query parameter: activity_id' }, { status: 400 });
     }
 
+    // Fetch grading scale once
+    const { data: setting } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'grading_scale')
+      .maybeSingle();
+    const gradingLevels = parseGradingLevels(setting?.value);
+
     // 3. Fetch attempts with student profile names
     const { data: attempts, error: fetchError } = await supabase
       .from('activity_attempts')
@@ -45,6 +54,7 @@ export async function GET(request: Request) {
         score,
         max_score,
         percentage,
+        grade,
         time_taken_seconds,
         submitted_at,
         answers,
@@ -64,6 +74,7 @@ export async function GET(request: Request) {
     // Map profile join response to flatten student details
     const formattedAttempts = (attempts || []).map((attempt: any) => {
       const studentProfile = attempt.profiles || {};
+      const calculatedGrade = attempt.grade || getGradeForPercentage(attempt.percentage, gradingLevels);
       return {
         id: attempt.id,
         studentId: attempt.student_id,
@@ -72,6 +83,7 @@ export async function GET(request: Request) {
         score: attempt.score,
         maxScore: attempt.max_score,
         percentage: attempt.percentage,
+        grade: calculatedGrade,
         timeTakenSeconds: attempt.time_taken_seconds,
         submittedAt: attempt.submitted_at,
         answers: attempt.answers

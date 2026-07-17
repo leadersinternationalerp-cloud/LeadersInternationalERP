@@ -2,32 +2,28 @@
 
 import { useState } from 'react'
 import { saveGradingConfigAction } from './actions'
+import {
+  parseGradingLevels,
+  validateGradingLevels,
+  getGradeColor,
+  GradeLevel
+} from '@/utils/grading'
 
 export default function GradingClient({ initialConfig }: { initialConfig: any }) {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
 
-  const [config, setConfig] = useState({
-    A: initialConfig?.A ?? 90,
-    B: initialConfig?.B ?? 80,
-    C: initialConfig?.C ?? 70,
-    D: initialConfig?.D ?? 60
+  const [levels, setLevels] = useState<GradeLevel[]>(() => {
+    return parseGradingLevels(initialConfig)
   })
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setConfig({
-      ...config,
-      [e.target.name]: Number(e.target.value)
-    })
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Validation
-    if (config.A <= config.B || config.B <= config.C || config.C <= config.D) {
-      setError('Thresholds must be strictly descending (A > B > C > D)')
+    const validationError = validateGradingLevels(levels)
+    if (validationError) {
+      setError(validationError)
       return
     }
 
@@ -35,7 +31,7 @@ export default function GradingClient({ initialConfig }: { initialConfig: any })
     setError('')
     setSuccess('')
 
-    const res = await saveGradingConfigAction(config)
+    const res = await saveGradingConfigAction(levels)
     setLoading(false)
 
     if (res?.error) {
@@ -52,56 +48,78 @@ export default function GradingClient({ initialConfig }: { initialConfig: any })
 
       <div style={{ display: 'grid', gap: '1.25rem' }}>
         <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-          Define the minimum percentage required to achieve each grade. Grade F will automatically be any score below the D threshold.
+          Define the minimum and maximum score percentage required to achieve each grade level.
         </p>
 
-        <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <label style={{ width: '100px', fontWeight: 'bold', fontSize: '1.2rem', color: 'var(--color-success)' }}>A</label>
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ color: 'var(--color-text-muted)' }}>≥</span>
-            <input type="number" name="A" value={config.A} onChange={handleChange} className="form-input" required min="0" max="100" />
-            <span style={{ color: 'var(--color-text-muted)' }}>%</span>
-          </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {levels.map((lvl, index) => (
+            <div key={lvl.grade} style={{ display: 'grid', gridTemplateColumns: '100px 1fr 1fr', gap: '1rem', alignItems: 'center' }}>
+              <label style={{ fontWeight: '600', fontSize: '1.1rem', color: getGradeColor(lvl.grade) }}>Grade {lvl.grade}</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Min:</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="any"
+                  className="form-input"
+                  style={{ padding: '0.4rem', width: '100%', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', outline: 'none' }}
+                  value={lvl.min}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value)
+                    const newLevels = [...levels]
+                    newLevels[index] = { ...lvl, min: isNaN(val) ? 0 : val }
+                    setLevels(newLevels)
+                  }}
+                  required
+                />
+                <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>%</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Max:</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="any"
+                  className="form-input"
+                  style={{ padding: '0.4rem', width: '100%', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', outline: 'none' }}
+                  value={lvl.max}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value)
+                    const newLevels = [...levels]
+                    newLevels[index] = { ...lvl, max: isNaN(val) ? 0 : val }
+                    setLevels(newLevels)
+                  }}
+                  required
+                />
+                <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>%</span>
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <label style={{ width: '100px', fontWeight: 'bold', fontSize: '1.2rem', color: 'var(--color-primary)' }}>B</label>
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ color: 'var(--color-text-muted)' }}>≥</span>
-            <input type="number" name="B" value={config.B} onChange={handleChange} className="form-input" required min="0" max="100" />
-            <span style={{ color: 'var(--color-text-muted)' }}>%</span>
-          </div>
+        <div style={{
+          fontSize: '0.85rem',
+          color: 'var(--color-text-muted)',
+          backgroundColor: 'rgba(0,0,0,0.02)',
+          padding: '0.75rem',
+          borderRadius: 'var(--radius-sm)',
+          border: '1px solid var(--color-border)',
+          lineHeight: '1.4',
+          marginTop: '0.5rem'
+        }}>
+          <strong style={{ display: 'block', marginBottom: '0.25rem' }}>Preview Bands:</strong>
+          {levels.map((lvl) => (
+            <span key={lvl.grade} style={{ marginRight: '1rem', display: 'inline-block' }}>
+              <span style={{ fontWeight: 600, color: getGradeColor(lvl.grade) }}>{lvl.grade}</span>: {lvl.min}–{lvl.max}%
+            </span>
+          ))}
         </div>
-
-        <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <label style={{ width: '100px', fontWeight: 'bold', fontSize: '1.2rem', color: 'var(--color-accent)' }}>C</label>
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ color: 'var(--color-text-muted)' }}>≥</span>
-            <input type="number" name="C" value={config.C} onChange={handleChange} className="form-input" required min="0" max="100" />
-            <span style={{ color: 'var(--color-text-muted)' }}>%</span>
-          </div>
-        </div>
-
-        <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <label style={{ width: '100px', fontWeight: 'bold', fontSize: '1.2rem', color: 'var(--color-warning)' }}>D</label>
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ color: 'var(--color-text-muted)' }}>≥</span>
-            <input type="number" name="D" value={config.D} onChange={handleChange} className="form-input" required min="0" max="100" />
-            <span style={{ color: 'var(--color-text-muted)' }}>%</span>
-          </div>
-        </div>
-
-        <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', backgroundColor: 'rgba(239, 68, 68, 0.05)', borderRadius: 'var(--radius-md)' }}>
-          <label style={{ width: '100px', fontWeight: 'bold', fontSize: '1.2rem', color: 'var(--color-error)' }}>F</label>
-          <div style={{ flex: 1, color: 'var(--color-text-muted)' }}>
-            Automatically &lt; {config.D}%
-          </div>
-        </div>
-
       </div>
 
       <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
-        <button type="submit" className="btn btn-primary" disabled={loading}>
+        <button type="submit" className="btn btn-primary" disabled={loading} style={{ padding: '0.6rem 2rem' }}>
           {loading ? 'Saving...' : 'Save Grading Scale'}
         </button>
       </div>

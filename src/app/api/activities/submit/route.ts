@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { createServiceClient } from '@/utils/supabase/service';
 import { markQuiz } from '@/lib/cambridge-syllabus';
+import { parseGradingLevels, getGradeForPercentage } from '@/utils/grading';
 
 export async function POST(request: Request) {
   try {
@@ -59,6 +60,15 @@ export async function POST(request: Request) {
     const questions = activity.questions || [];
     const evaluation = markQuiz(questions, answers);
 
+    // Fetch grading scale settings
+    const { data: setting } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'grading_scale')
+      .maybeSingle();
+    const gradingLevels = parseGradingLevels(setting?.value);
+    const grade = getGradeForPercentage(evaluation.percentage, gradingLevels);
+
     // 6. Store attempt in the database
     const { data: attempt, error: insertError } = await supabase
       .from('activity_attempts')
@@ -69,7 +79,8 @@ export async function POST(request: Request) {
         score: evaluation.score,
         max_score: evaluation.maxScore,
         percentage: evaluation.percentage,
-        time_taken_seconds
+        time_taken_seconds,
+        grade
       })
       .select()
       .single();
@@ -139,7 +150,7 @@ export async function POST(request: Request) {
           academic_year: academicYearName,
           score: evaluation.percentage,
           remarks: `Quiz: ${activity.title} (Auto-marked)`,
-          grading_scale: 'Percentage',
+          grading_scale: `Percentage (${grade})`,
           graded_by: activity.created_by,
           is_released: false
         };
@@ -171,7 +182,8 @@ export async function POST(request: Request) {
         score: evaluation.score,
         maxScore: evaluation.maxScore,
         percentage: evaluation.percentage,
-        results: evaluation.results
+        results: evaluation.results,
+        grade: attempt.grade
       }
     });
 

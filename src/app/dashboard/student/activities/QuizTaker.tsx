@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getGradeColor } from '@/utils/grading';
 
 interface Question {
   id: string;
@@ -39,6 +40,7 @@ export default function QuizTaker({
     score: number;
     maxScore: number;
     percentage: number;
+    grade?: string;
     results: {
       questionId: string;
       questionText: string;
@@ -267,18 +269,46 @@ export default function QuizTaker({
               Quiz Finished!
             </h3>
             
-            <div style={{ margin: '1.5rem 0' }}>
-              <div style={{ fontSize: '3rem', fontWeight: 800, lineHeight: 1, color: quizResult.percentage >= 70 ? '#10b981' : quizResult.percentage >= 50 ? '#f59e0b' : '#ef4444' }}>
-                {quizResult.score} / {quizResult.maxScore}
-              </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 700, marginTop: '0.5rem', color: 'var(--color-text)' }}>
-                {quizResult.percentage}% Score
-              </div>
-            </div>
+            {(() => {
+              const gradeColor = getGradeColor(quizResult.grade);
+              const encouragement = (quizResult.grade === 'A*' || quizResult.grade === 'A' || quizResult.percentage >= 80)
+                ? 'Fantastic effort! You demonstrated strong mastery of the Cambridge syllabus objectives.'
+                : (quizResult.grade === 'B' || quizResult.grade === 'C' || (quizResult.percentage >= 60 && quizResult.percentage < 80))
+                ? 'Good work! You have a fair understanding. Review the explanations below to improve.'
+                : 'Keep practicing! Review the detailed answers and explanations below to learn.';
 
-            <p style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', margin: '0 auto', maxWidth: '400px' }}>
-              {quizResult.percentage >= 70 ? 'Fantastic effort! You demonstrated strong mastery of the Cambridge syllabus objectives.' : quizResult.percentage >= 50 ? 'Good work! You have a fair understanding. Review the explanations below to improve.' : 'Keep practicing! Review the detailed answers and explanations below to learn.'}
-            </p>
+              return (
+                <>
+                  <div style={{ margin: '1.5rem 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ fontSize: '3rem', fontWeight: 800, lineHeight: 1, color: gradeColor }}>
+                      {quizResult.score} / {quizResult.maxScore}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <span style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text)' }}>
+                        {quizResult.percentage}% Score
+                      </span>
+                      {quizResult.grade && (
+                        <span style={{
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '1.1rem',
+                          fontWeight: 800,
+                          backgroundColor: 'rgba(0,0,0,0.03)',
+                          color: gradeColor,
+                          border: `1px solid ${gradeColor}`
+                        }}>
+                          Grade: {quizResult.grade}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <p style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', margin: '0 auto', maxWidth: '400px' }}>
+                    {encouragement}
+                  </p>
+                </>
+              );
+            })()}
           </div>
 
           <h4 style={{ fontSize: '1.05rem', fontWeight: 600, margin: '1rem 0 0 0' }}>Detailed Answer Review</h4>

@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import MarksForm from './MarksForm'
+import { parseGradingLevels } from '@/utils/grading'
 
 export default async function TeacherMarksPage({
   searchParams
@@ -80,25 +81,14 @@ export default async function TeacherMarksPage({
     subjects = Array.from(subjectMap.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''))
   }
 
-  // Fetch system settings for grading scale thresholds
-  const { data: settingsData } = await supabase
+  // Fetch system settings for grading scale
+  const { data: settingData } = await supabase
     .from('system_settings')
-    .select('key, value')
-    .in('key', ['grading_scale_a', 'grading_scale_b', 'grading_scale_c', 'grading_scale_d'])
+    .select('value')
+    .eq('key', 'grading_scale')
+    .maybeSingle()
 
-  const gradingScale = {
-    A: 80,
-    B: 70,
-    C: 60,
-    D: 50
-  }
-
-  settingsData?.forEach(item => {
-    if (item.key === 'grading_scale_a') gradingScale.A = Number(item.value)
-    if (item.key === 'grading_scale_b') gradingScale.B = Number(item.value)
-    if (item.key === 'grading_scale_c') gradingScale.C = Number(item.value)
-    if (item.key === 'grading_scale_d') gradingScale.D = Number(item.value)
-  })
+  const gradingLevels = parseGradingLevels(settingData?.value)
 
   const params = await searchParams
   const selectedClassId = params.class_id || (classes && classes.length > 0 ? classes[0].id : '')
@@ -290,7 +280,7 @@ export default async function TeacherMarksPage({
           subjectId={selectedSubjectId}
           assessmentType={selectedAssessmentType}
           term={selectedTerm}
-          gradingScale={gradingScale}
+          gradingLevels={gradingLevels}
           saveAction={handleSaveMarks}
         />
       ) : (

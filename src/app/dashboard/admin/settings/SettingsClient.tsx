@@ -4,6 +4,12 @@ import { useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { saveSystemSettingsAction, saveAcademicYearAction } from './actions'
 import { formatDate } from '@/utils/date'
+import {
+  parseGradingLevels,
+  validateGradingLevels,
+  getGradeColor,
+  GradeLevel
+} from '@/utils/grading'
 
 interface TermDetail {
   term_name: string
@@ -35,11 +41,10 @@ export default function SettingsClient({
   const [contactPhone, setContactPhone] = useState(initialSettings.contact_phone || '')
   const [schoolLogo, setSchoolLogo] = useState(initialSettings.school_logo || '')
 
-  // Grading scale thresholds
-  const [scaleA, setScaleA] = useState<number>(Number(initialSettings.grading_scale_a) || 80)
-  const [scaleB, setScaleB] = useState<number>(Number(initialSettings.grading_scale_b) || 70)
-  const [scaleC, setScaleC] = useState<number>(Number(initialSettings.grading_scale_c) || 60)
-  const [scaleD, setScaleD] = useState<number>(Number(initialSettings.grading_scale_d) || 50)
+  // Grading scale thresholds (7 levels Cambridge scale)
+  const [levels, setLevels] = useState<GradeLevel[]>(() => {
+    return parseGradingLevels(initialSettings.grading_scale)
+  })
 
   const [savingScale, setSavingScale] = useState(false)
   const [scaleMessage, setScaleMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -138,23 +143,17 @@ export default function SettingsClient({
     setSavingScale(true)
     setScaleMessage(null)
 
-    if (scaleA <= scaleB || scaleB <= scaleC || scaleC <= scaleD || scaleD <= 0) {
-      setScaleMessage({ type: 'error', text: 'Invalid thresholds: Grades must follow a strictly descending order (A > B > C > D > 0).' })
+    const validationError = validateGradingLevels(levels)
+    if (validationError) {
+      setScaleMessage({ type: 'error', text: validationError })
       setSavingScale(false)
       return
     }
 
     try {
-      const results = await Promise.all([
-        saveSystemSettingsAction('grading_scale_a', scaleA),
-        saveSystemSettingsAction('grading_scale_b', scaleB),
-        saveSystemSettingsAction('grading_scale_c', scaleC),
-        saveSystemSettingsAction('grading_scale_d', scaleD),
-      ])
-
-      const failed = results.find((r) => r.error)
-      if (failed) {
-        throw new Error(failed.error)
+      const result = await saveSystemSettingsAction('grading_scale', levels)
+      if (result.error) {
+        throw new Error(result.error)
       }
 
       setScaleMessage({ type: 'success', text: 'Grading scale settings updated successfully!' })
@@ -529,63 +528,73 @@ export default function SettingsClient({
           <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
             <h2 style={{ fontSize: '1.25rem', marginBottom: '1.25rem', fontWeight: 600 }}>Grading Scale Configurations</h2>
             <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-              Set the minimum scores required for each official grade letter.
+              Set the minimum and maximum scores required for each official grade letter.
             </p>
 
-            <form onSubmit={handleSaveScale} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontSize: '0.85rem' }}>Grade A</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    className="input-field"
-                    value={scaleA}
-                    onChange={(e) => setScaleA(Number(e.target.value))}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontSize: '0.85rem' }}>Grade B</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    className="input-field"
-                    value={scaleB}
-                    onChange={(e) => setScaleB(Number(e.target.value))}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontSize: '0.85rem' }}>Grade C</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    className="input-field"
-                    value={scaleC}
-                    onChange={(e) => setScaleC(Number(e.target.value))}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontSize: '0.85rem' }}>Grade D</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    className="input-field"
-                    value={scaleD}
-                    onChange={(e) => setScaleD(Number(e.target.value))}
-                    required
-                  />
-                </div>
+            <form onSubmit={handleSaveScale} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {levels.map((lvl, index) => (
+                  <div key={lvl.grade} style={{ display: 'grid', gridTemplateColumns: '100px 1fr 1fr', gap: '1rem', alignItems: 'center' }}>
+                    <label style={{ fontWeight: 600, color: getGradeColor(lvl.grade) }}>Grade {lvl.grade}</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Min:</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="any"
+                        className="input-field"
+                        style={{ padding: '0.4rem', width: '100%' }}
+                        value={lvl.min}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value)
+                          const newLevels = [...levels]
+                          newLevels[index] = { ...lvl, min: isNaN(val) ? 0 : val }
+                          setLevels(newLevels)
+                        }}
+                        required
+                      />
+                      <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>%</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Max:</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="any"
+                        className="input-field"
+                        style={{ padding: '0.4rem', width: '100%' }}
+                        value={lvl.max}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value)
+                          const newLevels = [...levels]
+                          newLevels[index] = { ...lvl, max: isNaN(val) ? 0 : val }
+                          setLevels(newLevels)
+                        }}
+                        required
+                      />
+                      <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>%</span>
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                * Scores below Grade D will fall back to **Grade F** (0 to {scaleD - 1}).
+              <div style={{
+                fontSize: '0.85rem',
+                color: 'var(--color-text-muted)',
+                backgroundColor: 'rgba(0,0,0,0.02)',
+                padding: '0.75rem',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-border)',
+                lineHeight: '1.4'
+              }}>
+                <strong style={{ display: 'block', marginBottom: '0.25rem' }}>Preview Bands:</strong>
+                {levels.map((lvl) => (
+                  <span key={lvl.grade} style={{ marginRight: '1rem', display: 'inline-block' }}>
+                    <span style={{ fontWeight: 600, color: getGradeColor(lvl.grade) }}>{lvl.grade}</span>: {lvl.min}–{lvl.max}%
+                  </span>
+                ))}
               </div>
 
               {scaleMessage && (

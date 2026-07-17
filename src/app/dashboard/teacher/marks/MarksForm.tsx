@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { GradeLevel, getGradeForPercentage, getGradeColor } from '@/utils/grading'
 
 interface Student {
   id: string
@@ -26,7 +27,7 @@ export default function MarksForm({
   subjectId,
   assessmentType,
   term,
-  gradingScale,
+  gradingLevels,
   saveAction
 }: {
   students: Student[]
@@ -36,7 +37,7 @@ export default function MarksForm({
   subjectId: string
   assessmentType: string
   term: string
-  gradingScale: { A: number; B: number; C: number; D: number }
+  gradingLevels: GradeLevel[]
   saveAction: (formData: FormData) => Promise<void>
 }) {
   // Initialize Out Of from existing marks if present
@@ -72,20 +73,7 @@ export default function MarksForm({
     if (isNaN(score) || score < 0 || isOutOfInvalid || score > outOfVal) return '-'
     
     const percentage = (score / outOfVal) * 100
-    if (percentage >= gradingScale.A) return 'A'
-    if (percentage >= gradingScale.B) return 'B'
-    if (percentage >= gradingScale.C) return 'C'
-    if (percentage >= gradingScale.D) return 'D'
-    return 'F'
-  }
-
-  const getGradeColor = (grade: string) => {
-    if (grade === 'A') return 'var(--color-success)'
-    if (grade === 'B') return 'var(--color-secondary)'
-    if (grade === 'C') return 'var(--color-text)'
-    if (grade === 'D') return 'var(--color-warning)'
-    if (grade === 'F') return 'var(--color-error)'
-    return 'var(--color-text-muted)'
+    return getGradeForPercentage(percentage, gradingLevels)
   }
 
   const handleScoreChange = (studentId: string, val: string) => {
