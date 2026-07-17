@@ -178,10 +178,10 @@ export async function saveMarksAction(formData: FormData) {
 
 export async function getRandomGradeCommentAction(subjectId: string, grade: string) {
   const supabase = await createClient()
-  console.log('[ANTIGRAVITY-COMMENTS] getRandomGradeCommentAction called with:', { subjectId, grade })
+  console.log('[ANTIGRAVITY-GRADING] getRandomGradeCommentAction called with:', { subjectId, grade })
 
   if (!subjectId || !grade) {
-    console.error('[ANTIGRAVITY-COMMENTS] Missing subjectId or grade')
+    console.error('[ANTIGRAVITY-GRADING] Missing subjectId or grade')
     return { success: false, error: 'Missing subjectId or grade' }
   }
 
@@ -194,22 +194,22 @@ export async function getRandomGradeCommentAction(subjectId: string, grade: stri
       .limit(100)
 
     if (error) {
-      console.error('[ANTIGRAVITY-COMMENTS] Error fetching comments:', error)
+      console.error('[ANTIGRAVITY-GRADING] Error fetching comments:', error)
       return { success: false, error: error.message }
     }
 
     if (!data || data.length === 0) {
-      console.warn('[ANTIGRAVITY-COMMENTS] No comments found for:', { subjectId, grade })
+      console.warn('[ANTIGRAVITY-GRADING] No comments found for:', { subjectId, grade })
       return { success: true, comment: null }
     }
 
     const randomIndex = Math.floor(Math.random() * data.length)
     const selectedComment = data[randomIndex].comment
 
-    console.log('[ANTIGRAVITY-COMMENTS] Successfully returned random comment:', selectedComment)
+    console.log('[ANTIGRAVITY-GRADING] Successfully returned random comment for grade:', grade, 'comment:', selectedComment)
     return { success: true, comment: selectedComment }
   } catch (err) {
-    console.error('[ANTIGRAVITY-COMMENTS] Action caught error:', err)
+    console.error('[ANTIGRAVITY-GRADING] Action caught error:', err)
     const errorMsg = err instanceof Error ? err.message : String(err)
     return { success: false, error: errorMsg }
   }

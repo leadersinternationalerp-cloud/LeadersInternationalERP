@@ -204,11 +204,21 @@ export default async function ParentDashboardPage({
                 <tbody>
                   {childMarks.map((res) => {
                     const scoreVal = res.score
-                    let grade = 'F'
-                    if (scoreVal >= 80) grade = 'A'
-                    else if (scoreVal >= 70) grade = 'B'
-                    else if (scoreVal >= 60) grade = 'C'
-                    else if (scoreVal >= 50) grade = 'D'
+                    let grade = '-'
+                    if (res.grading_scale) {
+                      const match = res.grading_scale.match(/\(([^)]+)\)/)
+                      if (match) grade = match[1]
+                    }
+                    if (grade === '-') {
+                      if (scoreVal >= 90) grade = 'A*'
+                      else if (scoreVal >= 80) grade = 'A'
+                      else if (scoreVal >= 70) grade = 'B'
+                      else if (scoreVal >= 60) grade = 'C'
+                      else if (scoreVal >= 50) grade = 'D'
+                      else if (scoreVal >= 40) grade = 'E'
+                      else if (scoreVal >= 30) grade = 'F'
+                      else grade = 'G'
+                    }
 
                     return (
                       <tr key={res.id} style={{ borderBottom: '1px solid var(--color-border)' }}>

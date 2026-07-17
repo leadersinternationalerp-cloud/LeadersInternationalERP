@@ -1,5 +1,5 @@
 export interface GradeLevel {
-  grade: string   // e.g. 'A*', 'A', ..., 'F'
+  grade: string   // e.g. 'A*', 'A', ..., 'G'
   min: number     // minimum percentage, inclusive
   max: number     // maximum percentage, inclusive
 }
@@ -11,7 +11,8 @@ export const DEFAULT_GRADING_LEVELS: GradeLevel[] = [
   { grade: 'C', min: 60, max: 70 },
   { grade: 'D', min: 50, max: 60 },
   { grade: 'E', min: 40, max: 50 },
-  { grade: 'F', min: 0, max: 40 },
+  { grade: 'F', min: 30, max: 40 },
+  { grade: 'G', min: 0, max: 30 },
 ];
 
 export function parseGradingLevels(value: unknown): GradeLevel[] {
@@ -47,6 +48,7 @@ export function parseGradingLevels(value: unknown): GradeLevel[] {
       const valD = Number(d ?? 50);
 
       const minE = Math.max(0, valD - 10);
+      const minF = Math.max(0, minE - 10);
 
       return [
         { grade: 'A', min: valA, max: 100 },
@@ -54,7 +56,8 @@ export function parseGradingLevels(value: unknown): GradeLevel[] {
         { grade: 'C', min: valC, max: valB },
         { grade: 'D', min: valD, max: valC },
         { grade: 'E', min: minE, max: valD },
-        { grade: 'F', min: 0, max: minE },
+        { grade: 'F', min: minF, max: minE },
+        { grade: 'G', min: 0, max: minF },
       ];
     }
   }
@@ -101,7 +104,7 @@ export function getGradeColor(grade: string | null | undefined): string {
   if (normalized === 'D' || normalized === 'E') {
     return 'var(--color-warning)';
   }
-  if (normalized === 'F') {
+  if (normalized === 'F' || normalized === 'G') {
     return 'var(--color-error)';
   }
   return 'var(--color-text-muted)';

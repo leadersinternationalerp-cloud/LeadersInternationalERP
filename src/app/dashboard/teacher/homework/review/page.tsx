@@ -172,11 +172,14 @@ export default async function TeacherHomeworkReviewPage({
                       <div className="form-group">
                         <label className="form-label" style={{ fontSize: '0.8rem' }}>Grade</label>
                         <select name="grade" className="input-field" required>
-                          <option value="A">A (Excellent)</option>
-                          <option value="B">B (Very Good)</option>
-                          <option value="C">C (Good)</option>
+                          <option value="A*">A* (Excellent)</option>
+                          <option value="A">A (Very Good)</option>
+                          <option value="B">B (Good)</option>
+                          <option value="C">C (Satisfactory)</option>
                           <option value="D">D (Pass)</option>
-                          <option value="F">F (Fail)</option>
+                          <option value="E">E (Developing)</option>
+                          <option value="F">F (Needs Support)</option>
+                          <option value="G">G (Fail)</option>
                         </select>
                       </div>
 
