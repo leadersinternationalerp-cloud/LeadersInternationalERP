@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { GradeLevel, getGradeForPercentage, getGradeColor } from '@/utils/grading'
 
 interface Student {
@@ -54,14 +54,16 @@ export default function MarksForm({
   })
 
   // Initialize state
-  const initialScores: Record<string, string> = {}
-  const initialRemarks: Record<string, string> = {}
-
-  students.forEach(s => {
-    const existing = existingMarks.find(m => m.student_id === s.id)
-    initialScores[s.id] = existing ? existing.score.toString() : ''
-    initialRemarks[s.id] = existing ? existing.remarks : ''
-  })
+  const { initialScores, initialRemarks } = useMemo(() => {
+    const scoresObj: Record<string, string> = {}
+    const remarksObj: Record<string, string> = {}
+    students.forEach(s => {
+      const existing = existingMarks.find(m => m.student_id === s.id)
+      scoresObj[s.id] = existing ? existing.score.toString() : ''
+      remarksObj[s.id] = existing ? existing.remarks : ''
+    })
+    return { initialScores: scoresObj, initialRemarks: remarksObj }
+  }, [students, existingMarks])
 
   const [scores, setScores] = useState<Record<string, string>>(initialScores)
   const [remarks, setRemarks] = useState<Record<string, string>>(initialRemarks)
@@ -69,6 +71,17 @@ export default function MarksForm({
 
   const outOfVal = parseFloat(outOf)
   const isOutOfInvalid = isNaN(outOfVal) || outOfVal <= 0
+
+  const isDirty = useMemo(() => {
+    const scoreChanged = Object.keys(scores).some(id => scores[id] !== (initialScores[id] || ''))
+    if (scoreChanged) return true
+    const remarkChanged = Object.keys(remarks).some(id => remarks[id] !== (initialRemarks[id] || ''))
+    if (remarkChanged) return true
+    return false
+  }, [scores, remarks, initialScores, initialRemarks])
+
+  const hasDrafts = existingMarks.length > 0 && !isReleased
+  const buttonLabel = isDirty || !hasDrafts ? 'Save Draft' : 'Publish Marks'
 
   // Live Grading Calculator based on dynamic settings
   const getGrade = (scoreStr: string) => {
@@ -94,10 +107,10 @@ export default function MarksForm({
     setRemarks(prev => ({ ...prev, [studentId]: val }))
   }
 
-  const handleSubmit = async (e: React.FormEvent, lock: boolean) => {
+  const handleSubmit = async (e: React.FormEvent, publish: boolean) => {
     e.preventDefault()
     if (isOutOfInvalid) {
-      alert('Please enter a valid "Out Of" value greater than 0 before saving.')
+      alert('Please enter a valid &quot;Out Of&quot; value greater than 0 before saving.')
       return
     }
 
@@ -108,7 +121,7 @@ export default function MarksForm({
     formData.append('subjectId', subjectId)
     formData.append('assessmentType', assessmentType)
     formData.append('term', term)
-    formData.append('lock', lock ? 'true' : 'false')
+    formData.append('publish', publish ? 'true' : 'false')
 
     let hasInvalidScore = false
 
@@ -132,7 +145,7 @@ export default function MarksForm({
 
     try {
       await saveAction(formData)
-      alert(lock ? 'Marks submitted & locked successfully!' : 'Draft marks saved successfully.')
+      alert(publish ? 'Marks published successfully!' : 'Draft marks saved successfully.')
     } catch (err) {
       console.error(err)
     } finally {
@@ -269,20 +282,11 @@ export default function MarksForm({
           <button
             type="button"
             disabled={saving || isOutOfInvalid}
-            onClick={(e) => handleSubmit(e, false)}
-            className="btn"
-            style={{ padding: '0.6rem 2rem', background: 'transparent', border: '1px solid var(--color-border)', cursor: isOutOfInvalid ? 'not-allowed' : 'pointer' }}
-          >
-            Save Draft Grades
-          </button>
-          <button
-            type="button"
-            disabled={saving || isOutOfInvalid}
-            onClick={(e) => handleSubmit(e, true)}
+            onClick={(e) => handleSubmit(e, !(isDirty || !hasDrafts))}
             className="btn btn-primary"
             style={{ padding: '0.6rem 2.5rem', cursor: isOutOfInvalid ? 'not-allowed' : 'pointer' }}
           >
-            {saving ? 'Saving...' : 'Submit & Lock Marks Sheet'}
+            {saving ? 'Saving...' : buttonLabel}
           </button>
         </div>
       )}

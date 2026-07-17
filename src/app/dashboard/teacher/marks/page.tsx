@@ -191,7 +191,7 @@ export default async function TeacherMarksPage({
     const subjectId = formData.get('subjectId') as string
     const assessmentType = formData.get('assessmentType') as string
     const term = formData.get('term') as string
-    const lock = formData.get('lock') === 'true'
+    const publish = formData.get('publish') === 'true'
 
     if (!classId || !subjectId) return
 
@@ -270,7 +270,6 @@ export default async function TeacherMarksPage({
         const gradingScale = formData.get(`grade_${studentId}`) as string
 
         if (!isNaN(score)) {
-          const wasReleased = releasedMap.get(studentId) || false
           updates.push({
             student_id: studentId,
             class_id: classId,
@@ -282,8 +281,8 @@ export default async function TeacherMarksPage({
             remarks: remarks || '',
             grading_scale: gradingScale || 'Standard',
             graded_by: user?.id,
-            is_locked: lock,
-            is_released: wasReleased
+            is_locked: publish,
+            is_released: publish
           })
         }
       }
