@@ -120,13 +120,25 @@ export async function GET(request: Request) {
     }
 
     const topics = (units || []).flatMap((unit: any) =>
-      (unit.topics || []).map((topic: any) => ({
-        id: topic.id,
-        topicNumber: topic.topic_number,
-        topicTitle: topic.topic_title,
-        unitTitle: unit.unit_title,
-        objectives: (topic.objectives || []).map((o: any) => o.objective_text || '')
-      }))
+      (unit.topics || []).map((topic: any) => {
+        let objectives = (topic.objectives || []).map((o: any) => o.objective_text || '')
+        if (!objectives.length) {
+          const matchingLocal = localTopics.find(
+            (lt) => normalizeKey(lt.topicTitle) === normalizeKey(topic.topic_title)
+              || normalizeKey(lt.topicNumber) === normalizeKey(topic.topic_number)
+          )
+          if (matchingLocal) {
+            objectives = matchingLocal.objectives
+          }
+        }
+        return {
+          id: topic.id,
+          topicNumber: topic.topic_number,
+          topicTitle: topic.topic_title,
+          unitTitle: unit.unit_title,
+          objectives
+        }
+      })
     )
 
     // If the DB has no topics for this subject/stage yet, fall back to the local schemes JSON.
