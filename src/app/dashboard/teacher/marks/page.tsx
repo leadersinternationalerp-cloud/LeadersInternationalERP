@@ -191,6 +191,7 @@ export default async function TeacherMarksPage({
     const term = formData.get('term') as string
     const mode = formData.get('mode') as 'draft' | 'publish'
     const shouldPublish = mode === 'publish'
+    console.log('[ANTIGRAVITY-MARKS] handleSaveMarks called', { classId, subjectId, assessmentType, term, mode, scoreCount: Array.from(formData.keys()).filter(k => k.startsWith('score_')).length });
 
     if (!classId || !subjectId) return
 
@@ -281,6 +282,9 @@ export default async function TeacherMarksPage({
       }
     })
 
+    const errors: string[] = []
+    let savedCount = 0
+
     // Upsert records
     for (const update of updates) {
       const { data: existing } = await supabase
@@ -302,12 +306,26 @@ export default async function TeacherMarksPage({
 
       const { error } = await supabase
         .from('marks')
-        .upsert(update, { onConflict: 'student_id,class_id,subject_id,assessment_type,term' })
+        .upsert(update, {
+          onConflict: 'student_id,class_id,subject_id,assessment_type,term',
+          ignoreDuplicates: false
+        })
 
       if (error) {
-        console.error('Error saving mark record:', error.message)
-        throw new Error(`Failed to save mark: ${error.message}`)
+        console.error(`[ANTIGRAVITY-MARKS] Upsert FAILED for student_id=${update.student_id}:`, {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        errors.push(`${update.student_id}: ${error.message}`);
+      } else {
+        savedCount++;
       }
+    }
+
+    if (errors.length > 0) {
+      throw new Error(`Failed to save ${errors.length} mark(s):\n${errors.join('\n')}`)
     }
 
     revalidatePath('/dashboard/teacher/marks')

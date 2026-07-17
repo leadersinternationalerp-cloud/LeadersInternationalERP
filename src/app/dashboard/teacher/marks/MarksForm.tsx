@@ -140,13 +140,15 @@ export default function MarksForm({
     }
 
     try {
-      await saveAction(formData)
-      alert(mode === 'publish' ? 'Marks published successfully!' : 'Draft marks saved successfully.')
-      router.refresh()
-    } catch (err) {
-      console.error(err)
+      await saveAction(formData);
+      alert(mode === 'publish' ? 'Marks published successfully!' : 'Draft marks saved successfully.');
+      router.refresh();
+    } catch (err: any) {
+      console.error('[ANTIGRAVITY-MARKS] saveAction threw:', err);
+      const msg = err?.message || err?.toString() || 'Unknown server error';
+      alert(`FAILED TO SAVE MARKS:\n${msg}\n\nCheck browser console for [ANTIGRAVITY-MARKS] logs.`);
     } finally {
-      setSavingMode(null)
+      setSavingMode(null);
     }
   }
 
