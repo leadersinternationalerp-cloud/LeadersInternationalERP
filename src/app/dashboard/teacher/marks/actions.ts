@@ -100,6 +100,7 @@ export async function saveMarksAction(formData: FormData) {
         const gradingScale = formData.get(`grade_${studentId}`) as string
 
         if (!isNaN(score)) {
+          console.log(`[ANTIGRAVITY-COMMENTS] Preparing mark update for student_id=${studentId}: remarks="${remarksVal || ''}"`)
           updates.push({
             student_id: studentId,
             class_id: classId,
@@ -170,6 +171,45 @@ export async function saveMarksAction(formData: FormData) {
     return { success: true, savedCount }
   } catch (err) {
     console.error('[ANTIGRAVITY-MARKS] Action caught error:', err)
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    return { success: false, error: errorMsg }
+  }
+}
+
+export async function getRandomGradeCommentAction(subjectId: string, grade: string) {
+  const supabase = await createClient()
+  console.log('[ANTIGRAVITY-COMMENTS] getRandomGradeCommentAction called with:', { subjectId, grade })
+
+  if (!subjectId || !grade) {
+    console.error('[ANTIGRAVITY-COMMENTS] Missing subjectId or grade')
+    return { success: false, error: 'Missing subjectId or grade' }
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('subject_grade_comments')
+      .select('comment')
+      .eq('subject_id', subjectId)
+      .eq('grade', grade)
+      .limit(100)
+
+    if (error) {
+      console.error('[ANTIGRAVITY-COMMENTS] Error fetching comments:', error)
+      return { success: false, error: error.message }
+    }
+
+    if (!data || data.length === 0) {
+      console.warn('[ANTIGRAVITY-COMMENTS] No comments found for:', { subjectId, grade })
+      return { success: true, comment: null }
+    }
+
+    const randomIndex = Math.floor(Math.random() * data.length)
+    const selectedComment = data[randomIndex].comment
+
+    console.log('[ANTIGRAVITY-COMMENTS] Successfully returned random comment:', selectedComment)
+    return { success: true, comment: selectedComment }
+  } catch (err) {
+    console.error('[ANTIGRAVITY-COMMENTS] Action caught error:', err)
     const errorMsg = err instanceof Error ? err.message : String(err)
     return { success: false, error: errorMsg }
   }

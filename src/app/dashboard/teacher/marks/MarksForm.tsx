@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { GradeLevel, getGradeForPercentage, getGradeColor } from '@/utils/grading'
+import { getRandomGradeCommentAction } from './actions'
 
 interface Student {
   id: string
@@ -70,6 +71,36 @@ export default function MarksForm({
   const [scores, setScores] = useState<Record<string, string>>(initialScores)
   const [remarks, setRemarks] = useState<Record<string, string>>(initialRemarks)
   const [savingMode, setSavingMode] = useState<'draft' | 'publish' | null>(null)
+  const [loadingComments, setLoadingComments] = useState<Record<string, boolean>>({})
+
+  const handleSuggestComment = async (studentId: string, currentGrade: string) => {
+    if (currentGrade === '-') {
+      alert('Please enter a valid score first to determine the grade.')
+      return
+    }
+
+    console.log(`[ANTIGRAVITY-COMMENTS] Requesting suggestion. studentId=${studentId}, grade=${currentGrade}, subjectId=${subjectId}`)
+    
+    setLoadingComments(prev => ({ ...prev, [studentId]: true }))
+    try {
+      const result = await getRandomGradeCommentAction(subjectId, currentGrade)
+      console.log('[ANTIGRAVITY-COMMENTS] Suggestion result:', result)
+
+      if (result.success && result.comment) {
+        handleRemarksChange(studentId, result.comment)
+        console.log(`[ANTIGRAVITY-COMMENTS] Successfully set suggested remark for studentId=${studentId}`)
+      } else {
+        const errMsg = result.error || 'No suggestions found'
+        console.error('[ANTIGRAVITY-COMMENTS] Failed to get comment:', errMsg)
+        alert(`Failed to get suggestion: ${errMsg}`)
+      }
+    } catch (err) {
+      console.error('[ANTIGRAVITY-COMMENTS] Error in handleSuggestComment:', err)
+      alert('An error occurred while fetching suggestion.')
+    } finally {
+      setLoadingComments(prev => ({ ...prev, [studentId]: false }))
+    }
+  }
  
   const outOfVal = parseFloat(outOf)
   const isOutOfInvalid = isNaN(outOfVal) || outOfVal <= 0
@@ -267,15 +298,48 @@ export default function MarksForm({
                     </strong>
                   </td>
                   <td style={{ padding: '1rem' }}>
-                    <input
-                      type="text"
-                      value={remarks[stud.id]}
-                      disabled={isReadOnly || isSaving}
-                      onChange={(e) => handleRemarksChange(stud.id, e.target.value)}
-                      placeholder="e.g. Very active student"
-                      className="input-field"
-                      style={{ padding: '0.4rem' }}
-                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="text"
+                        value={remarks[stud.id]}
+                        disabled={isReadOnly || isSaving}
+                        onChange={(e) => handleRemarksChange(stud.id, e.target.value)}
+                        placeholder="e.g. Very active student"
+                        className="input-field"
+                        style={{ padding: '0.4rem', flex: 1 }}
+                      />
+                      {!isReadOnly && (
+                        <button
+                          type="button"
+                          disabled={isSaving || loadingComments[stud.id]}
+                          onClick={() => handleSuggestComment(stud.id, currentGrade)}
+                          title="Suggest Comment"
+                          style={{
+                            padding: '0.3rem 0.6rem',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: 'var(--radius-sm)',
+                            backgroundColor: '#fff',
+                            cursor: 'pointer',
+                            fontSize: '1rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s',
+                            opacity: loadingComments[stud.id] ? 0.5 : 1
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.borderColor = 'var(--color-primary)'
+                            e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.05)'
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.borderColor = 'var(--color-border)'
+                            e.currentTarget.style.backgroundColor = '#fff'
+                          }}
+                        >
+                          {loadingComments[stud.id] ? '⏳' : '✦'}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               )
