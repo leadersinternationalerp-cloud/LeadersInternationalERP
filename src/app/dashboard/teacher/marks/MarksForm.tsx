@@ -72,6 +72,7 @@ export default function MarksForm({
   const [remarks, setRemarks] = useState<Record<string, string>>(initialRemarks)
   const [savingMode, setSavingMode] = useState<'draft' | 'publish' | null>(null)
   const [loadingComments, setLoadingComments] = useState<Record<string, boolean>>({})
+  const [suggestedRemarks, setSuggestedRemarks] = useState<Record<string, string>>({})
 
   const handleSuggestComment = async (studentId: string, targetGrade: string) => {
     if (targetGrade === '-') {
@@ -93,6 +94,7 @@ export default function MarksForm({
           
           if (currentGrade === targetGrade) {
             handleRemarksChange(studentId, result.comment!)
+            setSuggestedRemarks(prev => ({ ...prev, [studentId]: result.comment! }))
             console.log(`[ANTIGRAVITY-COMMENTS] Automatically set/suggested remark for studentId=${studentId}`)
           } else {
             console.log(`[ANTIGRAVITY-COMMENTS] Ignored suggestion for studentId=${studentId} because grade changed from "${targetGrade}" to "${currentGrade}"`)
@@ -133,12 +135,22 @@ export default function MarksForm({
     if (val === '' || /^\d*\.?\d*$/.test(val)) {
       const num = parseFloat(val)
       if (isNaN(num) || num <= outOfVal) {
+        const prevScore = scores[studentId] || ''
+        const prevGrade = getGrade(prevScore)
+
         setScores(prev => ({ ...prev, [studentId]: val }))
         
-        // Trigger automatic suggestion if the field is empty and grade is valid
         const currentGrade = getGrade(val)
-        if (currentGrade !== '-' && (!remarks[studentId] || remarks[studentId].trim() === '')) {
-          handleSuggestComment(studentId, currentGrade)
+        
+        // Trigger automatic suggestion if the grade changed and remark is unmodified/empty
+        if (currentGrade !== '-' && currentGrade !== prevGrade) {
+          const isRemarkUnmodified = !remarks[studentId] || 
+                                     remarks[studentId].trim() === '' || 
+                                     remarks[studentId] === suggestedRemarks[studentId]
+                                     
+          if (isRemarkUnmodified) {
+            handleSuggestComment(studentId, currentGrade)
+          }
         }
       }
     }
