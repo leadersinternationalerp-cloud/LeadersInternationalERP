@@ -70,6 +70,13 @@ export default async function ParentAcademicReportsPage({
     .eq('is_released', true)
     .order('created_at', { ascending: false })
 
+  // Fetch grading scale
+  const { data: settingData } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', 'grading_scale')
+    .maybeSingle()
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
@@ -112,7 +119,7 @@ export default async function ParentAcademicReportsPage({
         </h3>
       </div>
 
-      <ResultsClient marks={(marks as unknown as MarkRecord[]) || []} />
+      <ResultsClient marks={(marks as unknown as MarkRecord[]) || []} initialGradingScale={settingData?.value} />
     </div>
   )
 }

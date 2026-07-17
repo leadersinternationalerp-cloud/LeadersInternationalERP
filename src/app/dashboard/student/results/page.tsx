@@ -39,6 +39,13 @@ export default async function StudentResultsPage() {
     .eq('is_released', true)
     .order('created_at', { ascending: false })
 
+  // Fetch grading scale
+  const { data: settingData } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', 'grading_scale')
+    .maybeSingle()
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div>
@@ -49,8 +56,8 @@ export default async function StudentResultsPage() {
           View your official academic performance across all terms.
         </p>
       </div>
-
-      <ResultsClient marks={(marks as unknown as MarkRecord[]) || []} />
+ 
+      <ResultsClient marks={(marks as unknown as MarkRecord[]) || []} initialGradingScale={settingData?.value} />
     </div>
   )
 }

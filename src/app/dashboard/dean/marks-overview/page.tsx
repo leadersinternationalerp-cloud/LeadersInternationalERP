@@ -45,6 +45,13 @@ export default async function DeanMarksOverviewPage() {
     console.error('Error fetching marks:', error)
   }
 
+  // Fetch system settings for grading scale
+  const { data: settingData } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', 'grading_scale')
+    .maybeSingle()
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div>
@@ -56,7 +63,7 @@ export default async function DeanMarksOverviewPage() {
         </p>
       </div>
 
-      <DeanMarksClient marks={(marksData as any[]) || []} />
+      <DeanMarksClient marks={(marksData as any[]) || []} initialGradingScale={settingData?.value} />
     </div>
   )
 }

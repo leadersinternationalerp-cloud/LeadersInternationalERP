@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import PDFDocument from 'pdfkit'
+import { parseGradingLevels, getGradeForPercentage } from '@/utils/grading'
 
 
 export async function GET(request: Request) {
@@ -64,6 +65,15 @@ export async function GET(request: Request) {
     .eq('student_id', student_id)
     .eq('term', termName)
 
+  // Fetch grading scale from system_settings
+  const { data: settingData } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', 'grading_scale')
+    .maybeSingle()
+
+  const gradingLevels = parseGradingLevels(settingData?.value)
+
   // Fetch Grade Boundaries (assuming standard framework)
   const { data: boundaries } = await supabase
     .from('grade_boundaries')
@@ -72,6 +82,9 @@ export async function GET(request: Request) {
     .order('min_score', { ascending: false })
 
   const getGrade = (score: number) => {
+    if (settingData?.value) {
+      return getGradeForPercentage(score, gradingLevels)
+    }
     if (!boundaries || boundaries.length === 0) return 'N/A'
     for (const b of boundaries) {
       if (score >= b.min_score) return b.grade_label

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
+import { parseGradingLevels, getGradeForPercentage, getGradeColor } from '@/utils/grading'
 
 export interface MarkRecord {
   id: string
@@ -11,7 +12,14 @@ export interface MarkRecord {
   subjects?: { name: string }
 }
 
-export default function ResultsClient({ marks }: { marks: MarkRecord[] }) {
+export default function ResultsClient({
+  marks,
+  initialGradingScale
+}: {
+  marks: MarkRecord[]
+  initialGradingScale?: any
+}) {
+  const gradingLevels = parseGradingLevels(initialGradingScale)
   // Group by term
   const terms = useMemo(() => {
     const t = new Set<string>()
@@ -24,11 +32,7 @@ export default function ResultsClient({ marks }: { marks: MarkRecord[] }) {
   const termMarks = marks.filter(m => m.term === activeTerm)
 
   const getGrade = (score: number) => {
-    if (score >= 80) return 'A'
-    if (score >= 70) return 'B'
-    if (score >= 60) return 'C'
-    if (score >= 50) return 'D'
-    return 'F'
+    return getGradeForPercentage(score, gradingLevels)
   }
 
   const overallAvg = termMarks.length > 0 
@@ -110,8 +114,9 @@ export default function ResultsClient({ marks }: { marks: MarkRecord[] }) {
                   <td style={{ padding: '1rem' }}>
                     <span style={{
                       padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600,
-                      backgroundColor: grade === 'A' ? 'rgba(16, 185, 129, 0.1)' : grade === 'F' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(0,0,0,0.05)',
-                      color: grade === 'A' ? 'var(--color-success)' : grade === 'F' ? 'var(--color-error)' : 'var(--color-text)'
+                      backgroundColor: 'rgba(0,0,0,0.03)',
+                      color: getGradeColor(grade),
+                      border: `1px solid ${getGradeColor(grade)}`
                     }}>
                       {grade}
                     </span>

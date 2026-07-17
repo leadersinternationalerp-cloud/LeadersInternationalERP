@@ -44,6 +44,13 @@ export default async function HOSMarksPage() {
     console.error('Error fetching marks:', error)
   }
 
+  // Fetch system settings for grading scale
+  const { data: settingData } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', 'grading_scale')
+    .maybeSingle()
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div>
@@ -55,7 +62,7 @@ export default async function HOSMarksPage() {
         </p>
       </div>
 
-      <HOSMarksClient marks={(marksData as any[]) || []} />
+      <HOSMarksClient marks={(marksData as any[]) || []} initialGradingScale={settingData?.value} />
     </div>
   )
 }
