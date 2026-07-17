@@ -73,30 +73,38 @@ export default function MarksForm({
   const [savingMode, setSavingMode] = useState<'draft' | 'publish' | null>(null)
   const [loadingComments, setLoadingComments] = useState<Record<string, boolean>>({})
 
-  const handleSuggestComment = async (studentId: string, currentGrade: string) => {
-    if (currentGrade === '-') {
-      alert('Please enter a valid score first to determine the grade.')
+  const handleSuggestComment = async (studentId: string, targetGrade: string) => {
+    if (targetGrade === '-') {
       return
     }
 
-    console.log(`[ANTIGRAVITY-COMMENTS] Requesting suggestion. studentId=${studentId}, grade=${currentGrade}, subjectId=${subjectId}`)
+    console.log(`[ANTIGRAVITY-COMMENTS] Requesting suggestion. studentId=${studentId}, grade=${targetGrade}, subjectId=${subjectId}`)
     
     setLoadingComments(prev => ({ ...prev, [studentId]: true }))
     try {
-      const result = await getRandomGradeCommentAction(subjectId, currentGrade)
+      const result = await getRandomGradeCommentAction(subjectId, targetGrade)
       console.log('[ANTIGRAVITY-COMMENTS] Suggestion result:', result)
 
       if (result.success && result.comment) {
-        handleRemarksChange(studentId, result.comment)
-        console.log(`[ANTIGRAVITY-COMMENTS] Successfully set suggested remark for studentId=${studentId}`)
+        // Race condition guard: verify current grade matches targetGrade
+        setScores(currentScores => {
+          const currentScore = currentScores[studentId] || ''
+          const currentGrade = getGrade(currentScore)
+          
+          if (currentGrade === targetGrade) {
+            handleRemarksChange(studentId, result.comment!)
+            console.log(`[ANTIGRAVITY-COMMENTS] Automatically set/suggested remark for studentId=${studentId}`)
+          } else {
+            console.log(`[ANTIGRAVITY-COMMENTS] Ignored suggestion for studentId=${studentId} because grade changed from "${targetGrade}" to "${currentGrade}"`)
+          }
+          return currentScores
+        })
       } else {
         const errMsg = result.error || 'No suggestions found'
         console.error('[ANTIGRAVITY-COMMENTS] Failed to get comment:', errMsg)
-        alert(`Failed to get suggestion: ${errMsg}`)
       }
     } catch (err) {
       console.error('[ANTIGRAVITY-COMMENTS] Error in handleSuggestComment:', err)
-      alert('An error occurred while fetching suggestion.')
     } finally {
       setLoadingComments(prev => ({ ...prev, [studentId]: false }))
     }
@@ -126,6 +134,12 @@ export default function MarksForm({
       const num = parseFloat(val)
       if (isNaN(num) || num <= outOfVal) {
         setScores(prev => ({ ...prev, [studentId]: val }))
+        
+        // Trigger automatic suggestion if the field is empty and grade is valid
+        const currentGrade = getGrade(val)
+        if (currentGrade !== '-' && (!remarks[studentId] || remarks[studentId].trim() === '')) {
+          handleSuggestComment(studentId, currentGrade)
+        }
       }
     }
   }
