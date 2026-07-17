@@ -41,7 +41,7 @@ export default function MarksForm({
   assessmentType: string
   term: string
   gradingLevels: GradeLevel[]
-  saveAction: (formData: FormData) => Promise<void>
+  saveAction: (formData: FormData) => Promise<{ success: boolean; error?: string; savedCount?: number }>
 }) {
   const router = useRouter()
   const isReadOnly = isLocked || isReleased
@@ -140,15 +140,23 @@ export default function MarksForm({
     }
 
     try {
-      await saveAction(formData);
-      alert(mode === 'publish' ? 'Marks published successfully!' : 'Draft marks saved successfully.');
-      router.refresh();
+      const result = await saveAction(formData)
+      
+      console.log('[ANTIGRAVITY-MARKS] saveAction result:', result)
+
+      if (result && typeof result === 'object' && result.success === false) {
+        const errMsg = result.error || 'Unknown server error'
+        alert(`FAILED TO SAVE MARKS:\n\n${errMsg}\n\nOpen DevTools Console, filter for [ANTIGRAVITY-MARKS], and paste the logs here.`)
+      } else {
+        alert(mode === 'publish' ? 'Marks published successfully!' : 'Draft marks saved successfully.')
+        router.refresh()
+      }
     } catch (err: any) {
-      console.error('[ANTIGRAVITY-MARKS] saveAction threw:', err);
-      const msg = err?.message || err?.toString() || 'Unknown server error';
-      alert(`FAILED TO SAVE MARKS:\n${msg}\n\nCheck browser console for [ANTIGRAVITY-MARKS] logs.`);
+      console.error('[ANTIGRAVITY-MARKS] saveAction threw:', err)
+      const digest = err?.digest || (err?.message?.match(/digest[:=]\s*([a-z0-9-]+)/i)?.[1] || '')
+      alert(`FAILED TO SAVE MARKS:\n${err?.message || err}${digest ? '\nDigest: ' + digest : ''}\n\nPaste ALL [ANTIGRAVITY-MARKS] console output.`)
     } finally {
-      setSavingMode(null);
+      setSavingMode(null)
     }
   }
 
