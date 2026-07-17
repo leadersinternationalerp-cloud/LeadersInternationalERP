@@ -145,7 +145,6 @@ export default async function TeacherMarksPage({
 
   // Fetch students in selected class
   let classStudents: StudentRecord[] = []
-  let isLocked = false
   let existingMarks: MarkRecord[] = []
 
   if (selectedClassId) {
@@ -171,7 +170,6 @@ export default async function TeacherMarksPage({
       .eq('term', selectedTerm)
 
     existingMarks = (marksLogs as unknown as MarkRecord[]) || []
-    isLocked = existingMarks.some(m => m.is_locked === true || m.is_released === true)
   }
 
   const cleanAllocations = allocations.map(alloc => {
@@ -191,7 +189,8 @@ export default async function TeacherMarksPage({
     const subjectId = formData.get('subjectId') as string
     const assessmentType = formData.get('assessmentType') as string
     const term = formData.get('term') as string
-    const publish = formData.get('publish') === 'true'
+    const mode = formData.get('mode') as 'draft' | 'publish'
+    const shouldPublish = mode === 'publish'
 
     if (!classId || !subjectId) return
 
@@ -238,12 +237,6 @@ export default async function TeacherMarksPage({
       throw new Error('Forbidden: Marks are already submitted/locked or published and cannot be modified.')
     }
 
-    // Map student to their released status to preserve it
-    const releasedMap = new Map<string, boolean>()
-    existingMarks?.forEach(m => {
-      releasedMap.set(m.student_id, m.is_released || false)
-    })
-
     interface MarkUpdate {
       id?: string
       student_id: string
@@ -281,8 +274,8 @@ export default async function TeacherMarksPage({
             remarks: remarks || '',
             grading_scale: gradingScale || 'Standard',
             graded_by: user?.id,
-            is_locked: publish,
-            is_released: publish
+            is_locked: false,
+            is_released: false
           })
         }
       }
@@ -292,7 +285,7 @@ export default async function TeacherMarksPage({
     for (const update of updates) {
       const { data: existing } = await supabase
         .from('marks')
-        .select('id')
+        .select('id, is_released')
         .eq('student_id', update.student_id)
         .eq('class_id', update.class_id)
         .eq('subject_id', update.subject_id)
@@ -303,6 +296,9 @@ export default async function TeacherMarksPage({
       if (existing) {
         update.id = existing.id
       }
+
+      update.is_locked = shouldPublish
+      update.is_released = shouldPublish ? true : (existing?.is_released ?? false)
 
       const { error } = await supabase
         .from('marks')
@@ -342,7 +338,7 @@ export default async function TeacherMarksPage({
           key={`${selectedClassId}_${selectedSubjectId}_${selectedAssessmentType}_${selectedTerm}`}
           students={classStudents}
           existingMarks={existingMarks}
-          isLocked={isLocked}
+          isLocked={existingMarks.some(m => m.is_locked === true)}
           isReleased={existingMarks.some(m => m.is_released === true)}
           classId={selectedClassId}
           subjectId={selectedSubjectId}

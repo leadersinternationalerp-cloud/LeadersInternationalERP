@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { GradeLevel, getGradeForPercentage, getGradeColor } from '@/utils/grading'
 
 interface Student {
@@ -42,6 +43,7 @@ export default function MarksForm({
   gradingLevels: GradeLevel[]
   saveAction: (formData: FormData) => Promise<void>
 }) {
+  const router = useRouter()
   const isReadOnly = isLocked || isReleased
   // Initialize Out Of from existing marks if present
   const [outOf, setOutOf] = useState<string>(() => {
@@ -67,21 +69,15 @@ export default function MarksForm({
 
   const [scores, setScores] = useState<Record<string, string>>(initialScores)
   const [remarks, setRemarks] = useState<Record<string, string>>(initialRemarks)
-  const [saving, setSaving] = useState(false)
-
+  const [savingMode, setSavingMode] = useState<'draft' | 'publish' | null>(null)
+ 
   const outOfVal = parseFloat(outOf)
   const isOutOfInvalid = isNaN(outOfVal) || outOfVal <= 0
-
-  const isDirty = useMemo(() => {
-    const scoreChanged = Object.keys(scores).some(id => scores[id] !== (initialScores[id] || ''))
-    if (scoreChanged) return true
-    const remarkChanged = Object.keys(remarks).some(id => remarks[id] !== (initialRemarks[id] || ''))
-    if (remarkChanged) return true
-    return false
-  }, [scores, remarks, initialScores, initialRemarks])
-
-  const hasDrafts = existingMarks.length > 0 && !isReleased
-  const buttonLabel = isDirty || !hasDrafts ? 'Save Draft' : 'Publish Marks'
+ 
+  const hasDraftMarks = existingMarks.length > 0 && !isReleased && !isLocked
+  const buttonLabel = hasDraftMarks ? 'Publish Marks' : 'Save Draft Marks'
+  const isSaving = savingMode !== null
+  const loadingLabel = savingMode === 'publish' ? 'Publishing...' : 'Saving Draft...'
 
   // Live Grading Calculator based on dynamic settings
   const getGrade = (scoreStr: string) => {
@@ -107,21 +103,21 @@ export default function MarksForm({
     setRemarks(prev => ({ ...prev, [studentId]: val }))
   }
 
-  const handleSubmit = async (e: React.FormEvent, publish: boolean) => {
+  const handleSubmit = async (e: React.FormEvent, mode: 'draft' | 'publish') => {
     e.preventDefault()
     if (isOutOfInvalid) {
       alert('Please enter a valid &quot;Out Of&quot; value greater than 0 before saving.')
       return
     }
 
-    setSaving(true)
+    setSavingMode(mode)
 
     const formData = new FormData()
     formData.append('classId', classId)
     formData.append('subjectId', subjectId)
     formData.append('assessmentType', assessmentType)
     formData.append('term', term)
-    formData.append('publish', publish ? 'true' : 'false')
+    formData.append('mode', mode)
 
     let hasInvalidScore = false
 
@@ -139,17 +135,18 @@ export default function MarksForm({
 
     if (hasInvalidScore) {
       alert(`Some scores exceed the "Out Of" limit of ${outOf}. Please correct them.`)
-      setSaving(false)
+      setSavingMode(null)
       return
     }
 
     try {
       await saveAction(formData)
-      alert(publish ? 'Marks published successfully!' : 'Draft marks saved successfully.')
+      alert(mode === 'publish' ? 'Marks published successfully!' : 'Draft marks saved successfully.')
+      router.refresh()
     } catch (err) {
       console.error(err)
     } finally {
-      setSaving(false)
+      setSavingMode(null)
     }
   }
 
@@ -168,7 +165,7 @@ export default function MarksForm({
             type="number"
             min="1"
             value={outOf}
-            disabled={isReadOnly || saving}
+            disabled={isReadOnly || isSaving}
             onChange={(e) => {
               const val = e.target.value
               if (val === '' || (parseInt(val) > 0 && /^\d+$/.test(val))) {
@@ -244,7 +241,7 @@ export default function MarksForm({
                     <input
                       type="text"
                       value={currentScore}
-                      disabled={isReadOnly || saving || isOutOfInvalid}
+                      disabled={isReadOnly || isSaving || isOutOfInvalid}
                       onChange={(e) => handleScoreChange(stud.id, e.target.value)}
                       placeholder={isOutOfInvalid ? "Set Out Of" : `e.g. ${Math.min(outOfVal, 85)}`}
                       className="input-field"
@@ -263,7 +260,7 @@ export default function MarksForm({
                     <input
                       type="text"
                       value={remarks[stud.id]}
-                      disabled={isReadOnly || saving}
+                      disabled={isReadOnly || isSaving}
                       onChange={(e) => handleRemarksChange(stud.id, e.target.value)}
                       placeholder="e.g. Very active student"
                       className="input-field"
@@ -281,12 +278,12 @@ export default function MarksForm({
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
           <button
             type="button"
-            disabled={saving || isOutOfInvalid}
-            onClick={(e) => handleSubmit(e, !(isDirty || !hasDrafts))}
+            disabled={isSaving || isOutOfInvalid}
+            onClick={(e) => handleSubmit(e, hasDraftMarks ? 'publish' : 'draft')}
             className="btn btn-primary"
             style={{ padding: '0.6rem 2.5rem', cursor: isOutOfInvalid ? 'not-allowed' : 'pointer' }}
           >
-            {saving ? 'Saving...' : buttonLabel}
+            {isSaving ? loadingLabel : buttonLabel}
           </button>
         </div>
       )}
