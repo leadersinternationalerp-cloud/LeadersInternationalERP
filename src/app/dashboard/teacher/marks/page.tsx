@@ -291,7 +291,7 @@ export default async function TeacherMarksPage({
         .eq('subject_id', update.subject_id)
         .eq('assessment_type', update.assessment_type)
         .eq('term', update.term)
-        .single()
+        .maybeSingle()
 
       if (existing) {
         update.id = existing.id
@@ -302,10 +302,11 @@ export default async function TeacherMarksPage({
 
       const { error } = await supabase
         .from('marks')
-        .upsert(update)
+        .upsert(update, { onConflict: 'student_id,class_id,subject_id,assessment_type,term' })
 
       if (error) {
         console.error('Error saving mark record:', error.message)
+        throw new Error(`Failed to save mark: ${error.message}`)
       }
     }
 
