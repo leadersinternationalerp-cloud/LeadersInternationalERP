@@ -104,8 +104,11 @@ export function getGradeColor(grade: string | null | undefined): string {
   if (normalized === 'D' || normalized === 'E') {
     return 'var(--color-warning)';
   }
-  if (normalized === 'F' || normalized === 'G') {
-    return 'var(--color-error)';
+  if (normalized === 'F') {
+    return '#f87171'; // Softer red
+  }
+  if (normalized === 'G') {
+    return 'var(--color-error)'; // Sharp red
   }
   return 'var(--color-text-muted)';
 }
