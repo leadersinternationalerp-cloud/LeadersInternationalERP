@@ -8,6 +8,16 @@ export async function saveMarksAction(formData: FormData) {
   const classId = formData.get('classId') as string
   const subjectId = formData.get('subjectId') as string
   const assessmentType = formData.get('assessmentType') as string
+  const ALLOWED_ASSESSMENT_TYPES = ['Test 1', 'Test 2', 'Mid-Term', 'Terminal', 'CA'] as const;
+
+  if (!ALLOWED_ASSESSMENT_TYPES.includes(assessmentType as typeof ALLOWED_ASSESSMENT_TYPES[number])) {
+    return {
+      success: false,
+      error: `Invalid assessment_type: "${assessmentType}". Allowed values: ${ALLOWED_ASSESSMENT_TYPES.join(', ')}`
+    };
+  }
+
+  console.log('[ANTIGRAVITY-MARKS] assessment_type accepted:', assessmentType);
   const term = formData.get('term') as string
   const mode = formData.get('mode') as 'draft' | 'publish'
   const shouldPublish = mode === 'publish'
@@ -130,6 +140,7 @@ export async function saveMarksAction(formData: FormData) {
       update.is_locked = shouldPublish
       update.is_released = shouldPublish ? true : (existing?.is_released ?? false)
 
+      console.log('[ANTIGRAVITY-MARKS] upserting with assessment_type =', update.assessment_type);
       const { error } = await supabase
         .from('marks')
         .upsert(update, {
@@ -157,8 +168,9 @@ export async function saveMarksAction(formData: FormData) {
     console.log('[ANTIGRAVITY-MARKS] SUCCESSFULLY SAVED', savedCount, 'records')
     revalidatePath('/dashboard/teacher/marks')
     return { success: true, savedCount }
-  } catch (err: any) {
+  } catch (err) {
     console.error('[ANTIGRAVITY-MARKS] Action caught error:', err)
-    return { success: false, error: err?.message || err?.toString() || 'Internal action error' }
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    return { success: false, error: errorMsg }
   }
 }
