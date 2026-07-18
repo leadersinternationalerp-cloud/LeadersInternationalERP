@@ -13,6 +13,33 @@ export interface ReportSubjectMark {
   remarks: string
 }
 
+export interface AssessmentConfig {
+  type: string
+  weight: number
+  is_active?: boolean
+  display_order?: number
+}
+
+export function computeWeightedOverall(assessments: Record<string, number | null>, configs: AssessmentConfig[]): number {
+  if (!assessments || Object.keys(assessments).length === 0) return 0
+  const activeConfigs = (configs || []).filter(c => c.is_active !== false)
+  const totalWeight = activeConfigs.reduce((sum, c) => sum + Number(c.weight || 0), 0)
+  if (totalWeight <= 0) {
+    const keys = Object.keys(assessments)
+    const sum = keys.reduce((s, k) => s + (Number(assessments[k]) || 0), 0)
+    return sum / keys.length
+  }
+  let weightedSum = 0
+  activeConfigs.forEach(c => {
+    const key = Object.keys(assessments).find(k => k.toLowerCase() === c.type.toLowerCase())
+    const score = key !== undefined ? assessments[key] : null
+    if (score !== null && score !== undefined) {
+      weightedSum += score * Number(c.weight || 0)
+    }
+  });
+  return weightedSum / totalWeight
+}
+
 export interface ReportStudentInfo {
   id: string // Profile ID
   student_id: string // Admission No
@@ -39,7 +66,7 @@ export interface ReportCardOptions {
     class_name: string
     section?: string
   }
-  examTypes: { id: string; name: string; weight: number }[]
+  assessmentConfigs?: AssessmentConfig[]
   subjects: ReportSubjectMark[]
   gradingLevels: GradeLevel[]
   totalScore: number
@@ -47,6 +74,7 @@ export interface ReportCardOptions {
   overallGrade: string
   rank: number
   totalStudents: number
+  showRank?: boolean
   attendance?: {
     present: number
     total: number
@@ -142,15 +170,15 @@ export function getGradeColorHex(grade: string): string {
 // Helper to get default remark based on grade
 export function getDefaultRemark(grade: string): string {
   const g = grade.trim().toUpperCase()
-  if (g === 'A*') return 'Excellent performance across all learning areas.'
-  if (g === 'A') return 'Outstanding results. Keep maintaining this standard.'
-  if (g === 'B') return 'Very good progress. Keep working hard to reach the top.'
-  if (g === 'C') return 'Satisfactory standard of work. More focus will help.'
-  if (g === 'D') return 'Fair effort. Focus on regular review of key topics.'
-  if (g === 'E') return 'Basic understanding shown. Requires more dedication.'
-  if (g === 'F') return 'Weak performance. Substantial support is needed.'
-  if (g === 'G') return 'Needs urgent improvement. Dedicate regular study time.'
-  return 'Satisfactory performance.'
+  if (g === 'A*') return 'Demonstrates outstanding academic performance, exceptional command of the subject, and consistent diligence across all learning areas.'
+  if (g === 'A') return 'Shows excellent progress and mastery of concepts. Consistent effort and participation have yielded highly commendable results.'
+  if (g === 'B') return 'Very good progress. Displays a strong understanding of most concepts and participates actively in class discussions.'
+  if (g === 'C') return 'Satisfactory performance and steady progress. With continued focus and regular practice of core skills, higher achievements are possible.'
+  if (g === 'D') return 'Displays a fair understanding of topics but needs to pay closer attention to detail and devote more time to review key concepts.'
+  if (g === 'E') return 'Basic understanding is shown. Needs significant improvement in concentration, study habits, and homework completion to progress.'
+  if (g === 'F') return 'Weak performance overall. Requires intensive support, regular tutoring, and close parent-teacher coordination to build foundational skills.'
+  if (g === 'G') return 'Needs urgent academic improvement. Consistent remedial support, daily practice, and focused study are required to catch up with the class.'
+  return 'Shows a satisfactory level of effort and academic performance throughout the term.'
 }
 
 // Draw Header
@@ -206,6 +234,11 @@ async function drawStudentInfoSection(
   const contentWidth = 525.28
   const infoHeight = 110
 
+  const photoWidth = 85
+  const photoHeight = 105
+  const photoX = startX + contentWidth - photoWidth - 10
+  const photoY = startY + 2.5
+
   // 1. Draw Section Title
   doc.fontSize(12).font('Helvetica-Bold').fillColor('#00264b')
   doc.text('ACADEMIC PROGRESS REPORT', startX, 93, { align: 'center' })
@@ -216,7 +249,8 @@ async function drawStudentInfoSection(
   doc.roundedRect(startX, startY, contentWidth, infoHeight, 4).lineWidth(1).strokeColor('#cbd5e1').stroke()
 
   // 3. Draw "STUDENT INFORMATION" Box Header
-  doc.rect(startX + 0.5, startY + 0.5, contentWidth - 1, 18).fillColor('#f1f5f9').fill()
+  const headerWidth = contentWidth - photoWidth - 15
+  doc.rect(startX + 0.5, startY + 0.5, headerWidth, 18).fillColor('#f1f5f9').fill()
   doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#0f172a')
   doc.text('STUDENT INFORMATION', startX + 10, startY + 5)
 
@@ -248,11 +282,6 @@ async function drawStudentInfoSection(
   });
 
   // 5. Draw Student Passport Box on the far right
-  const photoWidth = 72
-  const photoHeight = 90
-  const photoX = startX + contentWidth - photoWidth - 10
-  const photoY = startY + 10
-
   doc.rect(photoX, photoY, photoWidth, photoHeight).lineWidth(0.75).strokeColor('#cbd5e1').stroke()
 
   if (photoBuffer) {
@@ -266,10 +295,10 @@ async function drawStudentInfoSection(
     drawPhotoPlaceholder(doc, photoX, photoY, photoWidth, photoHeight)
   }
 
-  // Centered student name caption below photo
-  doc.fontSize(7).font('Helvetica-Bold').fillColor('#475569')
+  // Centered student name caption below photo (if height permits, else skip to fit box)
+  doc.fontSize(6.5).font('Helvetica-Bold').fillColor('#475569')
   const captionText = `${opts.student.first_name} ${opts.student.last_name}`.toUpperCase()
-  doc.text(captionText, photoX - 20, photoY + photoHeight + 3, { width: photoWidth + 40, align: 'center' })
+  doc.text(captionText, photoX - 10, photoY + photoHeight + 1.5, { width: photoWidth + 20, align: 'center' })
 }
 
 function drawPhotoPlaceholder(doc: PDFKit.PDFDocument, x: number, y: number, w: number, h: number) {
@@ -278,106 +307,248 @@ function drawPhotoPlaceholder(doc: PDFKit.PDFDocument, x: number, y: number, w: 
   doc.text('No Photo', x, y + h / 2 - 4, { width: w, align: 'center' })
 }
 
+function computeTableLayout(
+  doc: PDFKit.PDFDocument,
+  subjects: ReportSubjectMark[],
+  subjectW: number,
+  remarksW: number,
+  availableHeight: number
+) {
+  let remarksFontSize = 7.5
+  let subjectFontSize = 8.0
+  let baseHeight = 22
+  let padding = 10
+
+  let rowHeights: number[] = []
+  let totalHeight = 0
+
+  for (let attempt = 0; attempt < 8; attempt++) {
+    rowHeights = []
+    totalHeight = 0
+
+    subjects.forEach(subj => {
+      const subjName = (subj.subject_name || '').toUpperCase()
+      const remarkText = subj.remarks || getDefaultRemark(subj.grade)
+
+      doc.font('Helvetica-Bold').fontSize(subjectFontSize)
+      const subjH = doc.heightOfString(subjName, { width: subjectW - 6 })
+
+      doc.font('Helvetica').fontSize(remarksFontSize)
+      const remarkH = doc.heightOfString(remarkText, { width: remarksW - 6 })
+
+      const rowH = Math.max(baseHeight, Math.max(subjH, remarkH) + padding)
+      rowHeights.push(rowH)
+      totalHeight += rowH
+    })
+
+    if (totalHeight <= availableHeight) {
+      break
+    }
+
+    remarksFontSize -= 0.5
+    if (remarksFontSize < 5.0) {
+      subjectFontSize = Math.max(7.0, subjectFontSize - 0.5)
+      padding = Math.max(6, padding - 1)
+      baseHeight = Math.max(18, baseHeight - 1)
+    }
+  }
+
+  return { rowHeights, remarksFontSize, subjectFontSize, baseHeight, padding }
+}
+
 // Draw Academic Performance Table
-function drawAcademicTable(doc: PDFKit.PDFDocument, opts: ReportCardOptions) {
+function drawAcademicTable(doc: PDFKit.PDFDocument, opts: ReportCardOptions): number {
   const startX = 35
   const startY = 245
   const contentWidth = 525.28
 
-  const examTypes = opts.examTypes || [
-    { id: 'test_1', name: 'Test 1', weight: 20 },
-    { id: 'opener', name: 'Opener', weight: 20 },
-    { id: 'terminal', name: 'Terminal', weight: 60 }
-  ]
+  // 1. Determine columns to draw
+  const activeConfigs = (opts.assessmentConfigs || [])
+    .filter(c => c.is_active !== false && c.weight > 0)
+    .sort((a, b) => {
+      const aIsQuiz = a.type.toUpperCase() === 'QUIZZES'
+      const bIsQuiz = b.type.toUpperCase() === 'QUIZZES'
+      if (aIsQuiz && !bIsQuiz) return -1
+      if (!aIsQuiz && bIsQuiz) return 1
+      if ((a.display_order || 0) !== (b.display_order || 0)) {
+        return (a.display_order || 0) - (b.display_order || 0)
+      }
+      return a.type.localeCompare(b.type)
+    })
 
-  const colSubjectWidth = 110
-  const colActivityWidth = 70
-  const colOverallWidth = 50
-  const colGradeWidth = 45
-  const colRemarksWidth = 120
+  let columnsToDraw = activeConfigs
+  if (columnsToDraw.length === 0) {
+    const distinctKeys = new Set<string>()
+    opts.subjects.forEach(s => {
+      if (s.exam_scores) {
+        Object.keys(s.exam_scores).forEach(k => distinctKeys.add(k))
+      }
+    })
+    columnsToDraw = Array.from(distinctKeys).map(k => ({ type: k, weight: 0 }))
+  }
 
-  const totalExamWidth = contentWidth - colSubjectWidth - colActivityWidth - colOverallWidth - colGradeWidth - colRemarksWidth // 130.28
-  const examColWidth = totalExamWidth / examTypes.length
+  const numExam = columnsToDraw.length
+
+  const colOverallWidth = 48
+  const colGradeWidth = 36
+  let colSubjectWidth = 110
+  let colRemarksWidth = 120
+
+  if (numExam === 0) {
+    colSubjectWidth = 140
+    colRemarksWidth = contentWidth - colSubjectWidth - colOverallWidth - colGradeWidth
+  } else if (numExam <= 2) {
+    colSubjectWidth = 110
+    colRemarksWidth = 120
+  } else if (numExam <= 3) {
+    colSubjectWidth = 95
+    colRemarksWidth = 110
+  } else if (numExam <= 4) {
+    colSubjectWidth = 85
+    colRemarksWidth = 95
+  } else if (numExam <= 5) {
+    colSubjectWidth = 75
+    colRemarksWidth = 80
+  } else {
+    colSubjectWidth = 65
+    colRemarksWidth = 70
+  }
+
+  let fixed = colSubjectWidth + colOverallWidth + colGradeWidth + colRemarksWidth
+  let remaining = contentWidth - fixed
+  let examColWidth = numExam > 0 ? remaining / numExam : 0
+
+  const minExamW = 38
+  const minRemarks = 68
+
+  if (numExam > 0 && examColWidth < minExamW) {
+    const deficit = (minExamW - examColWidth) * numExam
+    const subjectReduction = Math.min(15, colSubjectWidth - 50)
+    colSubjectWidth -= subjectReduction
+    let currentDeficit = deficit - subjectReduction
+
+    if (currentDeficit > 0) {
+      const remarksReduction = Math.min(20, colRemarksWidth - minRemarks)
+      colRemarksWidth -= remarksReduction
+      currentDeficit -= remarksReduction
+    }
+
+    fixed = colSubjectWidth + colOverallWidth + colGradeWidth + colRemarksWidth
+    remaining = contentWidth - fixed
+    examColWidth = remaining / numExam
+
+    if (examColWidth < minExamW) {
+      examColWidth = Math.max(32, examColWidth)
+    }
+  }
+
+  const headerHeight = 24
+  const summaryHeight = 17
   
-  const headerHeight = 20
-  const rowHeight = 17
+  // Calculate maximum allowed height for rows to prevent page overflow
+  // Page height is 841.89, margins are 35. Printable area height is 771.89.
+  // Table starts at 245. Space occupied below table is ~270pt.
+  // 771.89 - (245 - 35) - 270 = ~356. Available table height is ~320.
+  // 320 - headerHeight (24) - summaryHeight (17) = ~279pt max height for rows.
+  const maxRowsHeight = 279
+
+  const { rowHeights, remarksFontSize, subjectFontSize, padding } = computeTableLayout(
+    doc,
+    opts.subjects,
+    colSubjectWidth,
+    colRemarksWidth,
+    maxRowsHeight
+  )
 
   // 1. Draw Table Header
   doc.rect(startX, startY, contentWidth, headerHeight).fillColor('#0f172a').fill()
   
   doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#ffffff')
-  doc.text('SUBJECT', startX + 8, startY + 6)
-  doc.text('ACTIVITY (AVG)', startX + colSubjectWidth + 5, startY + 6)
+  doc.text('SUBJECT', startX + 8, startY + 8)
 
-  // Draw dynamic exam headers
-  let currentX = startX + colSubjectWidth + colActivityWidth
-  examTypes.forEach(et => {
-    const headerText = `${et.name.toUpperCase()} (${et.weight}%)`
-    doc.text(headerText, currentX + 2, startY + 6, { width: examColWidth - 4, align: 'center', lineBreak: false })
+  let currentX = startX + colSubjectWidth
+  columnsToDraw.forEach(col => {
+    // Dynamic header label (weights NOT displayed)
+    const headerLabel = col.type.toUpperCase()
+    doc.text(headerLabel, currentX + 2, startY + 8, { width: examColWidth - 4, align: 'center', lineBreak: false })
     currentX += examColWidth
   })
 
-  doc.text('OVERALL', currentX + 5, startY + 6)
-  doc.text('GRADE', currentX + colOverallWidth + 8, startY + 6)
-  doc.text('REMARKS', currentX + colOverallWidth + colGradeWidth + 8, startY + 6)
+  doc.text('OVERALL', currentX + 4, startY + 8)
+  doc.text('GRADE', currentX + colOverallWidth + 2, startY + 8)
+  doc.text('REMARKS', currentX + colOverallWidth + colGradeWidth + 8, startY + 8)
 
   let currentY = startY + headerHeight
 
   // 2. Draw Table Rows
   opts.subjects.forEach((subj, idx) => {
-    // Alternate background row colors
+    const rowH = rowHeights[idx]
     const bgColor = idx % 2 === 0 ? '#ffffff' : '#f8fafc'
-    doc.rect(startX, currentY, contentWidth, rowHeight).fillColor(bgColor).fill()
+    doc.rect(startX, currentY, contentWidth, rowH).fillColor(bgColor).fill()
     
-    // Draw cells
-    doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#0f172a')
-    doc.text(subj.subject_name.toUpperCase(), startX + 8, currentY + 4, { width: colSubjectWidth - 12, lineBreak: false })
+    // Draw Subject name (bold uppercase, vertically centered)
+    doc.fontSize(subjectFontSize).font('Helvetica-Bold').fillColor('#0f172a')
+    const subjName = subj.subject_name.toUpperCase()
+    const subjH = doc.heightOfString(subjName, { width: colSubjectWidth - 12 })
+    doc.text(subjName, startX + 8, currentY + (rowH - subjH) / 2, { width: colSubjectWidth - 12 })
     
-    doc.font('Helvetica')
-    doc.text(subj.activity_avg, startX + colSubjectWidth + 12, currentY + 4)
-
     // Draw dynamic exam scores
-    let cellX = startX + colSubjectWidth + colActivityWidth
-    examTypes.forEach(et => {
-      const scoreVal = subj.exam_scores[et.id]
-      const scoreText = scoreVal !== null && scoreVal !== undefined ? `${scoreVal.toFixed(0)}%` : '-'
-      doc.text(scoreText, cellX + 2, currentY + 4, { width: examColWidth - 4, align: 'center' })
+    let cellX = startX + colSubjectWidth
+    columnsToDraw.forEach(col => {
+      const key = Object.keys(subj.exam_scores || {}).find(k => k.toLowerCase() === col.type.toLowerCase())
+      const scoreVal = key !== undefined ? subj.exam_scores[key] : null
+      const scoreText = scoreVal !== null && scoreVal !== undefined ? `${Math.round(scoreVal)}%` : '-'
+      const scoreColor = scoreText === '-' ? '#94a3b8' : '#0f172a'
+      
+      doc.font('Helvetica').fontSize(7.5).fillColor(scoreColor)
+      doc.text(scoreText, cellX + 2, currentY + (rowH - 9) / 2, { width: examColWidth - 4, align: 'center' })
       cellX += examColWidth
     })
     
-    doc.text(`${subj.score.toFixed(0)}%`, cellX + 12, currentY + 4)
+    // Overall cell
+    doc.fontSize(8).font('Helvetica-Bold').fillColor('#0f172a')
+    doc.text(`${subj.score.toFixed(1)}%`, cellX + 4, currentY + (rowH - 9) / 2, { width: colOverallWidth - 8, align: 'center' })
     
+    // Grade cell
     const gradeColor = getGradeColorHex(subj.grade)
     doc.font('Helvetica-Bold').fillColor(gradeColor)
-    doc.text(subj.grade, cellX + colOverallWidth + 12, currentY + 4)
+    doc.text(subj.grade, cellX + colOverallWidth + 12, currentY + (rowH - 9) / 2)
     
-    doc.font('Helvetica').fillColor('#334155')
+    // Remarks cell (vertically centered, wrapped, no truncation)
+    doc.font('Helvetica').fontSize(remarksFontSize).fillColor('#475569')
     const remark = subj.remarks || getDefaultRemark(subj.grade)
-    doc.text(remark, cellX + colOverallWidth + colGradeWidth + 8, currentY + 4, { width: colRemarksWidth - 16, height: rowHeight - 4, lineBreak: false })
+    const remarkH = doc.heightOfString(remark, { width: colRemarksWidth - 16 })
+    doc.text(remark, cellX + colOverallWidth + colGradeWidth + 8, currentY + (rowH - remarkH) / 2, { width: colRemarksWidth - 16, lineBreak: true })
 
-    // Border lines
-    doc.lineWidth(0.5).strokeColor('#e2e8f0').moveTo(startX, currentY + rowHeight).lineTo(startX + contentWidth, currentY + rowHeight).stroke()
+    // Border line
+    doc.lineWidth(0.5).strokeColor('#e2e8f0').moveTo(startX, currentY + rowH).lineTo(startX + contentWidth, currentY + rowH).stroke()
     
-    currentY += rowHeight
+    currentY += rowH
   })
 
   // 3. Draw Summary Row
-  doc.rect(startX, currentY, contentWidth, rowHeight).fillColor('#f0f9ff').fill()
+  doc.rect(startX, currentY, contentWidth, summaryHeight).fillColor('#f0f9ff').fill()
 
   // Display aggregated summaries
   doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#0369a1')
   doc.text('SUMMARY', startX + 8, currentY + 4)
 
-  const summaryText = `TOTAL SCORE: ${opts.totalScore.toFixed(0)}  |  AVERAGE: ${opts.averageScore.toFixed(1)}%  |  OVERALL GRADE: ${opts.overallGrade}`
-  doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#0369a1')
-  doc.text(summaryText, startX + colSubjectWidth + 25, currentY + 4, { width: contentWidth - colSubjectWidth - 30 })
+  let summaryText = `TOTAL SCORE: ${opts.totalScore.toFixed(0)}  |  AVERAGE: ${opts.averageScore.toFixed(1)}%  |  OVERALL GRADE: ${opts.overallGrade}`
+  if (opts.showRank && opts.rank > 0) {
+    summaryText += `  |  RANK: ${opts.rank} of ${opts.totalStudents}`
+  }
+  
+  doc.fontSize(8).font('Helvetica-Bold').fillColor('#0369a1')
+  doc.text(summaryText, startX + colSubjectWidth + 15, currentY + 4, { width: contentWidth - colSubjectWidth - 20 })
 
   // Outer boundary line
   doc.lineWidth(1).strokeColor('#cbd5e1')
      .moveTo(startX, startY).lineTo(startX + contentWidth, startY)
-     .lineTo(startX + contentWidth, currentY + rowHeight)
-     .lineTo(startX, currentY + rowHeight)
+     .lineTo(startX + contentWidth, currentY + summaryHeight)
+     .lineTo(startX, currentY + summaryHeight)
      .lineTo(startX, startY).stroke()
+
+  return currentY + summaryHeight
 }
 
 // Draw Grading & Attendance Blocks
@@ -509,7 +680,7 @@ function drawCommentsAndSignatures(doc: PDFKit.PDFDocument, opts: ReportCardOpti
 export async function generateSmartkidzReportPdf(optsOrArray: ReportCardOptions | ReportCardOptions[]): Promise<Buffer> {
   const doc = new PDFDocument({
     size: 'A4',
-    margins: { top: 30, bottom: 30, left: 35, right: 35 },
+    margins: { top: 35, bottom: 35, left: 35, right: 35 },
     bufferPages: true
   })
 
@@ -540,8 +711,8 @@ export async function generateSmartkidzReportPdf(optsOrArray: ReportCardOptions 
       const { createServiceClient } = require('@/utils/supabase/service')
       const supabaseService = createServiceClient()
       const { data: files } = await supabaseService.storage
-        .from('student-photos')
-        .list(opts.student.id)
+          .from('student-photos')
+          .list(opts.student.id)
 
       if (files && files.length > 0) {
         const latestFile = files[0]
@@ -560,13 +731,13 @@ export async function generateSmartkidzReportPdf(optsOrArray: ReportCardOptions 
     // Draw Page Content (must fit strictly in 1 A4 page)
     drawHeader(doc, opts, logos)
     await drawStudentInfoSection(doc, opts, photoBuffer)
-    drawAcademicTable(doc, opts)
+    const finalTableY = drawAcademicTable(doc, opts)
     
     // Calculate dynamic starting Y for lower blocks to prevent overlaps
-    const startYGrading = 460
+    const startYGrading = finalTableY + 12
     drawGradingAndAttendance(doc, opts, startYGrading)
 
-    const startYComments = startYGrading + 95 + 10 // 565
+    const startYComments = startYGrading + 90 + 10 // boxHeight (90) + gap (10)
     drawCommentsAndSignatures(doc, opts, startYComments)
   }
 
@@ -579,12 +750,12 @@ export async function generateSmartkidzReportPdf(optsOrArray: ReportCardOptions 
     const genDate = opts.generatedDate || new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'long', year: 'numeric' })
     
     // Draw footer background/divider line
-    doc.lineWidth(0.5).strokeColor('#cbd5e1').moveTo(35, 808).lineTo(560, 808).stroke()
+    doc.lineWidth(0.5).strokeColor('#cbd5e1').moveTo(35, 802).lineTo(560, 802).stroke()
     
     doc.fontSize(7.5).font('Helvetica').fillColor('#94a3b8')
-    doc.text(`Generated: ${genDate} | ${opts.schoolName || 'Leaders International School'}`, 35, 814)
-    doc.text('End of Report', 260, 814, { width: 80, align: 'center' })
-    doc.text('Page 1 of 1', 490, 814, { width: 70, align: 'right' })
+    doc.text(`Generated: ${genDate} | ${opts.schoolName || 'Leaders International School'}`, 35, 808)
+    doc.text('End of Report', 260, 808, { width: 80, align: 'center' })
+    doc.text('Page 1 of 1', 490, 808, { width: 70, align: 'right' })
   }
 
   // Finalize PDF

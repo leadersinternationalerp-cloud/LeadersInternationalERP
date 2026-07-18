@@ -51,6 +51,7 @@ export default function ReportCardsGenerator({
   const [search, setSearch] = useState('')
   const [generatingId, setGeneratingId] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [showRank, setShowRank] = useState(false)
 
   // Fetch students for class when selection changes
   const fetchStudentsForClass = async (classId: string) => {
@@ -108,13 +109,13 @@ export default function ReportCardsGenerator({
   }, [students, selectedClassId, currentClassDetails, search])
 
   const handleGenerate = (studentId: string) => {
-    setPreviewUrl(`/api/report-cards/download?student_id=${studentId}&term_id=${selectedTermId}`)
+    setPreviewUrl(`/api/report-cards/download?student_id=${studentId}&term_id=${selectedTermId}&show_rank=${showRank}`)
   }
 
   const handleBulkGenerate = () => {
     if (filteredStudents.length === 0) return
     const ids = filteredStudents.map(s => s.id).join(',')
-    setPreviewUrl(`/api/report-cards/download?student_id=${ids}&term_id=${selectedTermId}`)
+    setPreviewUrl(`/api/report-cards/download?student_id=${ids}&term_id=${selectedTermId}&show_rank=${showRank}`)
   }
 
   // Update photo in local list state when uploaded
@@ -180,24 +181,39 @@ export default function ReportCardsGenerator({
             </div>
           </div>
 
-          <button 
-            type="button" 
-            onClick={handleBulkGenerate}
-            disabled={filteredStudents.length === 0}
-            className="btn btn-secondary" 
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              gap: '0.5rem', 
-              padding: '0.75rem 1.25rem',
-              fontWeight: 600,
-              cursor: filteredStudents.length === 0 ? 'not-allowed' : 'pointer'
-            }}
-          >
-            <FileDown size={18} />
-            Bulk Download ({filteredStudents.length})
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '100%' }}>
+            <button 
+              type="button" 
+              onClick={handleBulkGenerate}
+              disabled={filteredStudents.length === 0}
+              className="btn btn-secondary" 
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                gap: '0.5rem', 
+                padding: '0.75rem 1.25rem',
+                fontWeight: 600,
+                cursor: filteredStudents.length === 0 ? 'not-allowed' : 'pointer',
+                width: '100%'
+              }}
+            >
+              <FileDown size={18} />
+              Bulk Download ({filteredStudents.length})
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'center' }}>
+              <input 
+                type="checkbox" 
+                id="show_rank_check" 
+                checked={showRank} 
+                onChange={e => setShowRank(e.target.checked)} 
+                style={{ width: '14px', height: '14px', cursor: 'pointer' }}
+              />
+              <label htmlFor="show_rank_check" style={{ fontSize: '0.75rem', fontWeight: 500, cursor: 'pointer', color: 'var(--color-text-muted)', userSelect: 'none' }}>
+                Show Student Ranking
+              </label>
+            </div>
+          </div>
         </div>
       </div>
 

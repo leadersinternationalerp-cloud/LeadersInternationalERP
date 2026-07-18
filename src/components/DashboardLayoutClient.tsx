@@ -187,6 +187,9 @@ export default function DashboardLayoutClient({
           <NavLink href="/dashboard/admin/settings" icon={Settings}>
             School Settings
           </NavLink>
+          <NavLink href="/dashboard/admin/settings/assessment-weights" icon={FileSpreadsheet}>
+            Assessment Weights
+          </NavLink>
           <NavLink href="/dashboard/admin/backups" icon={Settings}>
             Database Backups
           </NavLink>

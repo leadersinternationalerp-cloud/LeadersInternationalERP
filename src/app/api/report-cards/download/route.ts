@@ -2,12 +2,125 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { parseGradingLevels, getGradeForPercentage } from '@/utils/grading'
-import { generateSmartkidzReportPdf, ReportCardOptions, ReportSubjectMark } from '@/lib/reportCardPdf'
+import { generateSmartkidzReportPdf, ReportCardOptions, ReportSubjectMark, computeWeightedOverall } from '@/lib/reportCardPdf'
+
+async function computeClassStudentRanks(
+  supabase: any,
+  classId: string,
+  termName: string,
+  assessmentConfigs: any[],
+  subjects: any[]
+) {
+  const { data: classStudents } = await supabase
+    .from('students')
+    .select('id')
+    .eq('class_id', classId)
+  
+  const studentIds = classStudents?.map((s: any) => s.id) || []
+  if (studentIds.length === 0) return {}
+
+  // Fetch all marks for the class
+  const { data: allMarks } = await supabase
+    .from('marks')
+    .select('student_id, subject_id, score, assessment_type')
+    .in('student_id', studentIds)
+    .eq('term', termName)
+
+  // Fetch all activity attempts for the class
+  const { data: allAttempts } = await supabase
+    .from('activity_attempts')
+    .select('student_id, percentage, class_activities (subject, activity_type, max_attempts)')
+    .in('student_id', studentIds)
+
+  const studentAverages: { studentId: string; averageScore: number }[] = []
+
+  for (const sId of studentIds) {
+    const sMarks = (allMarks || []).filter((m: any) => m.student_id === sId)
+    const sAttempts = (allAttempts || []).filter((a: any) => a.student_id === sId)
+
+    let totalAvgSum = 0
+    let subjectCount = 0
+
+    subjects.forEach((subj: any) => {
+      // Quizzes avg
+      const quizAttempts = sAttempts.filter((att: any) => {
+        const ca = att.class_activities
+        const subjName = ca?.subject || ''
+        const matchesSubj = subjName.toLowerCase() === subj.name.toLowerCase() ||
+                            subjName.toLowerCase() === (subj.code || '').toLowerCase()
+        return matchesSubj && ca?.activity_type === 'quiz' && ca?.max_attempts === 1
+      })
+      const quizzesAvg = quizAttempts.length > 0
+        ? quizAttempts.reduce((sum: number, att: any) => sum + Number(att.percentage || 0), 0) / quizAttempts.length
+        : null
+
+      // CA avg
+      const caAttempts = sAttempts.filter((att: any) => {
+        const ca = att.class_activities
+        const subjName = ca?.subject || ''
+        const matchesSubj = subjName.toLowerCase() === subj.name.toLowerCase() ||
+                            subjName.toLowerCase() === (subj.code || '').toLowerCase()
+        return matchesSubj && ca?.activity_type !== 'quiz'
+      })
+      const activityAvg = caAttempts.length > 0
+        ? caAttempts.reduce((sum: number, att: any) => sum + Number(att.percentage || 0), 0) / caAttempts.length
+        : null
+
+      // Find other marks
+      const subjMarks = sMarks.filter((m: any) => m.subject_id === subj.id)
+      
+      const examScores: Record<string, number | null> = {}
+      let hasAnyScore = false
+
+      assessmentConfigs.forEach((et: any) => {
+        if (et.type.toUpperCase() === 'QUIZZES') {
+          examScores[et.type] = quizzesAvg
+          if (quizzesAvg !== null) hasAnyScore = true
+        } else if (et.type.toUpperCase() === 'CA') {
+          examScores[et.type] = activityAvg
+          if (activityAvg !== null) hasAnyScore = true
+        } else {
+          const markRecord = subjMarks.find((m: any) => {
+            const mType = (m.assessment_type || '').toLowerCase().trim()
+            const etName = (et.type || '').toLowerCase().trim()
+            return mType === etName || mType.includes(etName) || etName.includes(mType)
+          })
+          const score = markRecord ? Number(markRecord.score) : null
+          examScores[et.type] = score
+          if (score !== null) hasAnyScore = true
+        }
+      })
+
+      if (hasAnyScore) {
+        const overallScore = computeWeightedOverall(examScores, assessmentConfigs)
+        totalAvgSum += overallScore
+        subjectCount++
+      }
+    })
+
+    const averageScore = subjectCount > 0 ? totalAvgSum / subjectCount : 0
+    studentAverages.push({ studentId: sId, averageScore })
+  }
+
+  // Sort descending
+  studentAverages.sort((a, b) => b.averageScore - a.averageScore)
+
+  const ranks: Record<string, { rank: number; total: number }> = {}
+  studentAverages.forEach((item, idx) => {
+    ranks[item.studentId] = {
+      rank: idx + 1,
+      total: studentAverages.length
+    }
+  })
+
+  return ranks
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const student_id = searchParams.get('student_id')
   const term_id = searchParams.get('term_id')
+  const showRank = searchParams.get('show_rank') === 'true'
 
   if (!student_id || !term_id) {
     return NextResponse.json({ error: 'Missing student_id or term_id' }, { status: 400 })
@@ -63,20 +176,51 @@ export async function GET(request: Request) {
       .single()
     const gradingLevels = parseGradingLevels(systemSettings?.value)
 
-    // Load exam types from settings
-    const { data: examTypesSetting } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'exam_types')
-      .maybeSingle()
-    
-    const examTypes = examTypesSetting?.value || [
-      { id: 'test_1', name: 'Test 1', weight: 20 },
-      { id: 'opener', name: 'Opener', weight: 20 },
-      { id: 'terminal', name: 'Terminal', weight: 60 }
-    ]
+    // Fetch active assessment weights from table
+    const { data: dbWeights } = await supabase
+      .from('assessment_weights')
+      .select('assessment_type, weight, is_active, display_order')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
+    let assessmentConfigs: any[] = []
+    if (dbWeights && dbWeights.length > 0) {
+      assessmentConfigs = dbWeights.map(w => ({
+        type: w.assessment_type,
+        weight: Number(w.weight),
+        is_active: w.is_active,
+        display_order: w.display_order
+      }))
+    } else {
+      const { data: sysSetting } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'assessment_weights')
+        .maybeSingle()
+
+      if (sysSetting?.value && Array.isArray(sysSetting.value)) {
+        assessmentConfigs = sysSetting.value
+          .filter((w: any) => w.is_active !== false)
+          .map((w: any) => ({
+            type: w.type || w.assessment_type,
+            weight: Number(w.weight),
+            is_active: w.is_active,
+            display_order: w.display_order
+          }))
+      } else {
+        // Fallback default seed
+        assessmentConfigs = [
+          { type: 'QUIZZES', weight: 20, is_active: true, display_order: 0 },
+          { type: 'Test 1', weight: 20, is_active: true, display_order: 1 },
+          { type: 'Test 2', weight: 20, is_active: true, display_order: 2 },
+          { type: 'Mid-Term', weight: 20, is_active: true, display_order: 3 },
+          { type: 'Terminal', weight: 40, is_active: true, display_order: 4 }
+        ]
+      }
+    }
 
     const pdfOptionsList: ReportCardOptions[] = []
+    let computedRanks: Record<string, { rank: number; total: number }> | null = null
 
     // 3. Process each student record sequentially
     for (const sId of studentIds) {
@@ -196,7 +340,7 @@ export async function GET(request: Request) {
       // Fetch all activity attempts for this student
       const { data: attempts } = await supabase
         .from('activity_attempts')
-        .select('percentage, class_activities (subject)')
+        .select('percentage, class_activities (subject, activity_type, max_attempts)')
         .eq('student_id', sId)
 
       // Assemble subject scores
@@ -204,58 +348,57 @@ export async function GET(request: Request) {
       let totalAverageSum = 0
 
       subjects.forEach(subj => {
-        // Calculate class activity average
-        const subjAttempts = (attempts || []).filter((att: any) => {
+        // Calculate quizzes average (activity_type === 'quiz' and max_attempts === 1)
+        const quizAttempts = (attempts || []).filter((att: any) => {
           const ca = att.class_activities
           const subjName = ca?.subject || ''
-          return subjName.toLowerCase() === subj.name.toLowerCase() ||
-                 subjName.toLowerCase() === (subj.code || '').toLowerCase()
+          const matchesSubj = subjName.toLowerCase() === subj.name.toLowerCase() ||
+                              subjName.toLowerCase() === (subj.code || '').toLowerCase()
+          return matchesSubj && ca?.activity_type === 'quiz' && ca?.max_attempts === 1
         })
-        const activityAvg = subjAttempts.length > 0
-          ? subjAttempts.reduce((sum: number, att: any) => sum + Number(att.percentage || 0), 0) / subjAttempts.length
+        const quizzesAvg = quizAttempts.length > 0
+          ? quizAttempts.reduce((sum: number, att: any) => sum + Number(att.percentage || 0), 0) / quizAttempts.length
+          : null
+
+        // Calculate class activity average (activity_type !== 'quiz')
+        const caAttempts = (attempts || []).filter((att: any) => {
+          const ca = att.class_activities
+          const subjName = ca?.subject || ''
+          const matchesSubj = subjName.toLowerCase() === subj.name.toLowerCase() ||
+                              subjName.toLowerCase() === (subj.code || '').toLowerCase()
+          return matchesSubj && ca?.activity_type !== 'quiz'
+        })
+        const activityAvg = caAttempts.length > 0
+          ? caAttempts.reduce((sum: number, att: any) => sum + Number(att.percentage || 0), 0) / caAttempts.length
           : null
 
         // Calculate dynamic exam scores and weighted average
         const subjMarks = (studentMarks || []).filter(m => m.subject_id === subj.id)
         const examScores: Record<string, number | null> = {}
-        let weightedExamSum = 0
-        let totalExamWeightUsed = 0
         let lastRemark = ''
 
-        examTypes.forEach((et: any) => {
-          const markRecord = subjMarks.find((m: any) => {
-            const mType = (m.assessment_type || '').toLowerCase().trim()
-            const etName = (et.name || '').toLowerCase().trim()
-            const etId = (et.id || '').toLowerCase().trim()
-            return mType === etName || mType === etId || mType.includes(etName) || etName.includes(mType)
-          })
+        assessmentConfigs.forEach((et: any) => {
+          if (et.type.toUpperCase() === 'QUIZZES') {
+            examScores[et.type] = quizzesAvg
+          } else if (et.type.toUpperCase() === 'CA') {
+            examScores[et.type] = activityAvg
+          } else {
+            const markRecord = subjMarks.find((m: any) => {
+              const mType = (m.assessment_type || '').toLowerCase().trim()
+              const etName = (et.type || '').toLowerCase().trim()
+              return mType === etName || mType.includes(etName) || etName.includes(mType)
+            })
 
-          const score = markRecord ? Number(markRecord.score) : null
-          examScores[et.id] = score
+            const score = markRecord ? Number(markRecord.score) : null
+            examScores[et.type] = score
 
-          if (score !== null) {
-            weightedExamSum += score * Number(et.weight)
-            totalExamWeightUsed += Number(et.weight)
             if (markRecord?.remarks) {
               lastRemark = markRecord.remarks
             }
           }
         })
 
-        const examAvg = totalExamWeightUsed > 0 ? (weightedExamSum / totalExamWeightUsed) : null
-
-        // Combine for overall score
-        let overallScore = 0
-        if (activityAvg !== null && examAvg !== null) {
-          overallScore = (activityAvg + examAvg) / 2
-        } else if (activityAvg !== null) {
-          overallScore = activityAvg
-        } else if (examAvg !== null) {
-          overallScore = examAvg
-        } else {
-          return
-        }
-
+        const overallScore = computeWeightedOverall(examScores, assessmentConfigs)
         const grade = getGradeForPercentage(overallScore, gradingLevels)
 
         subjectsReport.push({
@@ -366,6 +509,20 @@ export async function GET(request: Request) {
       const pName = principalUser ? `${principalUser.first_name || ''} ${principalUser.last_name || ''}`.trim() : 'Principal'
       const dName = deanUser ? `${deanUser.first_name || ''} ${deanUser.last_name || ''}`.trim() : 'Dean of Studies'
 
+      let rank = 0
+      let totalStudents = 0
+
+      if (showRank && classId) {
+        if (!computedRanks) {
+          computedRanks = await computeClassStudentRanks(supabase, classId, termName, assessmentConfigs, subjects)
+        }
+        const rankInfo = computedRanks[sId]
+        if (rankInfo) {
+          rank = rankInfo.rank
+          totalStudents = rankInfo.total
+        }
+      }
+
       pdfOptionsList.push({
         student: {
           id: sId,
@@ -388,14 +545,15 @@ export async function GET(request: Request) {
           class_name: className,
           section: classSection
         },
-        examTypes,
+        assessmentConfigs,
         subjects: subjectsReport,
         gradingLevels,
         totalScore,
         averageScore,
         overallGrade,
-        rank: 0,
-        totalStudents: 0,
+        rank,
+        totalStudents,
+        showRank,
         attendance,
         conduct: {
           grade: conductGrade,
