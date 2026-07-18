@@ -311,7 +311,7 @@ export default function EnrollmentClient() {
             Passport Photo Requirement
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', lineHeight: '1.4' }}>
-            An official passport photo is required for the Smartkidz Cambridge Academic Progress Report. Uploading a photo during enrollment ensures that the report card layout registers the student photo automatically.
+            An official passport photo is required for the Leaders International Academic Progress Report. Uploading a photo during enrollment ensures that the report card layout registers the student photo automatically.
           </div>
         </div>
       </div>

@@ -154,7 +154,7 @@ export function getDefaultRemark(grade: string): string {
 // Draw Header
 function drawHeader(doc: PDFKit.PDFDocument, opts: ReportCardOptions, logos: { logoBuffer: Buffer | null; cambridgeBuffer: Buffer | null }) {
   const schoolName = opts.schoolName || 'LEADERS INTERNATIONAL SCHOOL'
-  const schoolMotto = opts.schoolMotto || 'Nurturing Leaders of Tomorrow - Smartkidz Cambridge Curriculum'
+  const schoolMotto = opts.schoolMotto || 'Nurturing Leaders of Tomorrow'
   const schoolAddress = opts.schoolAddress || 'Zanzibar, Tanzania | Tel +255 777 123 456 | www.leaders.ac.tz'
 
   const contentWidth = 525.28
@@ -180,16 +180,13 @@ function drawHeader(doc: PDFKit.PDFDocument, opts: ReportCardOptions, logos: { l
 
   // Center header details
   doc.fontSize(16).font('Helvetica-Bold').fillColor('#00264b')
-  doc.text(schoolName, startX + 60, 28, { width: contentWidth - 165, align: 'center' })
+  doc.text(schoolName, startX + 60, 30, { width: contentWidth - 165, align: 'center' })
 
-  doc.fontSize(10).font('Helvetica-Bold').fillColor('#0ea5e9')
-  doc.text('Smartkidz Cambridge School', startX + 60, 46, { width: contentWidth - 165, align: 'center' })
+  doc.fontSize(8.5).font('Helvetica').fillColor('#475569')
+  doc.text(schoolAddress, startX + 60, 52, { width: contentWidth - 165, align: 'center' })
 
-  doc.fontSize(8).font('Helvetica').fillColor('#475569')
-  doc.text(schoolAddress, startX + 60, 58, { width: contentWidth - 165, align: 'center' })
-
-  doc.fontSize(7.5).font('Helvetica-Oblique').fillColor('#0f172a')
-  doc.text(schoolMotto, startX + 60, 68, { width: contentWidth - 165, align: 'center' })
+  doc.fontSize(8).font('Helvetica-Oblique').fillColor('#0f172a')
+  doc.text(schoolMotto, startX + 60, 65, { width: contentWidth - 165, align: 'center' })
 
   // Double separator line
   doc.lineWidth(1).strokeColor('#00264b').moveTo(startX, 82).lineTo(startX + contentWidth, 82).stroke()
@@ -360,9 +357,9 @@ function drawAcademicTable(doc: PDFKit.PDFDocument, opts: ReportCardOptions) {
   doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#0369a1')
   doc.text('SUMMARY', startX + 8, currentY + 4)
 
-  const summaryText = `TOTAL SCORE: ${opts.totalScore.toFixed(0)}  |  AVERAGE: ${opts.averageScore.toFixed(1)}%  |  OVERALL GRADE: ${opts.overallGrade}  |  CLASS RANK: ${opts.rank} of ${opts.totalStudents}`
+  const summaryText = `TOTAL SCORE: ${opts.totalScore.toFixed(0)}  |  AVERAGE: ${opts.averageScore.toFixed(1)}%  |  OVERALL GRADE: ${opts.overallGrade}`
   doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#0369a1')
-  doc.text(summaryText, startX + colSubjectWidth + 5, currentY + 4, { width: contentWidth - colSubjectWidth - 10 })
+  doc.text(summaryText, startX + colSubjectWidth + 25, currentY + 4, { width: contentWidth - colSubjectWidth - 30 })
 
   // Outer boundary line
   doc.lineWidth(1).strokeColor('#cbd5e1')
@@ -516,10 +513,27 @@ export async function generateSmartkidzReportPdf(opts: ReportCardOptions): Promi
   // Load logo files
   const logos = loadLogoBuffers()
 
-  // Fetch student photo if present
+  // Fetch student photo directly from Supabase storage by student UUID
   let photoBuffer: Buffer | null = null
-  if (opts.student.photo_url) {
-    photoBuffer = await fetchImageBuffer(opts.student.photo_url)
+  try {
+    const { createServiceClient } = require('@/utils/supabase/service')
+    const supabaseService = createServiceClient()
+    const { data: files } = await supabaseService.storage
+      .from('student-photos')
+      .list(opts.student.id)
+
+    if (files && files.length > 0) {
+      const latestFile = files[0]
+      const { data: blob, error: downloadError } = await supabaseService.storage
+        .from('student-photos')
+        .download(`${opts.student.id}/${latestFile.name}`)
+
+      if (!downloadError && blob) {
+        photoBuffer = Buffer.from(await blob.arrayBuffer())
+      }
+    }
+  } catch (e) {
+    console.error('Error fetching student photo directly from storage:', e)
   }
 
   // Draw Page Content (must fit strictly in 1 A4 page)

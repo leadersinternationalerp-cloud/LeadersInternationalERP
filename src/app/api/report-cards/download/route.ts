@@ -96,13 +96,12 @@ export async function GET(request: Request) {
     .select(`
       id,
       student_id,
-      photo_url,
-      admission_date,
       dob,
       gender,
       grade_level,
       section,
       class_id,
+      created_at,
       profiles (first_name, last_name, email)
     `)
     .eq('id', student_id)
@@ -234,59 +233,9 @@ export async function GET(request: Request) {
   const averageScore = subjectsReport.length > 0 ? totalAverageSum / subjectsReport.length : 0
   const overallGrade = getGradeForPercentage(averageScore, gradingLevels)
 
-  // 4. Compute Student Rank in the class
-  let classRank = 1
-  let totalClassStudents = 1
-
-  if (classId) {
-    // Get all students in the same class
-    const { data: classStudents } = await supabase
-      .from('students')
-      .select('id')
-      .eq('class_id', classId)
-
-    if (classStudents && classStudents.length > 0) {
-      totalClassStudents = classStudents.length
-      const classStudentIds = classStudents.map(s => s.id)
-
-      // Fetch all marks for these students
-      const { data: classMarks } = await supabase
-        .from('marks')
-        .select('student_id, score, subject_id')
-        .in('student_id', classStudentIds)
-        .eq('term', termName)
-
-      // Calculate averages for each class student
-      const studentTermAverages: { student_id: string, avg: number }[] = []
-      
-      classStudentIds.forEach(cStudentId => {
-        const studentMarks = (classMarks || []).filter(m => m.student_id === cStudentId)
-        
-        // Group by subject for this student
-        const studentSubjScores = new Map<string, number[]>()
-        studentMarks.forEach(m => {
-          const sId = m.subject_id
-          if (!studentSubjScores.has(sId)) {
-            studentSubjScores.set(sId, [])
-          }
-          studentSubjScores.get(sId)!.push(Number(m.score))
-        })
-
-        let subjAverageSum = 0
-        studentSubjScores.forEach(scores => {
-          subjAverageSum += scores.reduce((a, b) => a + b, 0) / scores.length
-        })
-
-        const studentAvg = studentSubjScores.size > 0 ? subjAverageSum / studentSubjScores.size : 0
-        studentTermAverages.push({ student_id: cStudentId, avg: studentAvg })
-      })
-
-      // Sort and find rank
-      studentTermAverages.sort((a, b) => b.avg - a.avg)
-      const rankIndex = studentTermAverages.findIndex(x => x.student_id === student_id)
-      classRank = rankIndex !== -1 ? rankIndex + 1 : 1
-    }
-  }
+  // 4. Compute Student Rank in the class (Disabled)
+  let classRank = 0
+  let totalClassStudents = 0
 
   // 5. Fetch Attendance from attendance table
   let attendance = undefined
@@ -397,8 +346,8 @@ export async function GET(request: Request) {
       section: student.section,
       dob: student.dob,
       gender: student.gender,
-      photo_url: student.photo_url,
-      admission_date: student.admission_date
+      photo_url: `/api/students/photo?student_id=${student_id}`,
+      admission_date: student.created_at
     },
     term: {
       id: term_id,

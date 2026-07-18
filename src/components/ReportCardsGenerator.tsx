@@ -303,30 +303,6 @@ export default function ReportCardsGenerator({
           </tbody>
         </table>
       </div>
-
-      {/* 4. Legend Glass-Panel */}
-      <div 
-        className="glass-panel" 
-        style={{ 
-          padding: '1.5rem', 
-          borderRadius: 'var(--radius-lg)', 
-          marginTop: '2rem',
-          borderLeft: '4px solid #f59e0b',
-          backgroundColor: 'rgba(245, 158, 11, 0.02)'
-        }}
-      >
-        <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, color: '#d97706', marginBottom: '0.75rem' }}>
-          <Sparkles size={18} />
-          Smartkidz Cambridge Progress Report Features
-        </h4>
-        <ul style={{ paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--color-text-muted)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <li><strong>Curriculum Standards:</strong> Output follows the official Smartkidz Cambridge Curriculum scale (A* to G).</li>
-          <li><strong>Automated Rankings:</strong> Student ranks are computed dynamically by sorting student averages across the entire class.</li>
-          <li><strong>Verified Signatures:</strong> Includes sections for Class Teacher, Dean of Studies, Principal, and Parent/Guardian.</li>
-          <li><strong>Image Verification:</strong> Passport photo buffers are fetched and embedded directly inside the PDF layout.</li>
-          <li><strong>Single Page Guarantee:</strong> The report layout uses compact rendering vectors to guarantee it fits exactly on 1 A4 page.</li>
-        </ul>
-      </div>
     </div>
   )
 }

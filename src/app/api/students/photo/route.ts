@@ -2,6 +2,43 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 
+// GET: returns the public image URL or checking existence
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const student_id = searchParams.get('student_id')
+    if (!student_id) {
+      return NextResponse.json({ error: 'Missing student_id' }, { status: 400 })
+    }
+
+    const supabaseService = createServiceClient()
+    const { data: files } = await supabaseService.storage
+      .from('student-photos')
+      .list(student_id)
+
+    const exists = files && files.length > 0
+    if (searchParams.get('json') === 'true') {
+      return NextResponse.json({
+        exists,
+        photo_url: exists ? `/api/students/photo?student_id=${student_id}` : null
+      })
+    }
+
+    if (exists) {
+      const latestFile = files[0]
+      const { data: urlData } = supabaseService.storage
+        .from('student-photos')
+        .getPublicUrl(`${student_id}/${latestFile.name}`)
+      return NextResponse.redirect(urlData.publicUrl)
+    }
+
+    return new NextResponse('No Photo Found', { status: 404 })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+// POST: uploads a photo file to storage
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
@@ -88,60 +125,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'File size exceeds the 5MB limit.' }, { status: 400 })
     }
 
-    // 5. Upload file using Service Client
+    const supabaseService = createServiceClient()
+
+    // 5. Delete existing files for this student first to save space
+    const { data: existingFiles } = await supabaseService.storage
+      .from('student-photos')
+      .list(student_id)
+
+    if (existingFiles && existingFiles.length > 0) {
+      const filesToDelete = existingFiles.map(f => `${student_id}/${f.name}`)
+      await supabaseService.storage
+        .from('student-photos')
+        .remove(filesToDelete)
+    }
+
+    // 6. Upload new file
     const buffer = Buffer.from(await file.arrayBuffer())
     const ext = file.name.split('.').pop() || 'png'
     const randomSuffix = Math.random().toString(36).substring(2, 8)
     const fileName = `${student_id}/${Date.now()}-${randomSuffix}.${ext}`
 
-    const supabaseService = createServiceClient()
-    
-    // Attempt upload to student-photos bucket
-    let { data: uploadData, error: uploadError } = await supabaseService.storage
+    const { error: uploadError } = await supabaseService.storage
       .from('student-photos')
       .upload(fileName, buffer, {
         contentType: file.type,
         upsert: true
       })
 
-    let publicUrl = ''
-    let bucketName = 'student-photos'
-    let finalPath = fileName
-
     if (uploadError) {
-      console.error('Error uploading to student-photos, trying logos fallback:', uploadError.message)
-      // Fallback: try logos bucket with student-photos/ prefix
-      const fallbackPath = `student-photos/${fileName}`
-      const { data: fallbackData, error: fallbackError } = await supabaseService.storage
-        .from('logos')
-        .upload(fallbackPath, buffer, {
-          contentType: file.type,
-          upsert: true
-        })
-
-      if (fallbackError) {
-        return NextResponse.json({ error: `Storage upload failed: ${fallbackError.message}` }, { status: 500 })
-      }
-      bucketName = 'logos'
-      finalPath = fallbackPath
+      return NextResponse.json({ error: `Storage upload failed: ${uploadError.message}` }, { status: 500 })
     }
 
-    // Get Public URL
-    const { data: urlData } = supabaseService.storage
-      .from(bucketName)
-      .getPublicUrl(finalPath)
-
-    publicUrl = urlData.publicUrl
-
-    // 6. Update student photo_url in database
-    const { error: dbError } = await supabaseService
-      .from('students')
-      .update({ photo_url: publicUrl })
-      .eq('id', student_id)
-
-    if (dbError) {
-      return NextResponse.json({ error: `Failed to update student profile: ${dbError.message}` }, { status: 500 })
-    }
+    const publicUrl = `/api/students/photo?student_id=${student_id}&t=${Date.now()}`
 
     return NextResponse.json({ success: true, photo_url: publicUrl })
   } catch (error: any) {
@@ -150,6 +165,7 @@ export async function POST(request: Request) {
   }
 }
 
+// DELETE: clears all photo files in the student's subfolder from storage
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -182,59 +198,17 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Unauthorized Staff Access' }, { status: 403 })
     }
 
-    // 2. Verify Teacher assignment
-    if (userRoles.includes('Teacher') && !userRoles.includes('System Admin') && !userRoles.includes('Principal') && !userRoles.includes('Dean') && !userRoles.includes('HOS')) {
-      const { data: studentRecord } = await supabase
-        .from('students')
-        .select('class_id, grade_level, section')
-        .eq('id', student_id)
-        .single()
-
-      let assigned = false
-      if (studentRecord) {
-        if (studentRecord.class_id) {
-          const { data: assignment } = await supabase
-            .from('class_subjects')
-            .select('id')
-            .eq('class_id', studentRecord.class_id)
-            .eq('teacher_id', user.id)
-            .limit(1)
-            .maybeSingle()
-          if (assignment) assigned = true
-        } else {
-          const { data: fallbackClass } = await supabase
-            .from('classes')
-            .select('id')
-            .eq('name', studentRecord.grade_level)
-            .eq('section', studentRecord.section || null)
-            .maybeSingle()
-          if (fallbackClass) {
-            const { data: assignment } = await supabase
-              .from('class_subjects')
-              .select('id')
-              .eq('class_id', fallbackClass.id)
-              .eq('teacher_id', user.id)
-              .limit(1)
-              .maybeSingle()
-            if (assignment) assigned = true
-          }
-        }
-      }
-
-      if (!assigned) {
-        return NextResponse.json({ error: 'Forbidden: You are not assigned to this student\'s class' }, { status: 403 })
-      }
-    }
-
-    // 3. Clear database photo_url
+    // 2. Delete files from storage
     const supabaseService = createServiceClient()
-    const { error: dbError } = await supabaseService
-      .from('students')
-      .update({ photo_url: null })
-      .eq('id', student_id)
+    const { data: files } = await supabaseService.storage
+      .from('student-photos')
+      .list(student_id)
 
-    if (dbError) {
-      return NextResponse.json({ error: `Failed to update student profile: ${dbError.message}` }, { status: 500 })
+    if (files && files.length > 0) {
+      const filesToDelete = files.map(f => `${student_id}/${f.name}`)
+      await supabaseService.storage
+        .from('student-photos')
+        .remove(filesToDelete)
     }
 
     return NextResponse.json({ success: true })

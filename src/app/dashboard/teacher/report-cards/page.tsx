@@ -84,7 +84,6 @@ export default async function TeacherReportCardsPage() {
         student_id,
         grade_level,
         section,
-        photo_url,
         class_id,
         profiles (first_name, last_name, email)
       `)
@@ -98,7 +97,7 @@ export default async function TeacherReportCardsPage() {
         student_id: s.student_id,
         grade_level: s.grade_level,
         section: s.section,
-        photo_url: s.photo_url,
+        photo_url: `/api/students/photo?student_id=${s.id}`,
         class_id: s.class_id,
         profiles: singleProfile ? {
           first_name: singleProfile.first_name,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Camera, Trash2, AlertCircle } from 'lucide-react'
 
 interface StudentPhotoManagerProps {
@@ -16,11 +16,30 @@ export default function StudentPhotoManager({
   studentName,
   onUploaded
 }: StudentPhotoManagerProps) {
-  const [photoUrl, setPhotoUrl] = useState<string | null>(currentPhotoUrl)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    let active = true
+    async function checkPhoto() {
+      try {
+        const res = await fetch(`/api/students/photo?student_id=${studentId}&json=true`)
+        if (res.ok) {
+          const data = await res.json()
+          if (active) {
+            setPhotoUrl(data.photo_url)
+          }
+        }
+      } catch (err) {
+        console.error('Error checking student photo:', err)
+      }
+    }
+    checkPhoto()
+    return () => { active = false }
+  }, [studentId])
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]

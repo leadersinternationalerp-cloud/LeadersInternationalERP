@@ -38,10 +38,8 @@ export default async function StudentsPage() {
       student_id,
       grade_level,
       section,
-      photo_url,
-      parent_contact,
       class_id,
-      profiles (first_name, last_name, email)
+      profiles (first_name, last_name, email, phone)
     `)
     .order('created_at', { ascending: false })
 
@@ -79,8 +77,8 @@ export default async function StudentsPage() {
       student_id: s.student_id,
       grade_level: s.grade_level,
       section: s.section,
-      photo_url: s.photo_url,
-      parent_contact: s.parent_contact,
+      photo_url: `/api/students/photo?student_id=${s.id}`,
+      parent_contact: singleProfile?.phone || 'No phone',
       class_id: s.class_id,
       profiles: singleProfile ? {
         first_name: singleProfile.first_name,
