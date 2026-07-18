@@ -12,7 +12,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Missing student_id or term_id' }, { status: 400 })
   }
 
-  const supabase = await createClient()
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!uuidRegex.test(student_id) || !uuidRegex.test(term_id)) {
+    return NextResponse.json({ error: 'Invalid UUID format for student_id or term_id' }, { status: 400 })
+  }
+
+  try {
+    const supabase = await createClient()
 
   // 1. Verify Authentication & Role Access
   const { data: { user } } = await supabase.auth.getUser()
@@ -386,11 +392,15 @@ export async function GET(request: Request) {
   const cleanFirstName = (studentProfile?.first_name || 'Student').replace(/[^a-zA-Z0-9]/g, '')
   const cleanTerm = termName.replace(/[^a-zA-Z0-9]/g, '')
 
-  return new NextResponse(pdfBuffer as any, {
-    status: 200,
-    headers: {
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename="ReportCard_${cleanFirstName}_${cleanTerm}.pdf"`
-    }
-  })
+    return new NextResponse(pdfBuffer as any, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="ReportCard_${cleanFirstName}_${cleanTerm}.pdf"`
+      }
+    })
+  } catch (error: any) {
+    console.error('Download Route Error:', error)
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+  }
 }
