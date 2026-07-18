@@ -145,7 +145,7 @@ export async function POST(request: Request) {
           student_id: user.id,
           class_id: activity.class_id,
           subject_id: subjectId,
-          assessment_type: 'CA',
+          assessment_type: 'HOME WORKS (H/W)',
           term: termName,
           academic_year: academicYearName,
           score: evaluation.percentage,

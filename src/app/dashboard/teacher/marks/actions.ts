@@ -8,7 +8,7 @@ export async function saveMarksAction(formData: FormData) {
   const classId = formData.get('classId') as string
   const subjectId = formData.get('subjectId') as string
   const assessmentType = formData.get('assessmentType') as string
-  const ALLOWED_ASSESSMENT_TYPES = ['Test 1', 'Test 2', 'Mid-Term', 'Terminal', 'CA'] as const;
+  const ALLOWED_ASSESSMENT_TYPES = ['Test 1', 'Test 2', 'Mid-Term', 'Terminal', 'CA', 'HOME WORKS (H/W)', 'HOME WORKS', 'H/W'] as const;
 
   if (!ALLOWED_ASSESSMENT_TYPES.includes(assessmentType as typeof ALLOWED_ASSESSMENT_TYPES[number])) {
     return {

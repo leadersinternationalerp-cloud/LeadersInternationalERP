@@ -76,7 +76,7 @@ async function computeClassStudentRanks(
         if (et.type.toUpperCase() === 'QUIZZES') {
           examScores[et.type] = quizzesAvg
           if (quizzesAvg !== null) hasAnyScore = true
-        } else if (et.type.toUpperCase() === 'CA') {
+        } else if (et.type.toUpperCase() === 'CA' || et.type.toUpperCase().includes('HOME WORKS') || et.type.toUpperCase().includes('H/W')) {
           examScores[et.type] = activityAvg
           if (activityAvg !== null) hasAnyScore = true
         } else {
@@ -380,7 +380,7 @@ export async function GET(request: Request) {
         assessmentConfigs.forEach((et: any) => {
           if (et.type.toUpperCase() === 'QUIZZES') {
             examScores[et.type] = quizzesAvg
-          } else if (et.type.toUpperCase() === 'CA') {
+          } else if (et.type.toUpperCase() === 'CA' || et.type.toUpperCase().includes('HOME WORKS') || et.type.toUpperCase().includes('H/W')) {
             examScores[et.type] = activityAvg
           } else {
             const markRecord = subjMarks.find((m: any) => {
