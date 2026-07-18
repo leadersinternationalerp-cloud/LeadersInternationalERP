@@ -495,7 +495,7 @@ function drawCommentsAndSignatures(doc: PDFKit.PDFDocument, opts: ReportCardOpti
 }
 
 // Main PDF Generator
-export async function generateSmartkidzReportPdf(opts: ReportCardOptions): Promise<Buffer> {
+export async function generateSmartkidzReportPdf(optsOrArray: ReportCardOptions | ReportCardOptions[]): Promise<Buffer> {
   const doc = new PDFDocument({
     size: 'A4',
     margins: { top: 30, bottom: 30, left: 35, right: 35 },
@@ -513,46 +513,58 @@ export async function generateSmartkidzReportPdf(opts: ReportCardOptions): Promi
   // Load logo files
   const logos = loadLogoBuffers()
 
-  // Fetch student photo directly from Supabase storage by student UUID
-  let photoBuffer: Buffer | null = null
-  try {
-    const { createServiceClient } = require('@/utils/supabase/service')
-    const supabaseService = createServiceClient()
-    const { data: files } = await supabaseService.storage
-      .from('student-photos')
-      .list(opts.student.id)
+  const isArray = Array.isArray(optsOrArray)
+  const optsList = isArray ? optsOrArray : [optsOrArray]
 
-    if (files && files.length > 0) {
-      const latestFile = files[0]
-      const { data: blob, error: downloadError } = await supabaseService.storage
-        .from('student-photos')
-        .download(`${opts.student.id}/${latestFile.name}`)
-
-      if (!downloadError && blob) {
-        photoBuffer = Buffer.from(await blob.arrayBuffer())
-      }
+  // Loop through options and generate pages
+  for (let idx = 0; idx < optsList.length; idx++) {
+    const opts = optsList[idx]
+    if (idx > 0) {
+      doc.addPage()
     }
-  } catch (e) {
-    console.error('Error fetching student photo directly from storage:', e)
+
+    // Fetch student photo directly from Supabase storage by student UUID
+    let photoBuffer: Buffer | null = null
+    try {
+      const { createServiceClient } = require('@/utils/supabase/service')
+      const supabaseService = createServiceClient()
+      const { data: files } = await supabaseService.storage
+        .from('student-photos')
+        .list(opts.student.id)
+
+      if (files && files.length > 0) {
+        const latestFile = files[0]
+        const { data: blob, error: downloadError } = await supabaseService.storage
+          .from('student-photos')
+          .download(`${opts.student.id}/${latestFile.name}`)
+
+        if (!downloadError && blob) {
+          photoBuffer = Buffer.from(await blob.arrayBuffer())
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching student photo directly from storage:', e)
+    }
+
+    // Draw Page Content (must fit strictly in 1 A4 page)
+    drawHeader(doc, opts, logos)
+    await drawStudentInfoSection(doc, opts, photoBuffer)
+    drawAcademicTable(doc, opts)
+    
+    // Calculate dynamic starting Y for lower blocks to prevent overlaps
+    const startYGrading = 460
+    drawGradingAndAttendance(doc, opts, startYGrading)
+
+    const startYComments = startYGrading + 95 + 10 // 565
+    drawCommentsAndSignatures(doc, opts, startYComments)
   }
-
-  // Draw Page Content (must fit strictly in 1 A4 page)
-  drawHeader(doc, opts, logos)
-  await drawStudentInfoSection(doc, opts, photoBuffer)
-  drawAcademicTable(doc, opts)
-  
-  // Calculate dynamic starting Y for lower blocks to prevent overlaps
-  const startYGrading = 460
-  drawGradingAndAttendance(doc, opts, startYGrading)
-
-  const startYComments = startYGrading + 95 + 10 // 565
-  drawCommentsAndSignatures(doc, opts, startYComments)
 
   // 3. Draw Footer on all pages
   const range = doc.bufferedPageRange()
   for (let i = range.start; i < range.start + range.count; i++) {
     doc.switchToPage(i)
     
+    const opts = optsList[i] || optsList[0]
     const genDate = opts.generatedDate || new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'long', year: 'numeric' })
     
     // Draw footer background/divider line
@@ -561,7 +573,7 @@ export async function generateSmartkidzReportPdf(opts: ReportCardOptions): Promi
     doc.fontSize(7.5).font('Helvetica').fillColor('#94a3b8')
     doc.text(`Generated: ${genDate} | ${opts.schoolName || 'Leaders International School'}`, 35, 814)
     doc.text('End of Report', 260, 814, { width: 80, align: 'center' })
-    doc.text(`Page ${i + 1} of ${range.count}`, 490, 814, { width: 70, align: 'right' })
+    doc.text('Page 1 of 1', 490, 814, { width: 70, align: 'right' })
   }
 
   // Finalize PDF

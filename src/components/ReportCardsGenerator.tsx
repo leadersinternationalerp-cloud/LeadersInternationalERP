@@ -50,6 +50,7 @@ export default function ReportCardsGenerator({
   const [loadingStudents, setLoadingStudents] = useState(false)
   const [search, setSearch] = useState('')
   const [generatingId, setGeneratingId] = useState<string | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   // Fetch students for class when selection changes
   const fetchStudentsForClass = async (classId: string) => {
@@ -107,19 +108,13 @@ export default function ReportCardsGenerator({
   }, [students, selectedClassId, currentClassDetails, search])
 
   const handleGenerate = (studentId: string) => {
-    window.open(`/api/report-cards/download?student_id=${studentId}&term_id=${selectedTermId}`, '_blank')
+    setPreviewUrl(`/api/report-cards/download?student_id=${studentId}&term_id=${selectedTermId}`)
   }
 
   const handleBulkGenerate = () => {
     if (filteredStudents.length === 0) return
-    const count = filteredStudents.length
-    if (confirm(`Generate report cards for all ${count} students in this class? This will open ${count} new tab(s).`)) {
-      filteredStudents.forEach((student, index) => {
-        setTimeout(() => {
-          window.open(`/api/report-cards/download?student_id=${student.id}&term_id=${selectedTermId}`, '_blank')
-        }, index * 500)
-      })
-    }
+    const ids = filteredStudents.map(s => s.id).join(',')
+    setPreviewUrl(`/api/report-cards/download?student_id=${ids}&term_id=${selectedTermId}`)
   }
 
   // Update photo in local list state when uploaded
@@ -206,26 +201,6 @@ export default function ReportCardsGenerator({
         </div>
       </div>
 
-      {/* 2. Info Banner */}
-      <div 
-        style={{ 
-          padding: '1rem 1.5rem', 
-          backgroundColor: 'rgba(14, 165, 233, 0.05)', 
-          border: '1px solid rgba(14, 165, 233, 0.15)',
-          borderRadius: 'var(--radius-md)', 
-          marginBottom: '1.5rem',
-          display: 'flex',
-          gap: '1rem',
-          alignItems: 'center'
-        }}
-      >
-        <Info size={24} style={{ color: '#0284c7', flexShrink: 0 }} />
-        <div style={{ fontSize: '0.85rem', color: 'var(--color-text)' }}>
-          Logged in as: <strong style={{ color: 'var(--color-secondary)' }}>{roleLabel}</strong>. Showing <strong>{filteredStudents.length}</strong> student(s) for <strong>{currentClassDetails?.class_name || 'Grade'}</strong> in <strong>{selectedTermName}</strong>. 
-          Upload passport-sized photos below to display them automatically in the official Cambridge Academic Report PDF.
-        </div>
-      </div>
-
       {/* 3. Students Directory Table */}
       <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', minHeight: '150px', position: 'relative' }}>
         {loadingStudents && (
@@ -303,6 +278,132 @@ export default function ReportCardsGenerator({
           </tbody>
         </table>
       </div>
+
+      {previewUrl && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100,
+          padding: '1.5rem'
+        }}>
+          <div className="glass-panel" style={{
+            width: '100%',
+            maxWidth: '900px',
+            borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'var(--color-bg)',
+            border: '1px solid var(--color-border)',
+            boxShadow: 'var(--shadow-xl)',
+            display: 'flex',
+            flexDirection: 'column',
+            height: '90vh',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1px solid var(--color-border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1rem',
+              backgroundColor: 'rgba(0,0,0,0.02)'
+            }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>
+                {previewUrl.includes(',') ? 'Bulk Report Cards Preview' : 'Report Card Preview'}
+              </h3>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                {/* Send WhatsApp Placeholder */}
+                <button
+                  onClick={() => alert('WhatsApp Integration Placeholder: Report Card sent successfully to the parent contact.')}
+                  style={{
+                    backgroundColor: '#25D366',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '0.5rem 1rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 4px rgba(37, 211, 102, 0.2)'
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <path d="M12.012 2c-5.506 0-9.989 4.478-9.99 9.984a9.96 9.96 0 0 0 1.333 4.993L2 22l5.233-1.371a9.936 9.936 0 0 0 4.777 1.218h.004c5.505 0 9.989-4.478 9.99-9.983A9.996 9.996 0 0 0 12.012 2zm5.82 14.156c-.252.712-1.461 1.294-2.014 1.347-.503.048-1.155.076-3.435-.866-2.915-1.205-4.786-4.185-4.931-4.378-.146-.193-1.176-1.571-1.176-2.996 0-1.425.728-2.126 1.01-2.408.28-.282.613-.353.818-.353.204 0 .408.002.585.01.183.008.428-.072.67.51.252.608.86 2.1.934 2.25.075.15.125.326.025.524-.1.198-.15.322-.3.494-.15.172-.315.385-.45.517-.15.148-.308.309-.133.61.176.3.78 1.282 1.67 2.075.146.13.275.243.385.342.756.68 1.438.89 1.89 1.037.45.147.88.106 1.213-.242.333-.348 1.46-1.696 1.85-2.28.39-.583.78-.49 1.32-.292.54.198 3.436 1.622 3.636 1.722.202.1.337.15.387.235.05.085.05.495-.202 1.208z"/>
+                  </svg>
+                  Send WhatsApp
+                </button>
+                
+                {/* Download Button */}
+                <a
+                  href={`${previewUrl}&download=true`}
+                  className="btn btn-secondary"
+                  style={{
+                    textDecoration: 'none',
+                    fontSize: '0.85rem',
+                    padding: '0.5rem 1rem',
+                    borderRadius: 'var(--radius-md)',
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    backgroundColor: '#0f172a',
+                    color: '#ffffff',
+                    border: 'none'
+                  }}
+                >
+                  <FileDown size={16} />
+                  Download PDF
+                </a>
+                
+                {/* Close Button */}
+                <button
+                  onClick={() => setPreviewUrl(null)}
+                  style={{
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--color-text-muted)',
+                    padding: '0.25rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '4px',
+                    transition: 'background-color 0.15s'
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            {/* Preview Body */}
+            <div style={{ flex: 1, backgroundColor: '#f8fafc', padding: '1rem', position: 'relative' }}>
+              <iframe
+                src={previewUrl}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
