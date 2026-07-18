@@ -450,7 +450,8 @@ function drawAcademicTable(doc: PDFKit.PDFDocument, opts: ReportCardOptions): nu
   // Table starts at 245. Space occupied below table is ~270pt.
   // 771.89 - (245 - 35) - 270 = ~356. Available table height is ~320.
   // 320 - headerHeight (24) - summaryHeight (17) = ~279pt max height for rows.
-  const maxRowsHeight = 279
+  // We reduce this to 260 to provide extra vertical breathing room at the bottom.
+  const maxRowsHeight = 260
 
   const { rowHeights, remarksFontSize, subjectFontSize, padding } = computeTableLayout(
     doc,
@@ -556,7 +557,7 @@ function drawGradingAndAttendance(doc: PDFKit.PDFDocument, opts: ReportCardOptio
   const startX = 35
   const contentWidth = 525.28
   const boxWidth = (contentWidth - 12) / 2 // 256.64
-  const boxHeight = 90
+  const boxHeight = 80
 
   // 1. Draw GRADING SCALE (CAMBRIDGE) Box (Left)
   doc.roundedRect(startX, startY, boxWidth, boxHeight, 4).lineWidth(1).strokeColor('#cbd5e1').stroke()
@@ -636,7 +637,7 @@ function drawCommentsAndSignatures(doc: PDFKit.PDFDocument, opts: ReportCardOpti
   const contentWidth = 525.28
 
   // 1. Draw Principal Remarks Box
-  const principalBoxHeight = 50
+  const principalBoxHeight = 42
   doc.roundedRect(startX, startY, contentWidth, principalBoxHeight, 4).lineWidth(1).strokeColor('#cbd5e1').stroke()
   doc.rect(startX + 0.5, startY + 0.5, contentWidth - 1, 15).fillColor('#f8fafc').fill()
   
@@ -644,11 +645,11 @@ function drawCommentsAndSignatures(doc: PDFKit.PDFDocument, opts: ReportCardOpti
   doc.text('PRINCIPAL REMARKS', startX + 8, startY + 4)
 
   const principalComment = opts.comments?.principal || 'Commendable progress overall. Keep up the high standard in all subjects.'
-  doc.fontSize(8.5).font('Helvetica').fillColor('#334155')
-  doc.text(principalComment, startX + 8, startY + 20, { width: contentWidth - 16 })
+  doc.fontSize(8).font('Helvetica').fillColor('#334155')
+  doc.text(principalComment, startX + 8, startY + 18, { width: contentWidth - 16 })
 
   // 2. Draw Signatures Layout
-  const sigStartY = startY + principalBoxHeight + 40
+  const sigStartY = startY + principalBoxHeight + 25
   const sigColWidth = contentWidth / 4
 
   const classTeacherName = opts.names?.classTeacher || 'Class Teacher'
@@ -683,6 +684,7 @@ export async function generateSmartkidzReportPdf(optsOrArray: ReportCardOptions 
     margins: { top: 35, bottom: 35, left: 35, right: 35 },
     bufferPages: true
   })
+  ;(doc as any).options.autoPageBreak = false
 
   // Create stream collector
   const pdfBufferPromise = new Promise<Buffer>((resolve, reject) => {
