@@ -180,28 +180,66 @@ export async function GET(request: Request) {
         .eq('student_id', sId)
         .eq('term', termName)
 
+      // Fetch all activity attempts for this student
+      const { data: attempts } = await supabase
+        .from('activity_attempts')
+        .select('percentage, class_activities (subject)')
+        .eq('student_id', sId)
+
       // Assemble subject scores
       const subjectsReport: ReportSubjectMark[] = []
       let totalAverageSum = 0
 
       subjects.forEach(subj => {
-        const subjMarks = (studentMarks || []).filter(m => m.subject_id === subj.id)
-        if (subjMarks.length === 0) return
+        // Calculate class activity average
+        const subjAttempts = (attempts || []).filter((att: any) => {
+          const ca = att.class_activities
+          const subjName = ca?.subject || ''
+          return subjName.toLowerCase() === subj.name.toLowerCase() ||
+                 subjName.toLowerCase() === (subj.code || '').toLowerCase()
+        })
+        const activityAvg = subjAttempts.length > 0
+          ? subjAttempts.reduce((sum: number, att: any) => sum + Number(att.percentage || 0), 0) / subjAttempts.length
+          : null
 
-        // Compute average score across assessments
-        const avgScore = subjMarks.reduce((a, b) => a + Number(b.score), 0) / subjMarks.length
-        const grade = getGradeForPercentage(avgScore, gradingLevels)
-        const lastRemark = subjMarks[subjMarks.length - 1]?.remarks || ''
+        // Calculate exam details
+        const subjMarks = (studentMarks || []).filter(m => m.subject_id === subj.id)
+        let examText = '-'
+        let examScore: number | null = null
+        let lastRemark = ''
+
+        if (subjMarks.length > 0) {
+          const lastMark = subjMarks[subjMarks.length - 1]
+          examScore = Number(lastMark.score || 0)
+          examText = `${lastMark.assessment_type || 'Exam'}: ${examScore}%`
+          lastRemark = lastMark.remarks || ''
+        }
+
+        // Combine for overall score
+        let overallScore = 0
+        if (activityAvg !== null && examScore !== null) {
+          overallScore = (activityAvg + examScore) / 2
+        } else if (activityAvg !== null) {
+          overallScore = activityAvg
+        } else if (examScore !== null) {
+          overallScore = examScore
+        } else {
+          return
+        }
+
+        const grade = getGradeForPercentage(overallScore, gradingLevels)
 
         subjectsReport.push({
           subject_name: subj.name,
           subject_code: subj.code,
-          score: avgScore,
+          activity_avg: activityAvg !== null ? `${activityAvg.toFixed(0)}%` : '-',
+          exam_info: examText,
+          score: overallScore,
           grade,
           remarks: lastRemark
         })
 
-        totalAverageSum += avgScore
+        totalAverageSum += overallScore
       })
 
       // Aggregated results

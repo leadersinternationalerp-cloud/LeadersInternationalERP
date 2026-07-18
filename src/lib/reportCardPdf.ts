@@ -6,6 +6,8 @@ import { GradeLevel } from '@/utils/grading'
 export interface ReportSubjectMark {
   subject_name: string
   subject_code?: string
+  activity_avg: string
+  exam_info: string
   score: number
   grade: string
   remarks: string
@@ -126,12 +128,11 @@ export function loadLogoBuffers() {
   return { logoBuffer, cambridgeBuffer }
 }
 
-// Helper to get grade color code
+// Color lookup helper based on grade ranges
 export function getGradeColorHex(grade: string): string {
   const g = grade.trim().toUpperCase()
-  if (g === 'A*' || g === 'A') return '#047857' // Green
-  if (g === 'B') return '#1d4ed8' // Blue
-  if (g === 'C') return '#1e293b' // Dark slate
+  if (g === 'A*' || g === 'A') return '#047857' // Emerald green
+  if (g === 'B' || g === 'C') return '#0284c7' // Blue
   if (g === 'D' || g === 'E') return '#d97706' // Amber
   if (g === 'F' || g === 'G') return '#b91c1c' // Red
   return '#1e293b'
@@ -193,24 +194,6 @@ function drawHeader(doc: PDFKit.PDFDocument, opts: ReportCardOptions, logos: { l
   doc.lineWidth(0.5).strokeColor('#00264b').moveTo(startX, 85).lineTo(startX + contentWidth, 85).stroke()
 }
 
-// Helper to calculate student age
-function computeAge(dobString?: string): string {
-  if (!dobString) return 'N/A'
-  try {
-    const dob = new Date(dobString)
-    if (isNaN(dob.getTime())) return 'N/A'
-    const today = new Date()
-    let age = today.getFullYear() - dob.getFullYear()
-    const m = today.getMonth() - dob.getMonth()
-    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
-      age--
-    }
-    return age > 0 ? `${age} Yrs` : '0 Yrs'
-  } catch {
-    return 'N/A'
-  }
-}
-
 // Draw Student Info
 async function drawStudentInfoSection(
   doc: PDFKit.PDFDocument,
@@ -237,7 +220,6 @@ async function drawStudentInfoSection(
   doc.text('STUDENT INFORMATION', startX + 10, startY + 5)
 
   // 4. Fill Student Info Fields
-  const dobVal = opts.student.dob ? new Date(opts.student.dob).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'
   const admDateVal = opts.student.admission_date ? new Date(opts.student.admission_date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'
 
   const col1Left = startX + 12
@@ -250,13 +232,10 @@ async function drawStudentInfoSection(
     { label: 'Admission No:', value: opts.student.student_id, col: 1, row: 1 },
     { label: 'Class / Grade:', value: `${opts.classInfo.class_name} ${opts.classInfo.section || ''}`.toUpperCase(), col: 1, row: 2 },
     { label: 'Academic Year:', value: opts.term.academic_year, col: 1, row: 3 },
-    { label: 'Date of Birth:', value: dobVal, col: 1, row: 4 },
 
     { label: 'Gender:', value: opts.student.gender || 'N/A', col: 2, row: 0 },
     { label: 'Term:', value: opts.term.term_name, col: 2, row: 1 },
-    { label: 'Age (Computed):', value: computeAge(opts.student.dob), col: 2, row: 2 },
-    { label: 'Admission Date:', value: admDateVal, col: 2, row: 3 },
-    { label: 'Student ID Code:', value: opts.student.id.substring(0, 8).toUpperCase(), col: 2, row: 4 },
+    { label: 'Admission Date:', value: admDateVal, col: 2, row: 2 },
   ]
 
   doc.fillColor('#0f172a')
@@ -265,7 +244,7 @@ async function drawStudentInfoSection(
     const y = rowStartY + f.row * rowHeight
     doc.fontSize(8.5).font('Helvetica-Bold').text(f.label, x, y)
     doc.font('Helvetica').text(f.value || 'N/A', x + (f.col === 1 ? 82 : 90), y)
-  })
+  });
 
   // 5. Draw Student Passport Box on the far right
   const photoWidth = 72
@@ -304,10 +283,12 @@ function drawAcademicTable(doc: PDFKit.PDFDocument, opts: ReportCardOptions) {
   const startY = 245
   const contentWidth = 525.28
 
-  const colSubjectWidth = 125
-  const colScoreWidth = 55
-  const colGradeWidth = 55
-  const colRemarksWidth = contentWidth - colSubjectWidth - colScoreWidth - colGradeWidth // 290.28
+  const colSubjectWidth = 110
+  const colActivityWidth = 85
+  const colExamWidth = 95
+  const colOverallWidth = 55
+  const colGradeWidth = 45
+  const colRemarksWidth = contentWidth - colSubjectWidth - colActivityWidth - colExamWidth - colOverallWidth - colGradeWidth // 135.28
   
   const headerHeight = 20
   const rowHeight = 17
@@ -315,11 +296,13 @@ function drawAcademicTable(doc: PDFKit.PDFDocument, opts: ReportCardOptions) {
   // 1. Draw Table Header
   doc.rect(startX, startY, contentWidth, headerHeight).fillColor('#0f172a').fill()
   
-  doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#ffffff')
+  doc.fontSize(8).font('Helvetica-Bold').fillColor('#ffffff')
   doc.text('SUBJECT', startX + 8, startY + 6)
-  doc.text('SCORE (%)', startX + colSubjectWidth + 5, startY + 6)
-  doc.text('GRADE', startX + colSubjectWidth + colScoreWidth + 8, startY + 6)
-  doc.text('TEACHER REMARKS / CONSTRUCTIVE FEEDBACK', startX + colSubjectWidth + colScoreWidth + colGradeWidth + 8, startY + 6)
+  doc.text('ACTIVITY (AVG)', startX + colSubjectWidth + 5, startY + 6)
+  doc.text('EXAM (SCORE)', startX + colSubjectWidth + colActivityWidth + 5, startY + 6)
+  doc.text('OVERALL', startX + colSubjectWidth + colActivityWidth + colExamWidth + 5, startY + 6)
+  doc.text('GRADE', startX + colSubjectWidth + colActivityWidth + colExamWidth + colOverallWidth + 8, startY + 6)
+  doc.text('REMARKS', startX + colSubjectWidth + colActivityWidth + colExamWidth + colOverallWidth + colGradeWidth + 8, startY + 6)
 
   let currentY = startY + headerHeight
 
@@ -330,19 +313,21 @@ function drawAcademicTable(doc: PDFKit.PDFDocument, opts: ReportCardOptions) {
     doc.rect(startX, currentY, contentWidth, rowHeight).fillColor(bgColor).fill()
     
     // Draw cells
-    doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#0f172a')
+    doc.fontSize(8).font('Helvetica-Bold').fillColor('#0f172a')
     doc.text(subj.subject_name.toUpperCase(), startX + 8, currentY + 4, { width: colSubjectWidth - 12, lineBreak: false })
     
     doc.font('Helvetica')
-    doc.text(`${subj.score.toFixed(0)}%`, startX + colSubjectWidth + 12, currentY + 4)
+    doc.text(subj.activity_avg, startX + colSubjectWidth + 12, currentY + 4)
+    doc.text(subj.exam_info, startX + colSubjectWidth + colActivityWidth + 8, currentY + 4)
+    doc.text(`${subj.score.toFixed(0)}%`, startX + colSubjectWidth + colActivityWidth + colExamWidth + 12, currentY + 4)
     
     const gradeColor = getGradeColorHex(subj.grade)
     doc.font('Helvetica-Bold').fillColor(gradeColor)
-    doc.text(subj.grade, startX + colSubjectWidth + colScoreWidth + 16, currentY + 4)
+    doc.text(subj.grade, startX + colSubjectWidth + colActivityWidth + colExamWidth + colOverallWidth + 12, currentY + 4)
     
     doc.font('Helvetica').fillColor('#334155')
     const remark = subj.remarks || getDefaultRemark(subj.grade)
-    doc.text(remark, startX + colSubjectWidth + colScoreWidth + colGradeWidth + 8, currentY + 4, { width: colRemarksWidth - 16, height: rowHeight - 4, lineBreak: false })
+    doc.text(remark, startX + colSubjectWidth + colActivityWidth + colExamWidth + colOverallWidth + colGradeWidth + 8, currentY + 4, { width: colRemarksWidth - 16, height: rowHeight - 4, lineBreak: false })
 
     // Border lines
     doc.lineWidth(0.5).strokeColor('#e2e8f0').moveTo(startX, currentY + rowHeight).lineTo(startX + contentWidth, currentY + rowHeight).stroke()
