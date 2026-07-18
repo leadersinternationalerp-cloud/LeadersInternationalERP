@@ -7,7 +7,7 @@ export interface ReportSubjectMark {
   subject_name: string
   subject_code?: string
   activity_avg: string
-  exam_info: string
+  exam_scores: Record<string, number | null>
   score: number
   grade: string
   remarks: string
@@ -39,6 +39,7 @@ export interface ReportCardOptions {
     class_name: string
     section?: string
   }
+  examTypes: { id: string; name: string; weight: number }[]
   subjects: ReportSubjectMark[]
   gradingLevels: GradeLevel[]
   totalScore: number
@@ -283,12 +284,20 @@ function drawAcademicTable(doc: PDFKit.PDFDocument, opts: ReportCardOptions) {
   const startY = 245
   const contentWidth = 525.28
 
+  const examTypes = opts.examTypes || [
+    { id: 'test_1', name: 'Test 1', weight: 20 },
+    { id: 'opener', name: 'Opener', weight: 20 },
+    { id: 'terminal', name: 'Terminal', weight: 60 }
+  ]
+
   const colSubjectWidth = 110
-  const colActivityWidth = 85
-  const colExamWidth = 95
-  const colOverallWidth = 55
+  const colActivityWidth = 70
+  const colOverallWidth = 50
   const colGradeWidth = 45
-  const colRemarksWidth = contentWidth - colSubjectWidth - colActivityWidth - colExamWidth - colOverallWidth - colGradeWidth // 135.28
+  const colRemarksWidth = 120
+
+  const totalExamWidth = contentWidth - colSubjectWidth - colActivityWidth - colOverallWidth - colGradeWidth - colRemarksWidth // 130.28
+  const examColWidth = totalExamWidth / examTypes.length
   
   const headerHeight = 20
   const rowHeight = 17
@@ -296,13 +305,21 @@ function drawAcademicTable(doc: PDFKit.PDFDocument, opts: ReportCardOptions) {
   // 1. Draw Table Header
   doc.rect(startX, startY, contentWidth, headerHeight).fillColor('#0f172a').fill()
   
-  doc.fontSize(8).font('Helvetica-Bold').fillColor('#ffffff')
+  doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#ffffff')
   doc.text('SUBJECT', startX + 8, startY + 6)
   doc.text('ACTIVITY (AVG)', startX + colSubjectWidth + 5, startY + 6)
-  doc.text('EXAM (SCORE)', startX + colSubjectWidth + colActivityWidth + 5, startY + 6)
-  doc.text('OVERALL', startX + colSubjectWidth + colActivityWidth + colExamWidth + 5, startY + 6)
-  doc.text('GRADE', startX + colSubjectWidth + colActivityWidth + colExamWidth + colOverallWidth + 8, startY + 6)
-  doc.text('REMARKS', startX + colSubjectWidth + colActivityWidth + colExamWidth + colOverallWidth + colGradeWidth + 8, startY + 6)
+
+  // Draw dynamic exam headers
+  let currentX = startX + colSubjectWidth + colActivityWidth
+  examTypes.forEach(et => {
+    const headerText = `${et.name.toUpperCase()} (${et.weight}%)`
+    doc.text(headerText, currentX + 2, startY + 6, { width: examColWidth - 4, align: 'center', lineBreak: false })
+    currentX += examColWidth
+  })
+
+  doc.text('OVERALL', currentX + 5, startY + 6)
+  doc.text('GRADE', currentX + colOverallWidth + 8, startY + 6)
+  doc.text('REMARKS', currentX + colOverallWidth + colGradeWidth + 8, startY + 6)
 
   let currentY = startY + headerHeight
 
@@ -313,21 +330,30 @@ function drawAcademicTable(doc: PDFKit.PDFDocument, opts: ReportCardOptions) {
     doc.rect(startX, currentY, contentWidth, rowHeight).fillColor(bgColor).fill()
     
     // Draw cells
-    doc.fontSize(8).font('Helvetica-Bold').fillColor('#0f172a')
+    doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#0f172a')
     doc.text(subj.subject_name.toUpperCase(), startX + 8, currentY + 4, { width: colSubjectWidth - 12, lineBreak: false })
     
     doc.font('Helvetica')
     doc.text(subj.activity_avg, startX + colSubjectWidth + 12, currentY + 4)
-    doc.text(subj.exam_info, startX + colSubjectWidth + colActivityWidth + 8, currentY + 4)
-    doc.text(`${subj.score.toFixed(0)}%`, startX + colSubjectWidth + colActivityWidth + colExamWidth + 12, currentY + 4)
+
+    // Draw dynamic exam scores
+    let cellX = startX + colSubjectWidth + colActivityWidth
+    examTypes.forEach(et => {
+      const scoreVal = subj.exam_scores[et.id]
+      const scoreText = scoreVal !== null && scoreVal !== undefined ? `${scoreVal.toFixed(0)}%` : '-'
+      doc.text(scoreText, cellX + 2, currentY + 4, { width: examColWidth - 4, align: 'center' })
+      cellX += examColWidth
+    })
+    
+    doc.text(`${subj.score.toFixed(0)}%`, cellX + 12, currentY + 4)
     
     const gradeColor = getGradeColorHex(subj.grade)
     doc.font('Helvetica-Bold').fillColor(gradeColor)
-    doc.text(subj.grade, startX + colSubjectWidth + colActivityWidth + colExamWidth + colOverallWidth + 12, currentY + 4)
+    doc.text(subj.grade, cellX + colOverallWidth + 12, currentY + 4)
     
     doc.font('Helvetica').fillColor('#334155')
     const remark = subj.remarks || getDefaultRemark(subj.grade)
-    doc.text(remark, startX + colSubjectWidth + colActivityWidth + colExamWidth + colOverallWidth + colGradeWidth + 8, currentY + 4, { width: colRemarksWidth - 16, height: rowHeight - 4, lineBreak: false })
+    doc.text(remark, cellX + colOverallWidth + colGradeWidth + 8, currentY + 4, { width: colRemarksWidth - 16, height: rowHeight - 4, lineBreak: false })
 
     // Border lines
     doc.lineWidth(0.5).strokeColor('#e2e8f0').moveTo(startX, currentY + rowHeight).lineTo(startX + contentWidth, currentY + rowHeight).stroke()

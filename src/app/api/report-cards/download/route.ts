@@ -63,6 +63,19 @@ export async function GET(request: Request) {
       .single()
     const gradingLevels = parseGradingLevels(systemSettings?.value)
 
+    // Load exam types from settings
+    const { data: examTypesSetting } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'exam_types')
+      .maybeSingle()
+    
+    const examTypes = examTypesSetting?.value || [
+      { id: 'test_1', name: 'Test 1', weight: 20 },
+      { id: 'opener', name: 'Opener', weight: 20 },
+      { id: 'terminal', name: 'Terminal', weight: 60 }
+    ]
+
     const pdfOptionsList: ReportCardOptions[] = []
 
     // 3. Process each student record sequentially
@@ -202,27 +215,43 @@ export async function GET(request: Request) {
           ? subjAttempts.reduce((sum: number, att: any) => sum + Number(att.percentage || 0), 0) / subjAttempts.length
           : null
 
-        // Calculate exam details
+        // Calculate dynamic exam scores and weighted average
         const subjMarks = (studentMarks || []).filter(m => m.subject_id === subj.id)
-        let examText = '-'
-        let examScore: number | null = null
+        const examScores: Record<string, number | null> = {}
+        let weightedExamSum = 0
+        let totalExamWeightUsed = 0
         let lastRemark = ''
 
-        if (subjMarks.length > 0) {
-          const lastMark = subjMarks[subjMarks.length - 1]
-          examScore = Number(lastMark.score || 0)
-          examText = `${lastMark.assessment_type || 'Exam'}: ${examScore}%`
-          lastRemark = lastMark.remarks || ''
-        }
+        examTypes.forEach((et: any) => {
+          const markRecord = subjMarks.find((m: any) => {
+            const mType = (m.assessment_type || '').toLowerCase().trim()
+            const etName = (et.name || '').toLowerCase().trim()
+            const etId = (et.id || '').toLowerCase().trim()
+            return mType === etName || mType === etId || mType.includes(etName) || etName.includes(mType)
+          })
+
+          const score = markRecord ? Number(markRecord.score) : null
+          examScores[et.id] = score
+
+          if (score !== null) {
+            weightedExamSum += score * Number(et.weight)
+            totalExamWeightUsed += Number(et.weight)
+            if (markRecord?.remarks) {
+              lastRemark = markRecord.remarks
+            }
+          }
+        })
+
+        const examAvg = totalExamWeightUsed > 0 ? (weightedExamSum / totalExamWeightUsed) : null
 
         // Combine for overall score
         let overallScore = 0
-        if (activityAvg !== null && examScore !== null) {
-          overallScore = (activityAvg + examScore) / 2
+        if (activityAvg !== null && examAvg !== null) {
+          overallScore = (activityAvg + examAvg) / 2
         } else if (activityAvg !== null) {
           overallScore = activityAvg
-        } else if (examScore !== null) {
-          overallScore = examScore
+        } else if (examAvg !== null) {
+          overallScore = examAvg
         } else {
           return
         }
@@ -233,7 +262,7 @@ export async function GET(request: Request) {
           subject_name: subj.name,
           subject_code: subj.code,
           activity_avg: activityAvg !== null ? `${activityAvg.toFixed(0)}%` : '-',
-          exam_info: examText,
+          exam_scores: examScores,
           score: overallScore,
           grade,
           remarks: lastRemark
@@ -359,6 +388,7 @@ export async function GET(request: Request) {
           class_name: className,
           section: classSection
         },
+        examTypes,
         subjects: subjectsReport,
         gradingLevels,
         totalScore,

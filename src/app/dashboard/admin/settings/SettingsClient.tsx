@@ -53,6 +53,58 @@ export default function SettingsClient({
   const [settingsMessage, setSettingsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [uploadingLogo, setUploadingLogo] = useState(false)
 
+  // Exam Types & Weights state
+  const [examTypes, setExamTypes] = useState<any[]>(() => {
+    return initialSettings.exam_types || [
+      { id: 'test_1', name: 'Test 1', weight: 20 },
+      { id: 'opener', name: 'Opener', weight: 20 },
+      { id: 'terminal', name: 'Terminal', weight: 60 }
+    ]
+  })
+  const [savingExamTypes, setSavingExamTypes] = useState(false)
+  const [examTypesMessage, setExamTypesMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [newTypeName, setNewTypeName] = useState('')
+  const [newTypeWeight, setNewTypeWeight] = useState(0)
+
+  const handleAddExamType = () => {
+    if (!newTypeName.trim()) return
+    const id = newTypeName.toLowerCase().replace(/[^a-z0-9]/g, '_')
+    if (examTypes.some(t => t.id === id)) {
+      alert('An exam type with this name already exists.')
+      return
+    }
+    setExamTypes([...examTypes, { id, name: newTypeName, weight: Number(newTypeWeight) }])
+    setNewTypeName('')
+    setNewTypeWeight(0)
+  }
+
+  const handleRemoveExamType = (id: string) => {
+    setExamTypes(examTypes.filter(t => t.id !== id))
+  }
+
+  const handleSaveExamTypes = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const totalWeight = examTypes.reduce((sum, t) => sum + Number(t.weight), 0)
+    if (totalWeight !== 100) {
+      setExamTypesMessage({ type: 'error', text: `Failed: Total weight must equal exactly 100% (currently ${totalWeight}%).` })
+      return
+    }
+
+    setSavingExamTypes(true)
+    setExamTypesMessage(null)
+    try {
+      const res = await saveSystemSettingsAction('exam_types', examTypes)
+      if (res.error) {
+        throw new Error(res.error)
+      }
+      setExamTypesMessage({ type: 'success', text: 'Exam types and weights saved successfully!' })
+    } catch (err: any) {
+      setExamTypesMessage({ type: 'error', text: err.message || 'Failed to save settings' })
+    } finally {
+      setSavingExamTypes(false)
+    }
+  }
+
   // Academic Year State
   const [academicYears, setAcademicYears] = useState<any[]>(initialAcademicYears)
   const [yearName, setYearName] = useState('')
@@ -387,6 +439,149 @@ export default function SettingsClient({
               style={{ marginTop: '0.5rem', width: '100%', padding: '0.75rem' }}
             >
               {savingSettings ? 'Saving Settings...' : 'Save Settings'}
+            </button>
+          </form>
+        </div>
+
+        {/* Exam Types Configurations */}
+        <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
+          <h2 style={{ fontSize: '1.25rem', marginBottom: '1.25rem', fontWeight: 600 }}>Report Card Exam Types & Weights</h2>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+            Define the exam types (columns) to appear on the student report cards and set their weights for computing the overall average.
+          </p>
+
+          <form onSubmit={handleSaveExamTypes} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {examTypes.map((type, index) => (
+                <div key={type.id} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 40px', gap: '0.75rem', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    className="input-field"
+                    style={{ padding: '0.4rem 0.75rem' }}
+                    value={type.name}
+                    onChange={(e) => {
+                      const newTypes = [...examTypes]
+                      newTypes[index] = { ...type, name: e.target.value }
+                      setExamTypes(newTypes)
+                    }}
+                    required
+                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Weight:</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      className="input-field"
+                      style={{ padding: '0.4rem 0.5rem', width: '100%' }}
+                      value={type.weight}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value)
+                        const newTypes = [...examTypes]
+                        newTypes[index] = { ...type, weight: isNaN(val) ? 0 : val }
+                        setExamTypes(newTypes)
+                      }}
+                      required
+                    />
+                    <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>%</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveExamType(type.id)}
+                    style={{
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      color: 'var(--color-error)',
+                      cursor: 'pointer',
+                      fontSize: '1.1rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    🗑️
+                  </button>
+                </div>
+              ))}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 40px', gap: '0.75rem', alignItems: 'center', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--color-border)' }}>
+                <input
+                  type="text"
+                  placeholder="New exam type (e.g. Midterm)"
+                  className="input-field"
+                  style={{ padding: '0.4rem 0.75rem' }}
+                  value={newTypeName}
+                  onChange={(e) => setNewTypeName(e.target.value)}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Weight:</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    className="input-field"
+                    style={{ padding: '0.4rem 0.5rem', width: '100%' }}
+                    value={newTypeWeight}
+                    onChange={(e) => setNewTypeWeight(Number(e.target.value))}
+                  />
+                  <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>%</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddExamType}
+                  className="btn"
+                  style={{
+                    backgroundColor: 'rgba(59, 179, 195, 0.1)',
+                    color: 'var(--color-secondary)',
+                    padding: '0.4rem',
+                    borderRadius: 'var(--radius-sm)',
+                    border: 'none',
+                    fontWeight: 600
+                  }}
+                >
+                  ➕
+                </button>
+              </div>
+            </div>
+
+            <div style={{
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              display: 'flex',
+              justifyContent: 'space-between',
+              padding: '0.5rem',
+              borderRadius: 'var(--radius-sm)',
+              backgroundColor: 'rgba(0,0,0,0.02)',
+              border: '1px solid var(--color-border)'
+            }}>
+              <span>Total Combined Weight:</span>
+              <span style={{
+                color: examTypes.reduce((sum, t) => sum + Number(t.weight), 0) === 100 ? 'var(--color-success)' : 'var(--color-error)'
+              }}>
+                {examTypes.reduce((sum, t) => sum + Number(t.weight), 0)}%
+              </span>
+            </div>
+
+            {examTypesMessage && (
+              <div style={{
+                padding: '0.75rem',
+                borderRadius: 'var(--radius-sm)',
+                backgroundColor: examTypesMessage.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                color: examTypesMessage.type === 'success' ? 'var(--color-success)' : 'var(--color-error)',
+                fontSize: '0.875rem',
+                borderLeft: `4px solid ${examTypesMessage.type === 'success' ? 'var(--color-success)' : 'var(--color-error)'}`
+              }}>
+                {examTypesMessage.text}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={savingExamTypes}
+              style={{ width: '100%', padding: '0.75rem' }}
+            >
+              {savingExamTypes ? 'Saving scale...' : 'Save Exam Types & Weights'}
             </button>
           </form>
         </div>
