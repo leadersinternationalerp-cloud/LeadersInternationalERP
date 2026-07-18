@@ -164,7 +164,7 @@ export default function DashboardLayoutClient({
           )}
 
           <NavLink href="/dashboard/principal/report-cards" icon={FileSpreadsheet}>
-            Report Cards Generator
+            Report Cards (Principal)
           </NavLink>
         </>
       )}
@@ -259,6 +259,9 @@ export default function DashboardLayoutClient({
           <NavLink href="/dashboard/dean/submissions" icon={BookOpen}>
             Submissions Review
           </NavLink>
+          <NavLink href="/dashboard/dean/report-cards" icon={FileSpreadsheet}>
+            Report Cards (Dean)
+          </NavLink>
         </>
       )}
 
@@ -300,6 +303,9 @@ export default function DashboardLayoutClient({
           </NavLink>
           <NavLink href="/dashboard/teacher/quizzes/jobs" icon={Sparkles}>
             Quiz Print Jobs
+          </NavLink>
+          <NavLink href="/dashboard/teacher/report-cards" icon={FileSpreadsheet}>
+            Report Cards (Teacher)
           </NavLink>
         </>
       )}
