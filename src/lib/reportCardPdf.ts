@@ -681,7 +681,7 @@ function drawCommentsAndSignatures(doc: PDFKit.PDFDocument, opts: ReportCardOpti
 export async function generateSmartkidzReportPdf(optsOrArray: ReportCardOptions | ReportCardOptions[]): Promise<Buffer> {
   const doc = new PDFDocument({
     size: 'A4',
-    margins: { top: 35, bottom: 35, left: 35, right: 35 },
+    margins: { top: 35, bottom: 20, left: 35, right: 35 },
     bufferPages: true
   })
   ;(doc as any).options.autoPageBreak = false
@@ -748,6 +748,10 @@ export async function generateSmartkidzReportPdf(optsOrArray: ReportCardOptions 
   for (let i = range.start; i < range.start + range.count; i++) {
     doc.switchToPage(i)
     
+    // Temporarily disable bottom margin to prevent auto page breaks
+    const oldMarginBottom = doc.page.margins.bottom
+    doc.page.margins.bottom = 0
+    
     const opts = optsList[i] || optsList[0]
     const genDate = opts.generatedDate || new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'long', year: 'numeric' })
     
@@ -758,6 +762,9 @@ export async function generateSmartkidzReportPdf(optsOrArray: ReportCardOptions 
     doc.text(`Generated: ${genDate} | ${opts.schoolName || 'Leaders International School'}`, 35, 808)
     doc.text('End of Report', 260, 808, { width: 80, align: 'center' })
     doc.text('Page 1 of 1', 490, 808, { width: 70, align: 'right' })
+
+    // Restore bottom margin
+    doc.page.margins.bottom = oldMarginBottom
   }
 
   // Finalize PDF
