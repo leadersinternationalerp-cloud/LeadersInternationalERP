@@ -41,7 +41,7 @@ export default async function StudentsPage() {
       photo_url,
       parent_contact,
       class_id,
-      profiles:id (first_name, last_name, email)
+      profiles (first_name, last_name, email)
     `)
     .order('created_at', { ascending: false })
 

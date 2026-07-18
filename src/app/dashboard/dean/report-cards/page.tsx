@@ -37,8 +37,14 @@ export default async function DeanReportCardsPage() {
   const { data: classesData } = await supabase
     .from('classes')
     .select('*')
-    .order('class_name', { ascending: true })
-  const classes = classesData || []
+    .order('name', { ascending: true })
+  
+  const classes = (classesData || []).map(c => ({
+    id: c.id,
+    class_name: c.name || '',
+    section: c.section || '',
+    name: c.name || ''
+  }))
 
   // 4. Fetch initial student list for the first class
   let initialStudents: any[] = []
@@ -54,7 +60,7 @@ export default async function DeanReportCardsPage() {
         section,
         photo_url,
         class_id,
-        profiles:id (first_name, last_name, email)
+        profiles (first_name, last_name, email)
       `)
       .eq('class_id', firstClassId)
     

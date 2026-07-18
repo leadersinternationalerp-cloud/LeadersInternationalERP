@@ -103,7 +103,7 @@ export async function GET(request: Request) {
       grade_level,
       section,
       class_id,
-      profiles:id (first_name, last_name, email)
+      profiles (first_name, last_name, email)
     `)
     .eq('id', student_id)
     .single()

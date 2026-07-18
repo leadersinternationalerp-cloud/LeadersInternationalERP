@@ -69,7 +69,7 @@ export async function GET(request: Request) {
       section,
       photo_url,
       class_id,
-      profiles:id (first_name, last_name, email)
+      profiles (first_name, last_name, email)
     `)
     .eq('class_id', class_id)
 
@@ -86,7 +86,7 @@ export async function GET(request: Request) {
         section,
         photo_url,
         class_id,
-        profiles:id (first_name, last_name, email)
+        profiles (first_name, last_name, email)
       `)
       .eq('grade_level', classInfo.name)
       .eq('section', classInfo.section || null)
@@ -113,7 +113,10 @@ export async function GET(request: Request) {
   })
 
   return NextResponse.json({
-    classInfo,
+    classInfo: classInfo ? {
+      ...classInfo,
+      class_name: classInfo.class_name || classInfo.name
+    } : null,
     students: mappedStudents
   })
 }

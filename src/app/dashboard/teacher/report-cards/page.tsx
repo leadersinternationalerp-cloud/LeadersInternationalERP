@@ -39,14 +39,19 @@ export default async function TeacherReportCardsPage() {
     const { data: allCls } = await supabase
       .from('classes')
       .select('*')
-      .order('class_name', { ascending: true })
-    classes = allCls || []
+      .order('name', { ascending: true })
+    classes = (allCls || []).map(c => ({
+      id: c.id,
+      class_name: c.name || '',
+      section: c.section || '',
+      name: c.name || ''
+    }))
   } else {
     const { data: classSubjects } = await supabase
       .from('class_subjects')
       .select(`
         class_id,
-        classes:class_id (id, name, class_name, section)
+        classes:class_id (id, name, section)
       `)
       .eq('teacher_id', user.id)
 
@@ -55,7 +60,12 @@ export default async function TeacherReportCardsPage() {
     if (classSubjects) {
       classSubjects.forEach((cs: any) => {
         if (cs.classes && cs.classes.id) {
-          uniqueClassMap.set(cs.classes.id, cs.classes)
+          uniqueClassMap.set(cs.classes.id, {
+            id: cs.classes.id,
+            class_name: cs.classes.name || '',
+            section: cs.classes.section || '',
+            name: cs.classes.name || ''
+          })
         }
       })
     }
@@ -76,7 +86,7 @@ export default async function TeacherReportCardsPage() {
         section,
         photo_url,
         class_id,
-        profiles:id (first_name, last_name, email)
+        profiles (first_name, last_name, email)
       `)
       .eq('class_id', firstClassId)
     
