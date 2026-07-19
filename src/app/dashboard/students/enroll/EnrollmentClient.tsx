@@ -20,7 +20,12 @@ export default function EnrollmentClient() {
     grade_level: 'Grade 1',
     section: 'A',
     parent_id: '',
-    relationship: 'Parent'
+    relationship: 'Parent',
+    medical_info: '',
+    allergies: '',
+    language_at_home: 'English',
+    previous_school: '',
+    emergency_contact: ''
   })
 
   // Photo state
@@ -32,6 +37,35 @@ export default function EnrollmentClient() {
   const [parentResults, setParentResults] = useState<any[]>([])
   const [selectedParent, setSelectedParent] = useState<any>(null)
   const [searching, setSearching] = useState(false)
+  const [ageWarning, setAgeWarning] = useState('')
+
+  const getAge = (dateString: string) => {
+    if (!dateString) return 0
+    const today = new Date()
+    const birthDate = new Date(dateString)
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const m = today.getMonth() - birthDate.getMonth()
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--
+    }
+    return age
+  }
+
+  const checkAge = (dobVal: string, gradeVal: string) => {
+    if (!dobVal) {
+      setAgeWarning('')
+      return
+    }
+    const age = getAge(dobVal)
+    const isEy = ['Baby Class', 'Playgroup', 'Nursery', 'Reception', 'KG1', 'KG2', 'Pre-Primary'].includes(gradeVal)
+    if (isEy && age >= 6) {
+      setAgeWarning(`Warning: Child is ${age} years old, which is older than the standard Early Years range (under 6 years).`)
+    } else if (!isEy && age < 6) {
+      setAgeWarning(`Warning: Student is ${age} years old, which is younger than the standard Primary range (6+ years).`)
+    } else {
+      setAgeWarning('')
+    }
+  }
 
   const handleSearchParent = async () => {
     if (!parentSearch.trim()) return
@@ -50,11 +84,13 @@ export default function EnrollmentClient() {
     setParentResults([])
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    })
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    const updatedForm = { ...formData, [name]: value }
+    setFormData(updatedForm)
+    if (name === 'dob' || name === 'grade_level') {
+      checkAge(name === 'dob' ? value : formData.dob, name === 'grade_level' ? value : formData.grade_level)
+    }
   }
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -138,11 +174,17 @@ export default function EnrollmentClient() {
       grade_level: 'Grade 1',
       section: 'A',
       parent_id: '',
-      relationship: 'Parent'
+      relationship: 'Parent',
+      medical_info: '',
+      allergies: '',
+      language_at_home: 'English',
+      previous_school: '',
+      emergency_contact: ''
     })
     setPhotoFile(null)
     setPhotoPreview('')
     setSelectedParent(null)
+    setAgeWarning('')
     setLoading(false)
   }
 
@@ -180,6 +222,11 @@ export default function EnrollmentClient() {
           <div className="form-group">
             <label className="form-label">Date of Birth *</label>
             <input type="date" name="dob" value={formData.dob} onChange={handleChange} className="input-field" required />
+            {ageWarning && (
+              <div style={{ color: '#d97706', fontSize: '0.75rem', marginTop: '0.25rem', fontWeight: 500 }}>
+                {ageWarning}
+              </div>
+            )}
           </div>
 
           <div className="form-group">
@@ -198,14 +245,25 @@ export default function EnrollmentClient() {
           <div className="form-group">
             <label className="form-label">Enrollment Class *</label>
             <select name="grade_level" value={formData.grade_level} onChange={handleChange} className="input-field" required>
-              <option value="Grade 1">Grade 1</option>
-              <option value="Grade 2">Grade 2</option>
-              <option value="Grade 3">Grade 3</option>
-              <option value="Grade 4">Grade 4</option>
-              <option value="Grade 5">Grade 5</option>
-              <option value="Grade 6">Grade 6</option>
-              <option value="Grade 7">Grade 7</option>
-              <option value="Grade 8">Grade 8</option>
+              <optgroup label="Early Years">
+                <option value="Baby Class">Baby Class</option>
+                <option value="Playgroup">Playgroup</option>
+                <option value="Nursery">Nursery</option>
+                <option value="Reception">Reception</option>
+                <option value="KG1">KG1</option>
+                <option value="KG2">KG2</option>
+                <option value="Pre-Primary">Pre-Primary</option>
+              </optgroup>
+              <optgroup label="Primary">
+                <option value="Grade 1">Grade 1</option>
+                <option value="Grade 2">Grade 2</option>
+                <option value="Grade 3">Grade 3</option>
+                <option value="Grade 4">Grade 4</option>
+                <option value="Grade 5">Grade 5</option>
+                <option value="Grade 6">Grade 6</option>
+                <option value="Grade 7">Grade 7</option>
+                <option value="Grade 8">Grade 8</option>
+              </optgroup>
             </select>
           </div>
 
@@ -213,6 +271,42 @@ export default function EnrollmentClient() {
             <label className="form-label">Section</label>
             <input type="text" name="section" value={formData.section} onChange={handleChange} className="input-field" placeholder="e.g. A" />
           </div>
+
+          <div className="form-group">
+            <label className="form-label">Language at Home</label>
+            <input type="text" name="language_at_home" value={formData.language_at_home} onChange={handleChange} className="input-field" placeholder="e.g. English, Swahili" />
+          </div>
+
+          <div className="form-group" style={{ gridColumn: 'span 2' }}>
+            <label className="form-label">Previous School (If any)</label>
+            <input type="text" name="previous_school" value={formData.previous_school} onChange={handleChange} className="input-field" placeholder="e.g. Kidz Academy" />
+          </div>
+
+          <div className="form-group" style={{ gridColumn: 'span 2' }}>
+            <label className="form-label">Emergency Contact Info (Name & Phone) *</label>
+            <input type="text" name="emergency_contact" value={formData.emergency_contact} onChange={handleChange} className="input-field" placeholder="e.g. Jane Doe - +255 777 123 456" required />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Medical Conditions / Info</label>
+            <input type="text" name="medical_info" value={formData.medical_info} onChange={handleChange} className="input-field" placeholder="e.g. Asthma, none" />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Allergies</label>
+            <input type="text" name="allergies" value={formData.allergies} onChange={handleChange} className="input-field" placeholder="e.g. Peanuts, none" />
+          </div>
+
+          {['Baby Class', 'Playgroup', 'Nursery', 'Reception', 'KG1', 'KG2', 'Pre-Primary'].includes(formData.grade_level) && (
+            <div style={{ gridColumn: 'span 2', padding: '1rem', backgroundColor: 'rgba(219, 39, 119, 0.05)', border: '1px solid rgba(219, 39, 119, 0.15)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <div style={{ color: '#db2777', fontWeight: 700, fontSize: '0.85rem' }}>
+                Early Years Enrollment Flow
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                This student will be enrolled in the Early Years Foundation Stage (EYFS). They will have access to observational recording, evidence uploads, and the custom EYFS progress report card.
+              </div>
+            </div>
+          )}
 
           {/* Photo Upload Container */}
           <div className="form-group" style={{ gridColumn: 'span 2', display: 'flex', gap: '1.5rem', alignItems: 'center', padding: '1rem', border: '1.5px dashed var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(255,255,255,0.01)', marginTop: '0.5rem' }}>

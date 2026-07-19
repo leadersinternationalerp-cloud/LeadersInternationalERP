@@ -70,17 +70,34 @@ export async function enrollStudentAction(formData: any) {
   const nextId = (count || 0) + 1
   const studentIdStr = `STUD-${nextId.toString().padStart(4, '0')}`
 
-  // Find class ID matching grade level and section
-  const { data: cls } = await supabaseService
+  // Find class ID matching name or class_name with section fallbacks
+  let classId = null
+  const { data: classList } = await supabaseService
     .from('classes')
-    .select('id')
-    .eq('name', formData.grade_level)
-    .eq('section', formData.section || null)
-    .maybeSingle()
+    .select('id, name, section')
 
-  const classId = cls?.id || null
+  if (classList && classList.length > 0) {
+    const searchName = `${formData.grade_level} ${formData.section || ''}`.trim().toLowerCase()
+    const exactNameMatch = classList.find(c => c.name.toLowerCase() === searchName)
+    if (exactNameMatch) {
+      classId = exactNameMatch.id
+    } else {
+      const matchByGrade = classList.find(c => 
+        c.name.toLowerCase().includes(formData.grade_level.toLowerCase()) && 
+        (!formData.section || c.section?.toLowerCase() === formData.section?.toLowerCase())
+      )
+      if (matchByGrade) {
+        classId = matchByGrade.id
+      } else {
+        const matchByGradeOnly = classList.find(c => c.name.toLowerCase().includes(formData.grade_level.toLowerCase()))
+        if (matchByGradeOnly) {
+          classId = matchByGradeOnly.id
+        }
+      }
+    }
+  }
 
-  // 4. Insert Student Record
+  // 4. Insert Student Record with EY specific fields
   const { error: studentError } = await supabaseService
     .from('students')
     .insert({
@@ -91,7 +108,12 @@ export async function enrollStudentAction(formData: any) {
       class_id: classId,
       dob: formData.dob || null,
       gender: formData.gender || null,
-      nationality: formData.nationality || null
+      nationality: formData.nationality || null,
+      medical_info: formData.medical_info || null,
+      allergies: formData.allergies || null,
+      language_at_home: formData.language_at_home || null,
+      previous_school: formData.previous_school || null,
+      emergency_contact: formData.emergency_contact || null
     })
 
   if (studentError) {

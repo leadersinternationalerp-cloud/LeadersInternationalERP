@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
-import EarlyYearsClient from './EarlyYearsClient'
+import EarlyYearsReportGenerator from '@/components/EarlyYearsReportGenerator'
 
-export default async function TeacherEarlyYearsPage() {
+export default async function TeacherEarlyYearsReportsPage() {
   const supabase = await createClient()
 
   // 1. Authenticate user
@@ -94,8 +94,6 @@ export default async function TeacherEarlyYearsPage() {
         grade_level,
         section,
         class_id,
-        dob,
-        gender,
         profiles (first_name, last_name, email)
       `)
       .eq('class_id', firstClassId)
@@ -109,8 +107,6 @@ export default async function TeacherEarlyYearsPage() {
         section: s.section,
         photo_url: `/api/students/photo?student_id=${s.id}`,
         class_id: s.class_id,
-        dob: s.dob,
-        gender: s.gender,
         profiles: sp ? {
           first_name: sp.first_name,
           last_name: sp.last_name,
@@ -124,17 +120,18 @@ export default async function TeacherEarlyYearsPage() {
     <div className="container-fluid" style={{ padding: '2rem' }}>
       <div style={{ marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          Early Years observations
+          EYFS Progress Report Cards
         </h1>
         <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
-          Record developmental observations, next steps, and evidence photos for student portfolios under the EYFS.
+          Generate, print, and compile Early Years Foundation Stage (EYFS) reports.
         </p>
       </div>
 
-      <EarlyYearsClient 
+      <EarlyYearsReportGenerator 
         classes={classes} 
         terms={terms || []} 
-        initialStudents={initialStudents} 
+        initialStudents={initialStudents}
+        roleLabel="Class Teacher"
       />
     </div>
   )

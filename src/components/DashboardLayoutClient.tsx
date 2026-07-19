@@ -166,6 +166,9 @@ export default function DashboardLayoutClient({
           <NavLink href="/dashboard/principal/report-cards" icon={FileSpreadsheet}>
             Report Cards (Principal)
           </NavLink>
+          <NavLink href="/dashboard/principal/early-years" icon={Baby}>
+            Early Years Reports (Principal)
+          </NavLink>
         </>
       )}
 
@@ -265,6 +268,9 @@ export default function DashboardLayoutClient({
           <NavLink href="/dashboard/dean/report-cards" icon={FileSpreadsheet}>
             Report Cards (Dean)
           </NavLink>
+          <NavLink href="/dashboard/dean/early-years" icon={Baby}>
+            Early Years (Dean)
+          </NavLink>
         </>
       )}
 
@@ -296,7 +302,10 @@ export default function DashboardLayoutClient({
             Lesson Plans
           </NavLink>
           <NavLink href="/dashboard/teacher/early-years" icon={Baby}>
-            Early Years
+            Early Years Observations
+          </NavLink>
+          <NavLink href="/dashboard/teacher/early-years/reports" icon={FileSpreadsheet}>
+            Early Years Reports
           </NavLink>
           <NavLink href="/dashboard/teacher/class-activities" icon={Puzzle}>
             Class Activities
