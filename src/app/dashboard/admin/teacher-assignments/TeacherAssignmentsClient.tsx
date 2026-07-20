@@ -138,15 +138,24 @@ export default function TeacherAssignmentsClient({
               ) : (
                 <>
                   <option value="">Select Subject...</option>
-                  {(subjects || []).map(s => (
-                    <option key={s.id} value={s.id}>{s.name || s.subject_name}</option>
-                  ))}
+                  <option value="HOMEROOM" style={{ fontWeight: 'bold', color: 'var(--color-primary)' }}>
+                    ★ Homeroom Teacher (Class Teacher)
+                  </option>
+                  <optgroup label="Subjects">
+                    {(subjects || []).map(s => (
+                      <option key={s.id} value={s.id}>{s.name || s.subject_name}</option>
+                    ))}
+                  </optgroup>
                 </>
               )}
             </select>
-            {isEarlyYears && (
+            {isEarlyYears ? (
               <div style={{ fontSize: '0.72rem', color: '#db2777', marginTop: '0.35rem', fontWeight: 600 }}>
                 Early Years class selected. Subject deactivated for Homeroom allocation.
+              </div>
+            ) : (
+              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '0.35rem' }}>
+                Select a subject OR select "Homeroom Teacher" to assign the main Class Teacher.
               </div>
             )}
           </div>
@@ -209,7 +218,17 @@ export default function TeacherAssignmentsClient({
                           Homeroom (Early Years)
                         </span>
                       ) : (
-                        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>N/A</span>
+                        <span style={{ 
+                          display: 'inline-block', 
+                          padding: '0.2rem 0.6rem', 
+                          borderRadius: '12px', 
+                          backgroundColor: 'rgba(14, 165, 233, 0.1)', 
+                          color: '#0284c7', 
+                          fontWeight: 600, 
+                          fontSize: '0.75rem' 
+                        }}>
+                          Homeroom (Class Teacher)
+                        </span>
                       )}
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'right' }}>

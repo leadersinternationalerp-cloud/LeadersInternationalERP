@@ -43,7 +43,9 @@ export default async function TeacherAssignmentsPage() {
     const isEarlyYears = cls?.is_early_years || 
       ['baby', 'nursery', 'reception', 'kg', 'playgroup', 'pre-primary'].some(ey => (cls?.name || '').toLowerCase().includes(ey))
 
-    if (isEarlyYears) {
+    const isHomeroom = isEarlyYears || subject_id === 'HOMEROOM'
+
+    if (isHomeroom) {
       // 1. Assign Homeroom Class Teacher on classes table
       await supabase
         .from('classes')
@@ -72,6 +74,7 @@ export default async function TeacherAssignmentsPage() {
 
     revalidatePath('/dashboard/admin/teacher-assignments')
     revalidatePath('/dashboard/teacher/early-years')
+    revalidatePath('/api/report-cards/download')
   }
 
   async function removeAllocationAction(formData: FormData) {
@@ -83,18 +86,19 @@ export default async function TeacherAssignmentsPage() {
       // Fetch allocation info before deleting
       const { data: alloc } = await supabase
         .from('class_subjects')
-        .select('class_id, classes(is_early_years)')
+        .select('class_id, subject_id, classes(is_early_years, class_teacher_id)')
         .eq('id', id)
         .maybeSingle()
 
       await supabase.from('class_subjects').delete().eq('id', id)
 
-      // If early years, clear class_teacher_id if no other allocation exists for that class
-      if (alloc?.class_id) {
+      // Clear class_teacher_id if this was a homeroom allocation (subject_id is null)
+      if (alloc?.class_id && alloc.subject_id === null) {
         const { count } = await supabase
           .from('class_subjects')
           .select('id', { count: 'exact', head: true })
           .eq('class_id', alloc.class_id)
+          .is('subject_id', null)
 
         if (count === 0) {
           await supabase
@@ -106,6 +110,7 @@ export default async function TeacherAssignmentsPage() {
 
       revalidatePath('/dashboard/admin/teacher-assignments')
       revalidatePath('/dashboard/teacher/early-years')
+      revalidatePath('/api/report-cards/download')
     }
   }
 

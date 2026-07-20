@@ -494,15 +494,37 @@ export async function GET(request: Request) {
 
       let classTeacherName = 'Class Teacher'
       if (classId) {
-        const { data: classSubj } = await supabase
-          .from('class_subjects')
-          .select('teacher:teacher_id(first_name, last_name)')
-          .eq('class_id', classId)
-          .limit(1)
+        // 1. Check classes table for assigned Homeroom / Class Teacher
+        const { data: clsData } = await supabase
+          .from('classes')
+          .select('class_teacher_id')
+          .eq('id', classId)
           .maybeSingle()
-        if (classSubj?.teacher) {
-          const tProf: any = classSubj.teacher
-          classTeacherName = `${tProf.first_name || ''} ${tProf.last_name || ''}`.trim()
+
+        if (clsData?.class_teacher_id) {
+          const { data: ctProf } = await supabase
+            .from('profiles')
+            .select('first_name, last_name')
+            .eq('id', clsData.class_teacher_id)
+            .maybeSingle()
+
+          if (ctProf) {
+            classTeacherName = `${ctProf.first_name || ''} ${ctProf.last_name || ''}`.trim()
+          }
+        }
+
+        // 2. Fallback to any teacher assigned in class_subjects if no explicit homeroom teacher set
+        if (classTeacherName === 'Class Teacher') {
+          const { data: classSubj } = await supabase
+            .from('class_subjects')
+            .select('teacher:teacher_id(first_name, last_name)')
+            .eq('class_id', classId)
+            .limit(1)
+            .maybeSingle()
+          if (classSubj?.teacher) {
+            const tProf: any = classSubj.teacher
+            classTeacherName = `${tProf.first_name || ''} ${tProf.last_name || ''}`.trim()
+          }
         }
       }
 
