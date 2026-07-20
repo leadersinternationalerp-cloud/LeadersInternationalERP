@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Camera, Trash, Eye, Sparkles, FileText, CheckCircle2 } from 'lucide-react'
+import { Camera, Trash, Eye, Sparkles, FileText, CheckCircle2, Pencil, X } from 'lucide-react'
 
 interface Student {
   id: string
@@ -207,7 +207,45 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
     setEvidencePreview(URL.createObjectURL(file))
   }
 
-  // Handle Submit
+  // Edit Observation state
+  const [editingObsId, setEditingObsId] = useState<string | null>(null)
+
+  const handleEdit = (obs: Observation) => {
+    setEditingObsId(obs.id)
+    setLearningArea(obs.learning_area)
+    setAchievementLevel(obs.achievement_level || 'Developed')
+    if (obs.age_band) setAgeBand(obs.age_band)
+    setObservationText(obs.teacher_observation || '')
+    setNextSteps(obs.next_steps || '')
+    setIsFinal(Boolean(obs.is_final))
+
+    const chars = obs.characteristics || []
+    setCharPlaying(chars.includes('Playing & Exploring'))
+    setCharActive(chars.includes('Active Learning'))
+    setCharCreating(chars.includes('Creating & Critical Thinking'))
+
+    setEvidencePreview(obs.evidence_url || '')
+    setEvidenceFile(null)
+    setError('')
+    setSuccess('')
+
+    window.scrollTo({ top: 320, behavior: 'smooth' })
+  }
+
+  const handleCancelEdit = () => {
+    setEditingObsId(null)
+    setObservationText('')
+    setNextSteps('')
+    setCharPlaying(false)
+    setCharActive(false)
+    setCharCreating(false)
+    setEvidenceFile(null)
+    setEvidencePreview('')
+    setError('')
+    setSuccess('')
+  }
+
+  // Handle Submit (Insert or Update)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedStudentId || !selectedTermId) {
@@ -250,11 +288,12 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
       if (charActive) characteristics.push('Active Learning')
       if (charCreating) characteristics.push('Creating & Critical Thinking')
 
-      // 3. Save Observation
+      // 3. Save or Update Observation
       const saveRes = await fetch('/api/early-years/observations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: editingObsId || undefined,
           student_id: selectedStudentId,
           term_id: selectedTermId,
           class_id: selectedClassId,
@@ -264,7 +303,7 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
           next_steps: nextSteps,
           age_band: ageBand,
           characteristics,
-          evidence_url: uploadedUrl || undefined,
+          evidence_url: uploadedUrl || evidencePreview || undefined,
           is_final: isFinal
         })
       })
@@ -274,18 +313,8 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
         throw new Error(saveData.error || 'Failed to save observation')
       }
 
-      setSuccess('Observation successfully recorded!')
-      
-      // Reset form
-      setObservationText('')
-      setNextSteps('')
-      setCharPlaying(false)
-      setCharActive(false)
-      setCharCreating(false)
-      setEvidenceFile(null)
-      setEvidencePreview('')
-      
-      // Refetch
+      setSuccess(editingObsId ? 'Observation updated successfully!' : 'Observation recorded successfully!')
+      handleCancelEdit()
       await loadObservations()
     } catch (err: any) {
       setError(err.message || 'An error occurred while saving.')
@@ -300,6 +329,7 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
       const res = await fetch(`/api/early-years/observations?id=${id}`, { method: 'DELETE' })
       if (res.ok) {
         setSuccess('Observation deleted successfully!')
+        if (editingObsId === id) handleCancelEdit()
         await loadObservations()
       } else {
         const data = await res.json()
@@ -465,9 +495,22 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
           
           {/* Observation recording Form */}
           <form onSubmit={handleSubmit} className="glass-panel" style={{ padding: '1.75rem', position: 'relative' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#be185d', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Sparkles size={18} />
-              Record Observation & Progress Summary
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#be185d', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Sparkles size={18} />
+                {editingObsId ? `Edit Observation (${learningArea})` : 'Record Observation & Progress Summary'}
+              </span>
+              {editingObsId && (
+                <button 
+                  type="button" 
+                  onClick={handleCancelEdit}
+                  className="btn"
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.65rem', backgroundColor: 'rgba(0,0,0,0.05)', color: 'var(--color-text)', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', border: '1px solid var(--color-border)' }}
+                >
+                  <X size={13} />
+                  Cancel Edit
+                </button>
+              )}
             </h2>
 
             {error && <div style={{ padding: '0.75rem 1rem', backgroundColor: 'rgba(239, 68, 68, 0.08)', color: 'var(--color-error)', border: '1px solid rgba(239, 68, 68, 0.15)', borderRadius: 'var(--radius-md)', marginBottom: '1rem', fontSize: '0.8rem' }}>{error}</div>}
@@ -593,8 +636,8 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
                   <input type="checkbox" checked={isFinal} onChange={e => setIsFinal(e.target.checked)} style={{ width: '14px', height: '14px' }} />
                   <span style={{ fontWeight: 600, color: '#db2777' }}>Register as Final Summary</span>
                 </label>
-                <button type="submit" disabled={saving || loading} className="btn" style={{ padding: '0.5rem 1.25rem', backgroundColor: '#db2777', color: '#ffffff', fontWeight: 600, fontSize: '0.8rem', width: '100%' }}>
-                  {saving ? 'Saving...' : 'Save Observation'}
+                <button type="submit" disabled={saving || loading} className="btn" style={{ padding: '0.5rem 1.25rem', backgroundColor: editingObsId ? '#0284c7' : '#db2777', color: '#ffffff', fontWeight: 600, fontSize: '0.8rem', width: '100%' }}>
+                  {saving ? (editingObsId ? 'Updating...' : 'Saving...') : (editingObsId ? 'Update Observation' : 'Save Observation')}
                 </button>
               </div>
             </div>
@@ -625,16 +668,22 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
                   </thead>
                   <tbody>
                     {observations.map(obs => {
-                      const badgeBg = obs.achievement_level === 'Exceeding' ? '#dcfce7' : obs.achievement_level === 'Expected' ? '#e0f2fe' : '#fef3c7'
-                      const badgeText = obs.achievement_level === 'Exceeding' ? '#166534' : obs.achievement_level === 'Expected' ? '#075985' : '#854d0e'
+                      const normLevel = (obs.achievement_level === 'Secured' || obs.achievement_level === 'Exceeding') ? 'Secured'
+                                      : (obs.achievement_level === 'Developed' || obs.achievement_level === 'Expected') ? 'Developed'
+                                      : 'Intermediate'
+
+                      const badgeBg = normLevel === 'Secured' ? '#ede9fe' : normLevel === 'Developed' ? '#d1fae5' : '#dbeafe'
+                      const badgeText = normLevel === 'Secured' ? '#6d28d9' : normLevel === 'Developed' ? '#047857' : '#1d4ed8'
+                      const isEditing = obs.id === editingObsId
+
                       return (
-                        <tr key={obs.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.2s' }}>
+                        <tr key={obs.id} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: isEditing ? 'rgba(219, 39, 119, 0.05)' : 'transparent', transition: 'background-color 0.2s' }}>
                           <td style={{ padding: '0.6rem 0.5rem', fontWeight: 600, color: '#be185d', whiteSpace: 'nowrap' }}>
                             {obs.learning_area}
                           </td>
                           <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
-                            <span style={{ display: 'inline-block', padding: '0.15rem 0.4rem', borderRadius: '4px', backgroundColor: badgeBg, color: badgeText, fontWeight: 700, fontSize: '0.65rem' }}>
-                              {obs.achievement_level}
+                            <span style={{ display: 'inline-block', padding: '0.15rem 0.45rem', borderRadius: '4px', backgroundColor: badgeBg, color: badgeText, fontWeight: 700, fontSize: '0.65rem' }}>
+                              {normLevel}
                             </span>
                           </td>
                           <td style={{ padding: '0.6rem 0.5rem', color: 'var(--color-text)', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={obs.teacher_observation}>
@@ -653,12 +702,20 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
                             {obs.is_final ? (
                               <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} title="Final Summary" />
                             ) : (
-                              <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--color-border)' }} title="Observation" />
+                              <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--color-border)' }} title="Observation (Draft)" />
                             )}
                           </td>
-                          <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
+                          <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <button 
+                              onClick={() => handleEdit(obs)} 
+                              title="Edit Observation"
+                              style={{ border: 'none', backgroundColor: 'transparent', color: '#0284c7', cursor: 'pointer', padding: '0.25rem', marginRight: '0.25rem' }}
+                            >
+                              <Pencil size={14} />
+                            </button>
                             <button 
                               onClick={() => handleDelete(obs.id)} 
+                              title="Delete Observation"
                               style={{ border: 'none', backgroundColor: 'transparent', color: 'var(--color-error)', cursor: 'pointer', padding: '0.25rem' }}
                             >
                               <Trash size={14} />

@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
     // 3. Parse Request Body
     const body = await request.json()
     const {
+      id,
       student_id,
       term_id,
       class_id,
@@ -94,6 +95,28 @@ export async function POST(request: NextRequest) {
 
     if (!student_id || !term_id || !learning_area || !achievement_level || !teacher_observation) {
       return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 })
+    }
+
+    // 4. Direct update if id is provided
+    if (id) {
+      const { error: updateErr } = await supabase
+        .from('learning_area_progress')
+        .update({
+          class_id: class_id || null,
+          learning_area,
+          achievement_level,
+          teacher_observation,
+          next_steps: next_steps || '',
+          age_band: age_band || '',
+          characteristics: characteristics || [],
+          evidence_url: evidence_url || null,
+          is_final: Boolean(is_final),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+
+      if (updateErr) throw updateErr
+      return NextResponse.json({ success: true })
     }
 
     // 4. Upsert/Insert logic to prevent duplicate final observations per student/term/area
