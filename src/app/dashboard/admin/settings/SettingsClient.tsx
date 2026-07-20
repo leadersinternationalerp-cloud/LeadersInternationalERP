@@ -114,6 +114,7 @@ export default function SettingsClient({
   const [t2End, setT2End] = useState('')
   const [t3Start, setT3Start] = useState('')
   const [t3End, setT3End] = useState('')
+  const [activeTerm, setActiveTerm] = useState<string>('Term 3')
   const [isYearActive, setIsYearActive] = useState(false)
   const [editingYearName, setEditingYearName] = useState<string | null>(null)
 
@@ -234,6 +235,9 @@ export default function SettingsClient({
     setT2End(t2.end_date || '')
     setT3Start(t3.start_date || '')
     setT3End(t3.end_date || '')
+
+    const currentT = terms.find((t: any) => t.is_current)?.term_name || 'Term 3'
+    setActiveTerm(currentT)
     setYearMessage(null)
   }
 
@@ -247,6 +251,7 @@ export default function SettingsClient({
     setT2End('')
     setT3Start('')
     setT3End('')
+    setActiveTerm('Term 3')
     setIsYearActive(false)
   }
 
@@ -263,20 +268,20 @@ export default function SettingsClient({
     }
 
     const term_details = [
-      { term_name: 'Term 1', start_date: t1Start, end_date: t1End },
-      { term_name: 'Term 2', start_date: t2Start, end_date: t2End },
-      { term_name: 'Term 3', start_date: t3Start, end_date: t3End },
+      { term_name: 'Term 1', start_date: t1Start, end_date: t1End, is_current: activeTerm === 'Term 1' },
+      { term_name: 'Term 2', start_date: t2Start, end_date: t2End, is_current: activeTerm === 'Term 2' },
+      { term_name: 'Term 3', start_date: t3Start, end_date: t3End, is_current: activeTerm === 'Term 3' },
     ]
 
     try {
-      const result = await saveAcademicYearAction(yearName, term_details, isYearActive)
+      const result = await saveAcademicYearAction(yearName, term_details, isYearActive, activeTerm)
       if (result.error) {
         throw new Error(result.error)
       }
 
       setYearMessage({
         type: 'success',
-        text: `Academic Year "${yearName}" saved successfully!`,
+        text: `Academic Year "${yearName}" and Term dates saved & synchronized successfully!`,
       })
 
       // Update state local view
@@ -670,6 +675,20 @@ export default function SettingsClient({
                 </div>
               </div>
 
+              <div className="form-group" style={{ marginTop: '0.5rem' }}>
+                <label className="form-label" style={{ fontWeight: 600 }}>Active Operational Term *</label>
+                <select 
+                  className="input-field" 
+                  value={activeTerm}
+                  onChange={(e) => setActiveTerm(e.target.value)}
+                  style={{ padding: '0.6rem', fontWeight: 600, color: 'var(--color-primary)' }}
+                >
+                  <option value="Term 1">Term 1 (Active Operational Term)</option>
+                  <option value="Term 2">Term 2 (Active Operational Term)</option>
+                  <option value="Term 3">Term 3 (Active Operational Term)</option>
+                </select>
+              </div>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
                 <input
                   type="checkbox"
@@ -678,9 +697,28 @@ export default function SettingsClient({
                   onChange={(e) => setIsYearActive(e.target.checked)}
                   style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                 />
-                <label htmlFor="is_active_check" style={{ fontSize: '0.875rem', fontWeight: 500, cursor: 'pointer' }}>
+                <label htmlFor="is_active_check" style={{ fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>
                   Set as active academic year
                 </label>
+              </div>
+
+              <div style={{
+                fontSize: '0.78rem',
+                color: 'var(--color-text-muted)',
+                backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                border: '1px solid rgba(59, 130, 246, 0.2)',
+                padding: '0.75rem',
+                borderRadius: 'var(--radius-sm)',
+                lineHeight: '1.4'
+              }}>
+                <strong style={{ color: '#2563eb', display: 'block', marginBottom: '0.2rem' }}>Operational Impact:</strong>
+                Saving term start/end dates and marking the active term updates:
+                <ul style={{ margin: '0.25rem 0 0 1.2rem', padding: 0 }}>
+                  <li><strong>Marks Entry</strong> & assessment submission periods</li>
+                  <li><strong>EYFS Progress Observations</strong> active logging period</li>
+                  <li><strong>Fee Payment & Billing</strong> structure calculations</li>
+                  <li><strong>Report Card Generations</strong> official header dates</li>
+                </ul>
               </div>
 
               {yearMessage && (
@@ -845,29 +883,43 @@ export default function SettingsClient({
                   <tr key={year.name} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 150ms' }}>
                     <td style={{ padding: '1rem', fontWeight: 600 }}>{year.name}</td>
                     <td style={{ padding: '1rem' }}>
-                      {year.is_active ? (
-                        <span style={{
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '999px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                          color: 'var(--color-success)'
-                        }}>
-                          Active Year
-                        </span>
-                      ) : (
-                        <span style={{
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '999px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          backgroundColor: 'rgba(0,0,0,0.05)',
-                          color: 'var(--color-text-muted)'
-                        }}>
-                          Inactive
-                        </span>
-                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
+                        {year.is_active ? (
+                          <span style={{
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '999px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            color: 'var(--color-success)'
+                          }}>
+                            Active Year
+                          </span>
+                        ) : (
+                          <span style={{
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '999px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            backgroundColor: 'rgba(0,0,0,0.05)',
+                            color: 'var(--color-text-muted)'
+                          }}>
+                            Inactive
+                          </span>
+                        )}
+                        {year.is_active && (
+                          <span style={{
+                            padding: '0.2rem 0.65rem',
+                            borderRadius: '12px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                            color: '#2563eb'
+                          }}>
+                            Current: {terms.find((t: any) => t.is_current)?.term_name || 'Term 3'}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: '1rem', fontSize: '0.85rem' }}>
                       {t1.start_date ? `${formatDate(t1.start_date)} to ${formatDate(t1.end_date)}` : 'N/A'}

@@ -47,7 +47,12 @@ export async function saveSystemSettingsAction(key: string, value: any) {
   return { success: true }
 }
 
-export async function saveAcademicYearAction(name: string, term_details: any[], is_active: boolean) {
+export async function saveAcademicYearAction(
+  name: string, 
+  term_details: any[], 
+  is_active: boolean, 
+  active_term_name?: string
+) {
   const supabase = await createClient()
 
   // 1. Get user and verify role
@@ -67,40 +72,96 @@ export async function saveAcademicYearAction(name: string, term_details: any[], 
 
   const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
   if (!isAdmin) {
-    return { error: 'Forbidden: You do not have permission to manage academic years.' }
+    return { error: 'Forbidden: You do not have permission to manage academic years and terms.' }
   }
 
-  // 2. If activating this year, deactivate all others
+  // 2. Compute academic year start and end dates from term details
+  const validStarts = term_details.map(t => t.start_date).filter(Boolean).sort()
+  const validEnds = term_details.map(t => t.end_date).filter(Boolean).sort()
+  const yearStartDate = validStarts[0] || null
+  const yearEndDate = validEnds[validEnds.length - 1] || null
+
+  // 3. If activating this year, deactivate all other academic years
   if (is_active) {
-    const { error: deactivateError } = await supabase
+    await supabase
       .from('academic_years')
       .update({ is_active: false })
       .neq('name', name)
-
-    if (deactivateError) {
-      return { error: deactivateError.message }
-    }
   }
 
-  // 3. Upsert the academic year by name (which is UNIQUE)
-  const { error: upsertError } = await supabase
+  // 4. Upsert the academic year record
+  const { data: ayRecord, error: upsertError } = await supabase
     .from('academic_years')
     .upsert(
       {
         name,
         term_details,
         is_active,
+        start_date: yearStartDate,
+        end_date: yearEndDate
       },
       { onConflict: 'name' }
     )
+    .select('id')
+    .single()
 
-  if (upsertError) {
-    return { error: upsertError.message }
+  if (upsertError || !ayRecord) {
+    return { error: upsertError?.message || 'Failed to save academic year record' }
   }
 
-  // 4. Log audit action
-  await logAuditAction(`Save Academic Year: ${name}`, 'academic_years', { name, term_details, is_active })
+  const ayId = ayRecord.id
 
-  revalidatePath('/admin/settings')
+  // 5. Synchronize rows in `terms` table for this Academic Year
+  for (const tDetail of term_details) {
+    const termName = tDetail.term_name
+    const isCurrentTerm = is_active && (active_term_name ? (active_term_name === termName) : (tDetail.is_current || false))
+
+    if (isCurrentTerm) {
+      // Deactivate is_current across all terms database-wide
+      await supabase.from('terms').update({ is_current: false }).neq('name', '___NON_EXISTENT___')
+    }
+
+    // Check if term row exists for this academic year and term name
+    const { data: existingTerm } = await supabase
+      .from('terms')
+      .select('id')
+      .eq('academic_year_id', ayId)
+      .eq('name', termName)
+      .maybeSingle()
+
+    if (existingTerm) {
+      await supabase
+        .from('terms')
+        .update({
+          start_date: tDetail.start_date || null,
+          end_date: tDetail.end_date || null,
+          is_current: isCurrentTerm
+        })
+        .eq('id', existingTerm.id)
+    } else {
+      await supabase
+        .from('terms')
+        .insert({
+          academic_year_id: ayId,
+          name: termName,
+          start_date: tDetail.start_date || null,
+          end_date: tDetail.end_date || null,
+          is_current: isCurrentTerm
+        })
+    }
+  }
+
+  // 6. Log audit action
+  await logAuditAction(`Save Academic Year & Terms: ${name}`, 'academic_years', { name, term_details, is_active, active_term_name })
+
+  revalidatePath('/dashboard/admin/settings')
+  revalidatePath('/dashboard/teacher/marks')
+  revalidatePath('/dashboard/teacher/early-years')
+  revalidatePath('/dashboard/teacher/report-cards')
+  revalidatePath('/dashboard/dean/report-cards')
+  revalidatePath('/dashboard/principal/report-cards')
+  revalidatePath('/dashboard/accountant/fee-structures')
+  revalidatePath('/dashboard/accountant/payments')
+
   return { success: true }
 }
