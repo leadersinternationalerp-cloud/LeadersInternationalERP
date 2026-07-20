@@ -119,60 +119,74 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null)
   const [evidencePreview, setEvidencePreview] = useState<string>('')
 
-  // Load students for class
-  useEffect(() => {
-    if (!selectedClassId) return
-    const loadClassStudents = async () => {
-      setLoading(true)
-      try {
-        const res = await fetch(`/api/early-years/students?class_id=${selectedClassId}`)
-        const data = await res.json()
-        if (data.students) {
-          setStudents(data.students)
-          if (data.students.length > 0) {
-            setSelectedStudentId(data.students[0].id)
-          } else {
-            setSelectedStudentId('')
-          }
-        }
-      } catch (e) {
-        console.error('Error loading students:', e)
-      }
-      setLoading(false)
-    }
-    loadClassStudents()
-  }, [selectedClassId])
-
-  // Load observations when student or term changes
-  const loadObservations = async () => {
-    if (!selectedStudentId || !selectedTermId) {
+  // Helper to fetch observations for a given student & term
+  const loadObservationsForStudentAndTerm = async (studentId: string, termId: string) => {
+    if (!studentId || !termId) {
       setObservations([])
       return
     }
     setLoading(true)
     try {
-      const res = await fetch(`/api/early-years/observations?student_id=${selectedStudentId}&term_id=${selectedTermId}`)
+      const res = await fetch(`/api/early-years/observations?student_id=${studentId}&term_id=${termId}`)
       const resData = await res.json()
-      if (resData.data) {
-        setObservations(resData.data)
-      }
+      setObservations(resData.data || [])
     } catch (e) {
       console.error('Error fetching observations:', e)
+      setObservations([])
     }
     setLoading(false)
   }
 
+  // Load students and observation history when class changes
   useEffect(() => {
-    loadObservations()
-  }, [selectedStudentId, selectedTermId])
+    if (!selectedClassId) {
+      setStudents([])
+      setSelectedStudentId('')
+      setObservations([])
+      return
+    }
 
-  // Sync default age group when class changes
-  useEffect(() => {
+    const loadClassData = async () => {
+      setLoading(true)
+      handleCancelEdit()
+      try {
+        const res = await fetch(`/api/early-years/students?class_id=${selectedClassId}`)
+        const data = await res.json()
+        const fetchedStudents: Student[] = data.students || []
+        setStudents(fetchedStudents)
+
+        if (fetchedStudents.length > 0) {
+          const firstStudentId = fetchedStudents[0].id
+          setSelectedStudentId(firstStudentId)
+          await loadObservationsForStudentAndTerm(firstStudentId, selectedTermId)
+        } else {
+          setSelectedStudentId('')
+          setObservations([])
+        }
+      } catch (e) {
+        console.error('Error loading class students:', e)
+        setStudents([])
+        setSelectedStudentId('')
+        setObservations([])
+      }
+      setLoading(false)
+    }
+
+    loadClassData()
+
+    // Sync default age group when class changes
     const selectedClass = classes.find(c => c.id === selectedClassId)
     if (selectedClass?.age_group) {
       setAgeBand(selectedClass.age_group)
     }
-  }, [selectedClassId, classes])
+  }, [selectedClassId])
+
+  // Load observations when student or term changes
+  useEffect(() => {
+    if (selectedStudentId && selectedTermId) {
+      loadObservationsForStudentAndTerm(selectedStudentId, selectedTermId)
+    }
+  }, [selectedStudentId, selectedTermId])
 
   // Filter students by search
   const filteredStudents = students.filter(s => {
@@ -315,7 +329,7 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
 
       setSuccess(editingObsId ? 'Observation updated successfully!' : 'Observation recorded successfully!')
       handleCancelEdit()
-      await loadObservations()
+      await loadObservationsForStudentAndTerm(selectedStudentId, selectedTermId)
     } catch (err: any) {
       setError(err.message || 'An error occurred while saving.')
     }
@@ -330,7 +344,7 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
       if (res.ok) {
         setSuccess('Observation deleted successfully!')
         if (editingObsId === id) handleCancelEdit()
-        await loadObservations()
+        await loadObservationsForStudentAndTerm(selectedStudentId, selectedTermId)
       } else {
         const data = await res.json()
         setError(data.error || 'Failed to delete observation')
