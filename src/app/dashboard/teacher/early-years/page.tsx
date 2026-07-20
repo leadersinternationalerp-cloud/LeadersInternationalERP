@@ -34,21 +34,22 @@ export default async function TeacherEarlyYearsPage() {
                        userRoles.includes('HOS') ||
                        userRoles.includes('Director')
 
+  const isEarlyYearsClass = (c: any) => {
+    if (!c) return false
+    if (c.is_early_years) return true
+    const nameStr = (c.name || c.class_name || '').toLowerCase()
+    return ['baby', 'nursery', 'reception', 'kg', 'playgroup', 'pre-primary'].some(ey => nameStr.includes(ey))
+  }
+
   // 3. Load early years classes
   let classes: any[] = []
   if (isManagement) {
     const { data: allEY } = await supabase
       .from('classes')
       .select('*')
-      .eq('is_early_years', true)
       .order('name', { ascending: true })
-    classes = allEY || []
     
-    // Fallback if none seeded yet
-    if (classes.length === 0) {
-      const { data: fallback } = await supabase.from('classes').select('*').limit(10)
-      classes = fallback || []
-    }
+    classes = (allEY || []).filter(isEarlyYearsClass)
   } else {
     // Teacher specific classes (homeroom + subject assignment)
     const { data: homeroom } = await supabase
@@ -64,16 +65,23 @@ export default async function TeacherEarlyYearsPage() {
     const assignedClasses = (assignments || []).map((a: any) => a.classes).filter(Boolean)
     const combined = [...(homeroom || []), ...assignedClasses]
     
-    // Deduplicate
+    // Deduplicate & filter strictly for Early Years
     const uniqueIds = new Set<string>()
     classes = combined.filter(c => {
+      if (!isEarlyYearsClass(c)) return false
       if (uniqueIds.has(c.id)) return false
       uniqueIds.add(c.id)
       return true
     })
 
-    // Filter early years or sort by is_early_years descending
-    classes.sort((a, b) => (b.is_early_years ? 1 : 0) - (a.is_early_years ? 1 : 0))
+    // Fallback if teacher has no specific EYFS assigned class yet
+    if (classes.length === 0) {
+      const { data: allEY } = await supabase
+        .from('classes')
+        .select('*')
+        .order('name', { ascending: true })
+      classes = (allEY || []).filter(isEarlyYearsClass)
+    }
   }
 
   // 4. Load academic terms

@@ -27,18 +27,20 @@ export default async function PrincipalEarlyYearsPage() {
     redirect('/dashboard')
   }
 
+  const isEarlyYearsClass = (c: any) => {
+    if (!c) return false
+    if (c.is_early_years) return true
+    const nameStr = (c.name || c.class_name || '').toLowerCase()
+    return ['baby', 'nursery', 'reception', 'kg', 'playgroup', 'pre-primary'].some(ey => nameStr.includes(ey))
+  }
+
   // 3. Load early years classes
-  const { data: classes } = await supabase
+  const { data: allEY } = await supabase
     .from('classes')
     .select('*')
-    .eq('is_early_years', true)
     .order('name', { ascending: true })
 
-  let eyClasses = classes || []
-  if (eyClasses.length === 0) {
-    const { data: fallback } = await supabase.from('classes').select('*').limit(10)
-    eyClasses = fallback || []
-  }
+  const eyClasses = (allEY || []).filter(isEarlyYearsClass)
 
   // 4. Load academic terms
   const { data: termsData } = await supabase
