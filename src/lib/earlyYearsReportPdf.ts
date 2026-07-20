@@ -320,16 +320,20 @@ function drawLearningAreasTable(doc: PDFKit.PDFDocument, opts: EYReportOptions) 
        .text(areaText, startX + 5, currentY + (cellHeight - hArea) / 2, { width: colWidths.area - 10 })
 
     // Level Badge
-    const lvlColor = levelText === 'Exceeding' ? '#dcfce7' : levelText === 'Expected' ? '#e0f2fe' : '#fef3c7'
-    const lvlText = levelText === 'Exceeding' ? '#166534' : levelText === 'Expected' ? '#075985' : '#854d0e'
-    const badgeW = 44
+    const normLevel = (levelText === 'Secured' || levelText === 'Exceeding') ? 'Secured'
+                    : (levelText === 'Developed' || levelText === 'Expected') ? 'Developed'
+                    : 'Intermediate'
+
+    const lvlColor = normLevel === 'Secured' ? '#ede9fe' : normLevel === 'Developed' ? '#d1fae5' : '#dbeafe'
+    const lvlText = normLevel === 'Secured' ? '#6d28d9' : normLevel === 'Developed' ? '#047857' : '#1d4ed8'
+    const badgeW = 48
     const badgeH = 12
     const badgeX = startX + colWidths.area + (colWidths.level - badgeW) / 2
     const badgeY = currentY + (cellHeight - badgeH) / 2
     
     doc.rect(badgeX, badgeY, badgeW, badgeH).fill(lvlColor)
     doc.fontSize(6).font('Helvetica-Bold').fillColor(lvlText)
-       .text(levelText, badgeX, badgeY + 3, { width: badgeW, align: 'center' })
+       .text(normLevel, badgeX, badgeY + 3, { width: badgeW, align: 'center' })
 
     // Age Band
     doc.fontSize(7).font('Helvetica').fillColor('#334155')

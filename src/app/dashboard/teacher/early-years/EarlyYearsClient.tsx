@@ -69,11 +69,46 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
 
   // Form Fields
   const [learningArea, setLearningArea] = useState(LEARNING_AREAS[0])
-  const [achievementLevel, setAchievementLevel] = useState('Expected')
+  const [achievementLevel, setAchievementLevel] = useState('Developed')
   const [ageBand, setAgeBand] = useState(classes[0]?.age_group || '3-4y')
   const [observationText, setObservationText] = useState('')
   const [nextSteps, setNextSteps] = useState('')
   const [isFinal, setIsFinal] = useState(true)
+  const [expandingAi, setExpandingAi] = useState(false)
+
+  // Handle AI Expansion of Observation Notes
+  const handleAiExpand = async () => {
+    if (!observationText.trim()) {
+      setError('Please type a brief observation note first, then click AI Assist.')
+      return
+    }
+    setExpandingAi(true)
+    setError('')
+    setSuccess('')
+    try {
+      const studentName = selectedStudent ? `${selectedStudent.profiles?.first_name || ''} ${selectedStudent.profiles?.last_name || ''}`.trim() : 'Child'
+      const res = await fetch('/api/ai/expand-observation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          note: observationText,
+          childName: studentName,
+          learningArea,
+          achievementLevel
+        })
+      })
+      const data = await res.json()
+      if (data.expandedText) {
+        setObservationText(data.expandedText)
+        setSuccess('AI expanded comment into a professional 3-4 sentence narrative without changing intended meaning!')
+      } else if (data.error) {
+        setError(data.error)
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to expand comment with AI.')
+    }
+    setExpandingAi(false)
+  }
   
   // Characteristics
   const [charPlaying, setCharPlaying] = useState(false)
@@ -451,9 +486,9 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
               <div className="form-group">
                 <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600 }}>Achievement Level *</label>
                 <select value={achievementLevel} onChange={e => setAchievementLevel(e.target.value)} className="input-field" required>
-                  <option value="Emerging">Emerging</option>
-                  <option value="Expected">Expected</option>
-                  <option value="Exceeding">Exceeding</option>
+                  <option value="Intermediate">Intermediate</option>
+                  <option value="Developed">Developed</option>
+                  <option value="Secured">Secured</option>
                 </select>
               </div>
 
@@ -468,13 +503,39 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
             </div>
 
             <div className="form-group" style={{ marginBottom: '1rem' }}>
-              <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600 }}>Observation & Progress Notes *</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: 0 }}>
+                  Observation & Progress Notes *
+                </label>
+                <button
+                  type="button"
+                  onClick={handleAiExpand}
+                  disabled={expandingAi}
+                  className="btn"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    padding: '0.25rem 0.65rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    color: '#831843',
+                    backgroundColor: 'rgba(219, 39, 119, 0.08)',
+                    border: '1px solid rgba(219, 39, 119, 0.25)',
+                    borderRadius: '20px',
+                    cursor: expandingAi ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <Sparkles size={13} style={{ animation: expandingAi ? 'spin 1s linear infinite' : 'none' }} />
+                  {expandingAi ? 'AI Expanding (3-4 sentences)...' : '✨ AI Assist (3-4 Sentences)'}
+                </button>
+              </div>
               <textarea 
                 rows={3} 
                 value={observationText} 
                 onChange={e => setObservationText(e.target.value)} 
                 className="input-field" 
-                placeholder="Write specific narrative notes of the child's achievement, activity participation, or behaviors in this area..." 
+                placeholder="Type a brief sentence (e.g. Zainab listens well during story time and answers questions)... then click AI Assist to expand into 3-4 professional sentences." 
                 required 
                 style={{ resize: 'vertical' }}
               />
