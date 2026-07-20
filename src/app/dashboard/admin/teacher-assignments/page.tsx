@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import TeacherAssignmentsClient from './TeacherAssignmentsClient'
 
 export default async function TeacherAssignmentsPage() {
   const supabase = await createClient()
@@ -17,7 +18,7 @@ export default async function TeacherAssignmentsPage() {
       subject_id,
       created_at,
       profiles(first_name, last_name),
-      classes(name, section),
+      classes(name, section, is_early_years),
       subjects(name)
     `)
     .order('created_at', { ascending: false })
@@ -30,16 +31,47 @@ export default async function TeacherAssignmentsPage() {
     const class_id = formData.get('class_id') as string
     const subject_id = formData.get('subject_id') as string
 
-    if (!teacher_id || !class_id || !subject_id) return
+    if (!teacher_id || !class_id) return
 
-    // Insert allocation
-    await supabase.from('class_subjects').insert({
-      teacher_id,
-      class_id,
-      subject_id
-    })
+    // Fetch class to verify if it is Early Years
+    const { data: cls } = await supabase
+      .from('classes')
+      .select('id, name, is_early_years')
+      .eq('id', class_id)
+      .maybeSingle()
+
+    const isEarlyYears = cls?.is_early_years || 
+      ['baby', 'nursery', 'reception', 'kg', 'playgroup', 'pre-primary'].some(ey => (cls?.name || '').toLowerCase().includes(ey))
+
+    if (isEarlyYears) {
+      // 1. Assign Homeroom Class Teacher on classes table
+      await supabase
+        .from('classes')
+        .update({ class_teacher_id: teacher_id })
+        .eq('id', class_id)
+
+      // 2. Insert into class_subjects with subject_id null
+      await supabase
+        .from('class_subjects')
+        .insert({
+          teacher_id,
+          class_id,
+          subject_id: null
+        })
+    } else {
+      if (!subject_id) return
+      // Regular Primary class subject allocation
+      await supabase
+        .from('class_subjects')
+        .insert({
+          teacher_id,
+          class_id,
+          subject_id
+        })
+    }
 
     revalidatePath('/dashboard/admin/teacher-assignments')
+    revalidatePath('/dashboard/teacher/early-years')
   }
 
   async function removeAllocationAction(formData: FormData) {
@@ -48,98 +80,44 @@ export default async function TeacherAssignmentsPage() {
     const id = formData.get('allocation_id') as string
     
     if (id) {
+      // Fetch allocation info before deleting
+      const { data: alloc } = await supabase
+        .from('class_subjects')
+        .select('class_id, classes(is_early_years)')
+        .eq('id', id)
+        .maybeSingle()
+
       await supabase.from('class_subjects').delete().eq('id', id)
+
+      // If early years, clear class_teacher_id if no other allocation exists for that class
+      if (alloc?.class_id) {
+        const { count } = await supabase
+          .from('class_subjects')
+          .select('id', { count: 'exact', head: true })
+          .eq('class_id', alloc.class_id)
+
+        if (count === 0) {
+          await supabase
+            .from('classes')
+            .update({ class_teacher_id: null })
+            .eq('id', alloc.class_id)
+        }
+      }
+
       revalidatePath('/dashboard/admin/teacher-assignments')
+      revalidatePath('/dashboard/teacher/early-years')
     }
   }
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)' }}>Teacher Assignments Matrix</h1>
-      </div>
-
-      <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)', marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>Assign Teacher to Class & Subject</h2>
-        <form action={assignTeacherAction} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Teacher</label>
-            <select name="teacher_id" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-              <option value="">Select Teacher...</option>
-              {(teachers || []).map(t => <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>)}
-            </select>
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Class</label>
-            <select name="class_id" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-              <option value="">Select Class...</option>
-              {(classes || []).map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.name || c.class_name || 'Unknown'}{c.section ? ` (${c.section})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Subject</label>
-            <select name="subject_id" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-              <option value="">Select Subject...</option>
-              {(subjects || []).map(s => <option key={s.id} value={s.id}>{s.name || s.subject_name}</option>)}
-            </select>
-          </div>
-          
-          <button type="submit" className="btn-primary" style={{ padding: '0.75rem 1.5rem' }}>Assign</button>
-        </form>
-      </div>
-
-      {/* Allocations Matrix/List */}
-      <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-        <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)', backgroundColor: 'rgba(0,0,0,0.02)' }}>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Current Assignments</h3>
-        </div>
-        
-        {allocError ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-error)' }}>
-            Error loading allocations: {allocError.message}. Make sure `class_subjects` table exists.
-          </div>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ backgroundColor: 'rgba(0,0,0,0.02)', borderBottom: '1px solid var(--color-border)' }}>
-                <th style={{ textAlign: 'left', padding: '1rem', fontWeight: 600 }}>Teacher</th>
-                <th style={{ textAlign: 'left', padding: '1rem', fontWeight: 600 }}>Class</th>
-                <th style={{ textAlign: 'left', padding: '1rem', fontWeight: 600 }}>Subject</th>
-                <th style={{ textAlign: 'right', padding: '1rem', fontWeight: 600 }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(allocations || []).map((alloc: any) => (
-                <tr key={alloc.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                  <td style={{ padding: '1rem', fontWeight: 600 }}>{alloc.profiles?.first_name} {alloc.profiles?.last_name}</td>
-                  <td style={{ padding: '1rem' }}>{alloc.classes?.name || alloc.classes?.class_name || 'Unknown'}{alloc.classes?.section ? ` (${alloc.classes.section})` : ''}</td>
-                  <td style={{ padding: '1rem' }}>{alloc.subjects?.name || alloc.subjects?.subject_name}</td>
-                  <td style={{ padding: '1rem', textAlign: 'right' }}>
-                    <form action={removeAllocationAction}>
-                      <input type="hidden" name="allocation_id" value={alloc.id} />
-                      <button type="submit" className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', backgroundColor: 'transparent', color: 'var(--color-error)', border: '1px solid var(--color-error)' }}>
-                        Remove
-                      </button>
-                    </form>
-                  </td>
-                </tr>
-              ))}
-              {(!allocations || allocations.length === 0) && (
-                <tr>
-                  <td colSpan={4} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                    No teacher assignments configured.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-    </div>
+    <TeacherAssignmentsClient
+      teachers={teachers || []}
+      classes={classes || []}
+      subjects={subjects || []}
+      allocations={(allocations || []) as any}
+      allocError={allocError}
+      assignTeacherAction={assignTeacherAction}
+      removeAllocationAction={removeAllocationAction}
+    />
   )
 }
