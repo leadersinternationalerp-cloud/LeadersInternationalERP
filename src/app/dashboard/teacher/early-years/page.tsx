@@ -77,10 +77,17 @@ export default async function TeacherEarlyYearsPage() {
   }
 
   // 4. Load academic terms
-  const { data: terms } = await supabase
+  const { data: termsData } = await supabase
     .from('terms')
-    .select('*')
+    .select('*, academic_years(name)')
     .order('created_at', { ascending: false })
+
+  const terms = (termsData || []).map((t: any) => ({
+    id: t.id,
+    term_name: t.name || t.term_name || 'Term',
+    academic_year: t.academic_years?.name || t.academic_year || '',
+    is_current: t.is_current
+  }))
 
   // 5. Load initial students for the first class
   let initialStudents: any[] = []

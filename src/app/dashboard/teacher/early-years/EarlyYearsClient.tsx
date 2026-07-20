@@ -292,10 +292,16 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
 
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600 }}>Academic Term</label>
-            <select value={selectedTermId} onChange={e => setSelectedTermId(e.target.value)} className="input-field" style={{ minWidth: '150px', padding: '0.4rem 0.75rem' }}>
-              {terms.map(t => (
-                <option key={t.id} value={t.id}>{t.term_name} - {t.academic_year}</option>
-              ))}
+            <select value={selectedTermId} onChange={e => setSelectedTermId(e.target.value)} className="input-field" style={{ minWidth: '180px', padding: '0.4rem 0.75rem' }}>
+              {terms.map(t => {
+                const termName = t.term_name || t.name || 'Term'
+                const yearName = t.academic_year || t.academic_years?.name || ''
+                return (
+                  <option key={t.id} value={t.id}>
+                    {termName}{yearName ? ` (${yearName})` : ''}{t.is_current ? ' ★ Active' : ''}
+                  </option>
+                )
+              })}
             </select>
           </div>
         </div>
