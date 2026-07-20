@@ -35,8 +35,23 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized Access' }, { status: 403 })
     }
 
-    // 3. If Teacher, verify homeroom or class_subjects assignment
-    if (userRoles.includes('Teacher') && 
+    // 3. Fetch Class Info first to verify if it is an Early Years class
+    const { data: classInfo } = await supabase
+      .from('classes')
+      .select('*')
+      .eq('id', class_id)
+      .single()
+
+    if (!classInfo) {
+      return NextResponse.json({ error: 'Class not found' }, { status: 404 })
+    }
+
+    const isEarlyYears = Boolean(classInfo.is_early_years) ||
+      ['baby', 'nursery', 'reception', 'kg', 'playgroup', 'pre-primary'].some(ey => (classInfo.name || '').toLowerCase().includes(ey))
+
+    // If non-Early-Years class and standard Teacher, verify homeroom or class_subjects assignment
+    if (!isEarlyYears &&
+        userRoles.includes('Teacher') && 
         !userRoles.includes('System Admin') && 
         !userRoles.includes('Principal') && 
         !userRoles.includes('Dean') && 
@@ -60,24 +75,13 @@ export async function GET(request: Request) {
           .maybeSingle()
 
         if (!assignment) {
-          return NextResponse.json({ error: 'Forbidden: You are not assigned to this class as homeroom or subject teacher.' }, { status: 403 })
+          return NextResponse.json({ error: 'Forbidden: You are not assigned to this class.' }, { status: 403 })
         }
       }
     }
 
-    // 4. Fetch Class Info
-    const { data: classInfo } = await supabase
-      .from('classes')
-      .select('*')
-      .eq('id', class_id)
-      .single()
-
-    if (!classInfo) {
-      return NextResponse.json({ error: 'Class not found' }, { status: 404 })
-    }
-
-    // 5. Fetch Students in Class
-    let students = []
+    // 4. Fetch Students in Class (Direct class_id match first)
+    let students: any[] = []
     const { data: directStudents } = await supabase
       .from('students')
       .select(`
@@ -100,7 +104,7 @@ export async function GET(request: Request) {
     students = directStudents || []
 
     if (students.length === 0) {
-      // Fallback
+      // Fallback 1: Match by exact grade_level == classInfo.name
       const { data: fallbackStudents } = await supabase
         .from('students')
         .select(`
@@ -119,9 +123,35 @@ export async function GET(request: Request) {
           profiles (first_name, last_name, email)
         `)
         .eq('grade_level', classInfo.name)
-        .eq('section', classInfo.section || null)
 
       students = fallbackStudents || []
+    }
+
+    if (students.length === 0) {
+      // Fallback 2: Fuzzy match by clean class name
+      const cleanClassName = (classInfo.name || '').replace(/\s+[A-Z]$/i, '').trim()
+      if (cleanClassName) {
+        const { data: fuzzyStudents } = await supabase
+          .from('students')
+          .select(`
+            id,
+            student_id,
+            grade_level,
+            section,
+            class_id,
+            dob,
+            gender,
+            medical_info,
+            allergies,
+            language_at_home,
+            previous_school,
+            emergency_contact,
+            profiles (first_name, last_name, email)
+          `)
+          .ilike('grade_level', `%${cleanClassName}%`)
+
+        students = fuzzyStudents || []
+      }
     }
 
     const mappedStudents = students.map((s: any) => {
