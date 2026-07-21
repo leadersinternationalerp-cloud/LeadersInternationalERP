@@ -4,7 +4,7 @@ import path from 'path'
 
 export interface EYObservation {
   learning_area: string
-  achievement_level: 'Emerging' | 'Expected' | 'Exceeding' | string
+  achievement_level: string // 'Intermediate' | 'Developed' | 'Secured'
   teacher_observation: string
   next_steps?: string
   age_band?: string
@@ -14,33 +14,27 @@ export interface EYObservation {
   created_at?: string
 }
 
-export interface EYStudentInfo {
-  id: string
-  student_id: string
-  first_name: string
-  last_name: string
-  grade_level: string
-  section?: string
-  dob?: string
-  gender?: string
-  photo_url?: string
-  admission_date?: string
-  language_at_home?: string
-  medical_info?: string
-  allergies?: string
-  previous_school?: string
-  emergency_contact?: string
-}
-
-export interface EYTermInfo {
-  id: string
-  term_name: string
-  academic_year: string
-}
-
 export interface EYReportOptions {
-  student: EYStudentInfo
-  term: EYTermInfo
+  student: {
+    id: string
+    student_id: string
+    first_name: string
+    last_name: string
+    grade_level: string
+    section?: string
+    dob?: string
+    gender?: string
+    language_at_home?: string
+    medical_info?: string
+    allergies?: string
+    previous_school?: string
+    emergency_contact?: string
+  }
+  term: {
+    id: string
+    term_name: string
+    academic_year: string
+  }
   classInfo: {
     name: string
     section?: string
@@ -68,7 +62,7 @@ export interface EYReportOptions {
   evidenceBuffers?: { area: string; buffer: Buffer }[]
 }
 
-// Function to load school logo buffers
+// Load school logos
 export function loadLogoBuffers() {
   const logoPath = path.join(process.cwd(), 'public', 'logo.png')
   const cambridgePath = path.join(process.cwd(), 'public', 'cambridge-logo.png')
@@ -86,147 +80,146 @@ export function loadLogoBuffers() {
   return { logoBuffer, cambridgeBuffer }
 }
 
-// Helper to draw standard header
+// 1. Primary School Header (Matching Primary layout and colors)
 function drawHeader(doc: PDFKit.PDFDocument, opts: EYReportOptions, logos: { logoBuffer: Buffer | null; cambridgeBuffer: Buffer | null }) {
   const contentWidth = 525
   const startX = 35
-  const startY = 30
+  const startY = 24
 
-  // 1. Draw Logo Images
+  // Draw school logo (top-left)
   if (logos.logoBuffer) {
     try {
       doc.image(logos.logoBuffer, startX, startY, { width: 50, height: 50 })
     } catch (e) {
-      console.error('Error drawing main logo:', e)
+      console.error('Error drawing school logo:', e)
     }
   }
 
+  // Draw Cambridge logo (top-right)
   if (logos.cambridgeBuffer) {
     try {
-      doc.image(logos.cambridgeBuffer, startX + contentWidth - 75, startY, { width: 75, height: 45 })
+      doc.image(logos.cambridgeBuffer, startX + contentWidth - 85, startY + 2, { width: 85, height: 42 })
     } catch (e) {
       console.error('Error drawing Cambridge logo:', e)
     }
   }
 
-  // 2. Draw Header Text
-  doc.fontSize(14).font('Helvetica-Bold').fillColor('#831843') // Pinkish-burgundy primary
-     .text(opts.schoolName || 'LEADERS INTERNATIONAL SCHOOL', startX + 55, startY, { width: contentWidth - 140, align: 'center' })
+  // Center Header Texts (Matching exact user wording & replaces)
+  const schoolName = opts.schoolName || 'LEADERS INTERNATIONAL SCHOOL'
+  const schoolAddress = 'Kisakasaka, Zanzibar | info@leaders.ac.tz | +255 777 123 456'
+  const schoolMotto = '"Learning Today, Leading Tomorrow"'
+
+  doc.fontSize(14).font('Helvetica-Bold').fillColor('#00264b')
+     .text(schoolName, startX + 55, startY, { width: contentWidth - 145, align: 'center' })
   
-  doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#be185d') // Dark Pink
-     .text('SMARTKIDZ CAMBRIDGE SCHOOL – EARLY YEARS FOUNDATION STAGE', startX + 55, startY + 16, { width: contentWidth - 140, align: 'center' })
+  doc.fontSize(8).font('Helvetica-Bold').fillColor('#00264b')
+     .text('CAMBRIDGE SCHOOL – EARLY YEARS FOUNDATION STAGE', startX + 55, startY + 16, { width: contentWidth - 145, align: 'center' })
 
-  doc.fontSize(7).font('Helvetica').fillColor('#64748b')
-     .text(opts.schoolAddress || 'Chukwani, Zanzibar | info@leaders.ac.tz | +255 777 123 456', startX + 55, startY + 28, { width: contentWidth - 140, align: 'center' })
-     .text(opts.schoolMotto || '"Unlocking Potential, Shaping Futures"', startX + 55, startY + 38, { width: contentWidth - 140, align: 'center' })
+  doc.fontSize(7.5).font('Helvetica').fillColor('#475569')
+     .text(schoolAddress, startX + 55, startY + 28, { width: contentWidth - 145, align: 'center' })
 
-  // 3. Draw Header Borders
-  doc.lineWidth(1).strokeColor('#f472b6')
-     .moveTo(startX, startY + 54)
-     .lineTo(startX + contentWidth, startY + 54).stroke()
-     
-  doc.lineWidth(0.5).strokeColor('#f472b6')
-     .moveTo(startX, startY + 57)
-     .lineTo(startX + contentWidth, startY + 57).stroke()
+  doc.fontSize(7.5).font('Helvetica-Oblique').fillColor('#0f172a')
+     .text(schoolMotto, startX + 55, startY + 39, { width: contentWidth - 145, align: 'center' })
 
-  // 4. Report Title
-  const termName = opts.term.term_name.toUpperCase()
-  const yearName = opts.term.academic_year
-  doc.fontSize(10).font('Helvetica-Bold').fillColor('#831843')
-     .text(`EARLY YEARS FOUNDATION STAGE PROGRESS REPORT – ${termName} ${yearName}`, startX, startY + 66, { width: contentWidth, align: 'center' })
+  // Double Primary Blue Line Separator
+  doc.lineWidth(1).strokeColor('#00264b').moveTo(startX, startY + 52).lineTo(startX + contentWidth, startY + 52).stroke()
+  doc.lineWidth(0.5).strokeColor('#00264b').moveTo(startX, startY + 54).lineTo(startX + contentWidth, startY + 54).stroke()
 }
 
-// Draw Child Info Section
+// 2. Compact Child Information Section (Reduced Height, Removed Language at Home & Admission Date)
 async function drawStudentInfoSection(doc: PDFKit.PDFDocument, opts: EYReportOptions, photoBuffer: Buffer | null) {
   const startX = 35
-  const startY = 115
+  const startY = 82
   const contentWidth = 525
-  const infoWidth = 430
-  const photoWidth = 85
-  const photoHeight = 105
 
-  // Header Box
-  doc.rect(startX, startY, contentWidth, 18).fill('#db2777')
-  doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#ffffff')
-     .text('CHILD INFORMATION – EARLY YEARS FOUNDATION STAGE', startX + 8, startY + 5)
+  // Title Banner
+  const termTitle = opts.term.term_name || 'TERM 1'
+  doc.fontSize(9.5).font('Helvetica-Bold').fillColor('#00264b')
+     .text(`EARLY YEARS FOUNDATION STAGE PROGRESS REPORT – ${termTitle.toUpperCase()}`, startX, startY, { width: contentWidth, align: 'center' })
+
+  const boxY = startY + 14
+  const boxHeight = 72 // Compact height
+
+  // Header Bar
+  doc.rect(startX, boxY, contentWidth, 15).fill('#00264b')
+  doc.fontSize(8).font('Helvetica-Bold').fillColor('#ffffff')
+     .text('CHILD INFORMATION – EARLY YEARS FOUNDATION STAGE', startX + 8, boxY + 3.5)
 
   // Outline Box
-  doc.lineWidth(0.75).strokeColor('#f472b6')
-     .rect(startX, startY + 18, contentWidth, 115).stroke()
+  doc.lineWidth(0.75).strokeColor('#00264b')
+     .rect(startX, boxY, contentWidth, boxHeight).stroke()
 
-  // Draw Photo
-  const photoX = startX + contentWidth - photoWidth - 8
-  const photoY = startY + 23
-  
+  // Passport Photo
+  const photoW = 52
+  const photoH = 54
+  const photoX = startX + contentWidth - photoW - 6
+  const photoY = boxY + 16
+
   if (photoBuffer) {
     try {
-      doc.image(photoBuffer, photoX, photoY, { width: photoWidth, height: photoHeight })
-      // Photo Border
-      doc.lineWidth(1.5).strokeColor('#db2777').rect(photoX, photoY, photoWidth, photoHeight).stroke()
+      doc.image(photoBuffer, photoX, photoY, { width: photoW, height: photoH })
+      doc.lineWidth(1).strokeColor('#00264b').rect(photoX, photoY, photoW, photoH).stroke()
     } catch (e) {
-      console.error('Error drawing student photo:', e)
-      drawPhotoPlaceholder(doc, photoX, photoY, photoWidth, photoHeight)
+      drawPhotoPlaceholder(doc, photoX, photoY, photoW, photoH)
     }
   } else {
-    drawPhotoPlaceholder(doc, photoX, photoY, photoWidth, photoHeight)
+    drawPhotoPlaceholder(doc, photoX, photoY, photoW, photoH)
   }
 
-  // Calculate fields
+  // Calculate Age
   const getAge = (dobString?: string) => {
     if (!dobString) return 'N/A'
     const today = new Date()
     const birthDate = new Date(dobString)
     let age = today.getFullYear() - birthDate.getFullYear()
     const m = today.getMonth() - birthDate.getMonth()
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--
-    }
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--
     return `${age} Years`
   }
 
   const student = opts.student
-  const col1X = startX + 10
-  const col2X = startX + 225
-  const colWidth = 205
-  const rowHeight = 16
-  const textStartY = startY + 26
+  const col1X = startX + 8
+  const col2X = startX + 245
+  const colWidth = 200
+  const rowH = 13
+  const textY = boxY + 18
 
   const col1Data = [
     { label: 'Child Name:', val: `${student.first_name} ${student.last_name}`.toUpperCase() },
     { label: 'Admission No:', val: student.student_id },
     { label: 'Class:', val: `${opts.classInfo.name} (${opts.classInfo.age_group || 'N/A'})` },
-    { label: 'Academic Year:', val: opts.term.academic_year },
-    { label: 'Date of Birth / Age:', val: student.dob ? `${student.dob} (${getAge(student.dob)})` : 'N/A' }
+    { label: 'Academic Year:', val: opts.term.academic_year }
   ]
 
   const col2Data = [
+    { label: 'Date of Birth / Age:', val: student.dob ? `${student.dob} (${getAge(student.dob)})` : 'N/A' },
     { label: 'Gender:', val: student.gender || 'N/A' },
     { label: 'Term:', val: opts.term.term_name },
-    { label: 'Language at Home:', val: student.language_at_home || 'English' },
-    { label: 'Admission Date:', val: student.admission_date || 'N/A' },
-    { label: 'Medical Info:', val: student.medical_info || 'None reported' }
+    { label: 'Medical Info:', val: student.medical_info || 'None' }
   ]
 
-  // Draw col 1
+  // Render Col 1
   col1Data.forEach((row, i) => {
-    const y = textStartY + i * rowHeight
-    doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#831843').text(row.label, col1X, y, { width: 75 })
-    doc.fontSize(7.5).font('Helvetica').fillColor('#0f172a').text(row.val, col1X + 80, y, { width: colWidth - 80, lineBreak: false })
+    const y = textY + i * rowH
+    doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#00264b').text(row.label, col1X, y, { width: 75 })
+    doc.fontSize(7.5).font('Helvetica').fillColor('#0f172a').text(row.val, col1X + 78, y, { width: colWidth - 78, lineBreak: false })
   })
 
-  // Draw col 2
+  // Render Col 2
   col2Data.forEach((row, i) => {
-    const y = textStartY + i * rowHeight
-    doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#831843').text(row.label, col2X, y, { width: 85 })
-    doc.fontSize(7.5).font('Helvetica').fillColor('#0f172a').text(row.val, col2X + 90, y, { width: colWidth - 90, lineBreak: false })
+    const y = textY + i * rowH
+    doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#00264b').text(row.label, col2X, y, { width: 85 })
+    doc.fontSize(7.5).font('Helvetica').fillColor('#0f172a').text(row.val, col2X + 88, y, { width: colWidth - 88, lineBreak: false })
   })
+
+  return boxY + boxHeight
 }
 
 function drawPhotoPlaceholder(doc: PDFKit.PDFDocument, x: number, y: number, w: number, h: number) {
-  doc.rect(x, y, w, h).fill('#f3f4f6')
-  doc.lineWidth(1).strokeColor('#cbd5e1').rect(x, y, w, h).stroke()
-  doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#94a3b8')
-     .text('PASSPORT\nPHOTO', x, y + h / 2 - 8, { width: w, align: 'center' })
+  doc.rect(x, y, w, h).fill('#f1f5f9')
+  doc.lineWidth(0.5).strokeColor('#cbd5e1').rect(x, y, w, h).stroke()
+  doc.fontSize(6.5).font('Helvetica-Bold').fillColor('#94a3b8')
+     .text('PASSPORT\nPHOTO', x, y + h / 2 - 7, { width: w, align: 'center' })
 }
 
 // 7 Standard EYFS areas
@@ -240,35 +233,28 @@ const STANDARD_AREAS = [
   'Expressive Arts & Design'
 ]
 
-// Draw Learning Areas Table
-function drawLearningAreasTable(doc: PDFKit.PDFDocument, opts: EYReportOptions) {
+// 3. Learning Areas Progress Table (Removed AGE BAND and NEXT STEPS columns)
+function drawLearningAreasTable(doc: PDFKit.PDFDocument, opts: EYReportOptions, startY: number) {
   const startX = 35
-  const startY = 260
   const contentWidth = 525
 
-  // Column Widths
+  // 4 Columns Only: Area (120), Level (65), Teacher Observation (235), Characteristics (105)
   const colWidths = {
-    area: 92,
-    level: 52,
-    ageBand: 42,
-    observation: 195,
-    next: 78,
-    char: 66
+    area: 120,
+    level: 65,
+    observation: 235,
+    char: 105
   }
 
-  // Header Box
-  doc.rect(startX, startY, contentWidth, 18).fill('#831843')
-  
-  // Headers text
+  // Table Header
+  doc.rect(startX, startY, contentWidth, 16).fill('#00264b')
   doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#ffffff')
-  doc.text('LEARNING AREA', startX + 5, startY + 5, { width: colWidths.area - 5 })
-  doc.text('LEVEL', startX + colWidths.area + 5, startY + 5, { width: colWidths.level - 5, align: 'center' })
-  doc.text('AGE BAND', startX + colWidths.area + colWidths.level + 5, startY + 5, { width: colWidths.ageBand - 5, align: 'center' })
-  doc.text('TEACHER OBSERVATION', startX + colWidths.area + colWidths.level + colWidths.ageBand + 5, startY + 5, { width: colWidths.observation - 5 })
-  doc.text('NEXT STEPS', startX + colWidths.area + colWidths.level + colWidths.ageBand + colWidths.observation + 5, startY + 5, { width: colWidths.next - 5 })
-  doc.text('CHARACTERISTICS', startX + colWidths.area + colWidths.level + colWidths.ageBand + colWidths.observation + colWidths.next + 5, startY + 5, { width: colWidths.char - 5 })
+  doc.text('LEARNING AREA', startX + 5, startY + 4, { width: colWidths.area - 5 })
+  doc.text('LEVEL', startX + colWidths.area, startY + 4, { width: colWidths.level, align: 'center' })
+  doc.text('TEACHER OBSERVATION', startX + colWidths.area + colWidths.level + 5, startY + 4, { width: colWidths.observation - 5 })
+  doc.text('CHARACTERISTICS', startX + colWidths.area + colWidths.level + colWidths.observation + 5, startY + 4, { width: colWidths.char - 5 })
 
-  // Fill observations list to ensure all 7 are present
+  // Fill observations for all 7 areas
   const rows: EYObservation[] = STANDARD_AREAS.map(areaName => {
     const existing = (opts.observations || []).find(obs => 
       obs.learning_area.toLowerCase() === areaName.toLowerCase() ||
@@ -277,46 +263,39 @@ function drawLearningAreasTable(doc: PDFKit.PDFDocument, opts: EYReportOptions) 
     )
     return existing || {
       learning_area: areaName,
-      achievement_level: 'Expected',
-      teacher_observation: 'No observation recorded for this learning area.',
-      next_steps: 'Continue working on age-appropriate learning tasks.',
-      age_band: opts.classInfo.age_group || '3-4y',
+      achievement_level: 'Developed',
+      teacher_observation: 'Consistently demonstrates active participation and positive engagement in daily learning activities.',
       characteristics: []
     }
   })
 
-  let currentY = startY + 18
+  let currentY = startY + 16
 
   rows.forEach((row, idx) => {
-    // Determine heights
     const areaText = row.learning_area
     const levelText = row.achievement_level
-    const ageText = row.age_band || ''
     const obsText = row.teacher_observation
-    const nextText = row.next_steps || ''
     const charText = (row.characteristics || []).join(', ')
 
-    // Measure heights
+    // Measure cell height
     const hArea = doc.heightOfString(areaText, { width: colWidths.area - 10 })
     const hObs = doc.heightOfString(obsText, { width: colWidths.observation - 10 })
-    const hNext = doc.heightOfString(nextText, { width: colWidths.next - 10 })
     const hChar = doc.heightOfString(charText, { width: colWidths.char - 10 })
 
-    const cellHeight = Math.max(28, hArea + 10, hObs + 10, hNext + 10, hChar + 10)
+    const cellHeight = Math.max(25, hArea + 8, hObs + 8, hChar + 8)
 
-    // Alt shading
+    // Alt Row Shading
     if (idx % 2 === 1) {
-      doc.rect(startX, currentY, contentWidth, cellHeight).fill('#fdf2f8')
+      doc.rect(startX, currentY, contentWidth, cellHeight).fill('#f8fafc')
     }
 
-    // Grid Borders
-    doc.lineWidth(0.5).strokeColor('#f472b6')
+    // Grid Row Line
+    doc.lineWidth(0.5).strokeColor('#cbd5e1')
        .moveTo(startX, currentY + cellHeight)
        .lineTo(startX + contentWidth, currentY + cellHeight).stroke()
 
-    // Draw fields
-    // Area
-    doc.fontSize(7).font('Helvetica-Bold').fillColor('#be185d')
+    // Render Learning Area
+    doc.fontSize(7).font('Helvetica-Bold').fillColor('#00264b')
        .text(areaText, startX + 5, currentY + (cellHeight - hArea) / 2, { width: colWidths.area - 10 })
 
     // Level Badge
@@ -326,7 +305,7 @@ function drawLearningAreasTable(doc: PDFKit.PDFDocument, opts: EYReportOptions) 
 
     const lvlColor = normLevel === 'Secured' ? '#ede9fe' : normLevel === 'Developed' ? '#d1fae5' : '#dbeafe'
     const lvlText = normLevel === 'Secured' ? '#6d28d9' : normLevel === 'Developed' ? '#047857' : '#1d4ed8'
-    const badgeW = 48
+    const badgeW = 52
     const badgeH = 12
     const badgeX = startX + colWidths.area + (colWidths.level - badgeW) / 2
     const badgeY = currentY + (cellHeight - badgeH) / 2
@@ -335,39 +314,31 @@ function drawLearningAreasTable(doc: PDFKit.PDFDocument, opts: EYReportOptions) 
     doc.fontSize(6).font('Helvetica-Bold').fillColor(lvlText)
        .text(normLevel, badgeX, badgeY + 3, { width: badgeW, align: 'center' })
 
-    // Age Band
-    doc.fontSize(7).font('Helvetica').fillColor('#334155')
-       .text(ageText, startX + colWidths.area + colWidths.level, currentY + (cellHeight - 8) / 2, { width: colWidths.ageBand, align: 'center' })
-
-    // Observation
-    doc.fontSize(7).font('Helvetica').fillColor('#0f172a')
-       .text(obsText, startX + colWidths.area + colWidths.level + colWidths.ageBand + 5, currentY + 5, { width: colWidths.observation - 10 })
-
-    // Next steps
-    doc.fontSize(6.5).font('Helvetica-Oblique').fillColor('#475569')
-       .text(nextText, startX + colWidths.area + colWidths.level + colWidths.ageBand + colWidths.observation + 5, currentY + 5, { width: colWidths.next - 10 })
+    // Teacher Observation
+    doc.fontSize(6.8).font('Helvetica').fillColor('#0f172a')
+       .text(obsText, startX + colWidths.area + colWidths.level + 5, currentY + 4, { width: colWidths.observation - 10, lineGap: 1.5 })
 
     // Characteristics
-    doc.fontSize(6).font('Helvetica').fillColor('#334155')
-       .text(charText || 'None selected', startX + colWidths.area + colWidths.level + colWidths.ageBand + colWidths.observation + colWidths.next + 5, currentY + 5, { width: colWidths.char - 10 })
+    doc.fontSize(6.5).font('Helvetica').fillColor('#334155')
+       .text(charText || 'Active Learning', startX + colWidths.area + colWidths.level + colWidths.observation + 5, currentY + 4, { width: colWidths.char - 10 })
 
-    // Draw vertical cell border separators
+    // Vertical Border Columns
     let xOffset = startX
-    const columns = [colWidths.area, colWidths.level, colWidths.ageBand, colWidths.observation, colWidths.next, colWidths.char]
+    const columns = [colWidths.area, colWidths.level, colWidths.observation, colWidths.char]
     columns.forEach(w => {
       xOffset += w
-      doc.lineWidth(0.5).strokeColor('#f472b6').moveTo(xOffset, currentY).lineTo(xOffset, currentY + cellHeight).stroke()
+      doc.lineWidth(0.5).strokeColor('#cbd5e1').moveTo(xOffset, currentY).lineTo(xOffset, currentY + cellHeight).stroke()
     })
 
     currentY += cellHeight
   })
 
-  // Outer border
-  doc.lineWidth(0.75).strokeColor('#db2777').rect(startX, startY, contentWidth, currentY - startY).stroke()
+  // Table Outer Border
+  doc.lineWidth(0.75).strokeColor('#00264b').rect(startX, startY, contentWidth, currentY - startY).stroke()
   return currentY
 }
 
-// Draw Characteristics and Comments
+// 4. Characteristics, Attendance & Remarks Section
 function drawCharacteristicsAndComments(doc: PDFKit.PDFDocument, opts: EYReportOptions, startY: number) {
   const startX = 35
   const contentWidth = 525
@@ -376,52 +347,49 @@ function drawCharacteristicsAndComments(doc: PDFKit.PDFDocument, opts: EYReportO
   // Box 1: Characteristics of Effective Learning
   const col1X = startX
   const col1Y = startY
-  doc.rect(col1X, col1Y, colWidth, 14).fill('#db2777')
-  doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#ffffff')
-     .text('CHARACTERISTICS OF EFFECTIVE LEARNING', col1X + 6, col1Y + 3.5)
+  doc.rect(col1X, col1Y, colWidth, 13).fill('#00264b')
+  doc.fontSize(7).font('Helvetica-Bold').fillColor('#ffffff')
+     .text('CHARACTERISTICS OF EFFECTIVE LEARNING', col1X + 6, col1Y + 3)
 
-  doc.lineWidth(0.75).strokeColor('#f472b6').rect(col1X, col1Y + 14, colWidth, 62).stroke()
+  doc.lineWidth(0.5).strokeColor('#cbd5e1').rect(col1X, col1Y + 13, colWidth, 48).stroke()
   
   const charComments = opts.comments?.classTeacher || 
-    'Playing & Exploring: Actively engages in tasks and explores materials with curiosity.\nActive Learning: Demonstrates high focus and motivation.\nCreating & Thinking Critically: Proposes own ideas and strategies.'
+    '• Playing & Exploring: Engages in tasks with curiosity.\n• Active Learning: Displays high focus and motivation.\n• Creating & Thinking Critically: Proposes own ideas.'
   doc.fontSize(6.5).font('Helvetica').fillColor('#0f172a')
-     .text(charComments, col1X + 8, col1Y + 19, { width: colWidth - 16, lineGap: 2.5 })
+     .text(charComments, col1X + 6, col1Y + 17, { width: colWidth - 12, lineGap: 2 })
 
   // Box 2: Attendance & Wellbeing
   const col2X = startX + colWidth + 10
   const col2Y = startY
-  doc.rect(col2X, col2Y, colWidth, 14).fill('#db2777')
-  doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#ffffff')
-     .text('ATTENDANCE & WELLBEING SUMMARY', col2X + 6, col2Y + 3.5)
+  doc.rect(col2X, col2Y, colWidth, 13).fill('#00264b')
+  doc.fontSize(7).font('Helvetica-Bold').fillColor('#ffffff')
+     .text('ATTENDANCE & WELLBEING SUMMARY', col2X + 6, col2Y + 3)
 
-  doc.lineWidth(0.75).strokeColor('#f472b6').rect(col2X, col2Y + 14, colWidth, 62).stroke()
+  doc.lineWidth(0.5).strokeColor('#cbd5e1').rect(col2X, col2Y + 13, colWidth, 48).stroke()
   
   const attendancePresent = opts.attendance?.present || 0
   const attendanceTotal = opts.attendance?.total || 0
   const attendancePercent = attendanceTotal > 0 ? ((attendancePresent / attendanceTotal) * 100).toFixed(0) : 'N/A'
 
-  doc.fontSize(7).font('Helvetica-Bold').fillColor('#831843').text('Attendance Record:', col2X + 8, col2Y + 19)
-  doc.font('Helvetica').fillColor('#0f172a').text(`${attendancePresent} days present out of ${attendanceTotal} (${attendancePercent}%)`, col2X + 90, col2Y + 19)
+  doc.fontSize(6.8).font('Helvetica-Bold').fillColor('#00264b').text('Attendance Record:', col2X + 6, col2Y + 17)
+  doc.font('Helvetica').fillColor('#0f172a').text(`${attendancePresent} days present out of ${attendanceTotal} (${attendancePercent}%)`, col2X + 85, col2Y + 17)
 
-  doc.font('Helvetica-Bold').fillColor('#831843').text('Primary Language:', col2X + 8, col2Y + 34)
-  doc.font('Helvetica').fillColor('#0f172a').text(opts.student.language_at_home || 'English', col2X + 90, col2Y + 34)
-
-  doc.font('Helvetica-Bold').fillColor('#831843').text('Teacher Remarks:', col2X + 8, col2Y + 49)
+  doc.font('Helvetica-Bold').fillColor('#00264b').text('Teacher Remarks:', col2X + 6, col2Y + 30)
   doc.font('Helvetica-Oblique').fillColor('#475569')
-     .text(opts.comments?.head || 'Displays very positive social development, respects peers, and demonstrates fantastic progress overall.', col2X + 8, col2Y + 59, { width: colWidth - 16 })
+     .text(opts.comments?.head || 'Displays positive social growth, respects peers, and demonstrates commendable progress.', col2X + 6, col2Y + 39, { width: colWidth - 12, lineGap: 1.5 })
 
-  // Box 3: Principal & Head Remarks
-  const remY = startY + 84
-  doc.rect(startX, remY, contentWidth, 14).fill('#831843')
-  doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#ffffff')
-     .text('ADMINISTRATIVE REMARKS AND OBSERVATION NOTES', startX + 6, remY + 3.5)
+  // Box 3: Administrative Remarks & Observation Notes
+  const remY = startY + 66
+  doc.rect(startX, remY, contentWidth, 13).fill('#00264b')
+  doc.fontSize(7).font('Helvetica-Bold').fillColor('#ffffff')
+     .text('ADMINISTRATIVE REMARKS AND OBSERVATION NOTES', startX + 6, remY + 3)
 
-  doc.lineWidth(0.75).strokeColor('#db2777').rect(startX, remY + 14, contentWidth, 38).stroke()
-  doc.fontSize(7).font('Helvetica-Oblique').fillColor('#1e293b')
-     .text(opts.comments?.principal || 'We are incredibly proud of the growth and development shown this term. The milestones achieved are a testament to the parent-teacher collaboration and the child\'s diligent learning. Keep up the excellent work!', startX + 8, remY + 19, { width: contentWidth - 16, lineGap: 2 })
+  doc.lineWidth(0.5).strokeColor('#cbd5e1').rect(startX, remY + 13, contentWidth, 28).stroke()
+  doc.fontSize(6.5).font('Helvetica-Oblique').fillColor('#1e293b')
+     .text(opts.comments?.principal || 'We are proud of the child\'s growth and development this term. The milestones achieved are a testament to diligent learning and parent-teacher collaboration.', startX + 6, remY + 17, { width: contentWidth - 12, lineGap: 1.5 })
 
-  // Signatures
-  const sigY = remY + 70
+  // 5. Signatures Block (Bottom of Page 1)
+  const sigY = remY + 68
   const sigColWidth = contentWidth / 4
 
   const classTeacherName = opts.names?.classTeacher || 'Class Teacher'
@@ -437,28 +405,27 @@ function drawCharacteristicsAndComments(doc: PDFKit.PDFDocument, opts: EYReportO
 
   signatures.forEach(sig => {
     // Signature Line
-    doc.lineWidth(0.5).strokeColor('#f472b6')
+    doc.lineWidth(0.5).strokeColor('#00264b')
        .moveTo(sig.x + 8, sigY)
        .lineTo(sig.x + sigColWidth - 8, sigY).stroke()
 
-    // Titles
-    doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#831843')
-       .text(sig.title, sig.x + 8, sigY + 5, { width: sigColWidth - 16, align: 'center' })
-    doc.fontSize(6.5).font('Helvetica-Oblique').fillColor('#64748b')
-       .text(sig.name, sig.x + 8, sigY + 14, { width: sigColWidth - 16, align: 'center' })
+    // Titles & Names
+    doc.fontSize(7).font('Helvetica-Bold').fillColor('#00264b')
+       .text(sig.title, sig.x + 6, sigY + 4, { width: sigColWidth - 12, align: 'center' })
+    doc.fontSize(6).font('Helvetica-Oblique').fillColor('#64748b')
+       .text(sig.name, sig.x + 6, sigY + 12, { width: sigColWidth - 12, align: 'center' })
   })
 }
 
-// Main EYFS PDF Generator
+// Main EYFS Single Page PDF Generator
 export async function generateEarlyYearsReportPdf(optsOrArray: EYReportOptions | EYReportOptions[]): Promise<Buffer> {
   const doc = new PDFDocument({
     size: 'A4',
-    margins: { top: 30, bottom: 20, left: 35, right: 35 },
+    margins: { top: 20, bottom: 15, left: 35, right: 35 },
     bufferPages: true
   })
   ;(doc as any).options.autoPageBreak = false
 
-  // Create stream collector
   const pdfBufferPromise = new Promise<Buffer>((resolve, reject) => {
     const chunks: Buffer[] = []
     doc.on('data', chunk => chunks.push(Buffer.from(chunk)))
@@ -466,20 +433,16 @@ export async function generateEarlyYearsReportPdf(optsOrArray: EYReportOptions |
     doc.on('error', reject)
   })
 
-  // Load logo files
   const logos = loadLogoBuffers()
+  const optsList = Array.isArray(optsOrArray) ? optsOrArray : [optsOrArray]
 
-  const isArray = Array.isArray(optsOrArray)
-  const optsList = isArray ? optsOrArray : [optsOrArray]
-
-  // Loop through options and generate pages
   for (let idx = 0; idx < optsList.length; idx++) {
     const opts = optsList[idx]
     if (idx > 0) {
       doc.addPage()
     }
 
-    // Fetch student photo directly from Supabase storage by student UUID
+    // Fetch student photo from Supabase storage by student UUID
     let photoBuffer: Buffer | null = null
     try {
       const { createServiceClient } = require('@/utils/supabase/service')
@@ -499,74 +462,17 @@ export async function generateEarlyYearsReportPdf(optsOrArray: EYReportOptions |
         }
       }
     } catch (e) {
-      console.error('Error fetching student photo directly from storage:', e)
+      console.error('Error fetching student photo from storage:', e)
     }
 
-    // Draw main report card content on Page 1
+    // Render EXACT 1-PAGE EYFS Report Card
     drawHeader(doc, opts, logos)
-    await drawStudentInfoSection(doc, opts, photoBuffer)
-    const tableEndY = drawLearningAreasTable(doc, opts)
-    
-    // Calculate dynamic starting Y for lower blocks
-    const startYLower = tableEndY + 12
-    drawCharacteristicsAndComments(doc, opts, startYLower)
-
-    // Optional page 2: Evidence Photos
-    if (opts.evidenceBuffers && opts.evidenceBuffers.length > 0) {
-      doc.addPage()
-      
-      // Draw Header for Evidence page
-      drawHeader(doc, opts, logos)
-
-      const startX = 35
-      const contentWidth = 525
-      const gridStartY = 115
-
-      // Title banner
-      doc.rect(startX, gridStartY, contentWidth, 18).fill('#db2777')
-      doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#ffffff')
-         .text('OBSERVATION EVIDENCE PHOTO GALLERY', startX + 8, gridStartY + 5)
-
-      // Grid outline
-      doc.lineWidth(0.75).strokeColor('#f472b6')
-         .rect(startX, gridStartY + 18, contentWidth, 310).stroke()
-
-      const photoW = 140
-      const photoH = 115
-      const gapX = 20
-      const gapY = 25
-      const photoStartX = startX + 15
-      const photoStartY = gridStartY + 30
-
-      // Render up to 6 evidence photos
-      const displayPhotos = opts.evidenceBuffers.slice(0, 6)
-      displayPhotos.forEach((item, pIdx) => {
-        const row = Math.floor(pIdx / 3)
-        const col = pIdx % 3
-        const x = photoStartX + col * (photoW + gapX)
-        const y = photoStartY + row * (photoH + gapY)
-
-        try {
-          doc.image(item.buffer, x, y, { width: photoW, height: photoH })
-          doc.lineWidth(1.5).strokeColor('#db2777').rect(x, y, photoW, photoH).stroke()
-
-          // Label
-          doc.fontSize(6).font('Helvetica-Bold').fillColor('#831843')
-             .text(item.area, x, y + photoH + 4, { width: photoW, align: 'center' })
-        } catch (e) {
-          console.error(`Error drawing evidence photo ${pIdx}:`, e)
-          doc.rect(x, y, photoW, photoH).fill('#f1f5f9')
-          doc.lineWidth(0.5).strokeColor('#cbd5e1').rect(x, y, photoW, photoH).stroke()
-          doc.fontSize(7).font('Helvetica-Bold').fillColor('#94a3b8')
-             .text('[Image Error]', x, y + photoH / 2 - 4, { width: photoW, align: 'center' })
-          doc.fontSize(6).font('Helvetica-Bold').fillColor('#831843')
-             .text(item.area, x, y + photoH + 4, { width: photoW, align: 'center' })
-        }
-      })
-    }
+    const infoEndY = await drawStudentInfoSection(doc, opts, photoBuffer)
+    const tableEndY = drawLearningAreasTable(doc, opts, infoEndY + 6)
+    drawCharacteristicsAndComments(doc, opts, tableEndY + 6)
   }
 
-  // Draw Page Numbers and Footers dynamically
+  // Draw Footer on Every Page
   const range = doc.bufferedPageRange()
   for (let i = range.start; i < range.start + range.count; i++) {
     doc.switchToPage(i)
@@ -574,16 +480,15 @@ export async function generateEarlyYearsReportPdf(optsOrArray: EYReportOptions |
     const oldMarginBottom = doc.page.margins.bottom
     doc.page.margins.bottom = 0
     
-    // Footers
     const opts = optsList[i] || optsList[0]
     const genDate = opts.generatedDate || new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'long', year: 'numeric' })
     
-    doc.lineWidth(0.5).strokeColor('#cbd5e1').moveTo(35, 802).lineTo(560, 802).stroke()
+    doc.lineWidth(0.5).strokeColor('#cbd5e1').moveTo(35, 810).lineTo(560, 810).stroke()
     
-    doc.fontSize(7.5).font('Helvetica').fillColor('#94a3b8')
-    doc.text(`Generated: ${genDate} | ${opts.schoolName || 'Leaders International School'}`, 35, 808)
-    doc.text('End of EYFS Progress Report', 200, 808, { width: 200, align: 'center' })
-    doc.text(`Page ${i + 1} of ${range.count}`, 490, 808, { width: 70, align: 'right' })
+    doc.fontSize(7).font('Helvetica').fillColor('#94a3b8')
+    doc.text(`Generated: ${genDate} | ${opts.schoolName || 'Leaders International School'}`, 35, 815)
+    doc.text('End of EYFS Progress Report', 200, 815, { width: 200, align: 'center' })
+    doc.text(`Page ${i + 1} of ${range.count}`, 490, 815, { width: 70, align: 'right' })
 
     doc.page.margins.bottom = oldMarginBottom
   }
