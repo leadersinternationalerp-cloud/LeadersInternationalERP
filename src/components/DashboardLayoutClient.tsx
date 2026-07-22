@@ -169,6 +169,9 @@ export default function DashboardLayoutClient({
           <NavLink href="/dashboard/principal/early-years" icon={Baby}>
             Early Years Reports (Principal)
           </NavLink>
+          <NavLink href="/dashboard/admin/timetable" icon={CalendarDays}>
+            School Timetable
+          </NavLink>
         </>
       )}
 
