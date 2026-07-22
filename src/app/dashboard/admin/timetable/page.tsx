@@ -42,6 +42,7 @@ export default async function TimetablePage() {
       class_id,
       teacher_id,
       subject_id,
+      periods_per_week,
       profiles (first_name, last_name),
       subjects (name)
     `)

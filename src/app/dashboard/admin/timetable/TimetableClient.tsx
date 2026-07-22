@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Calendar, Users, FileDown, Plus, Trash2, ShieldAlert, Sparkles, CheckCircle2, Loader2, Info } from 'lucide-react'
+import { Calendar, Users, FileDown, Plus, Trash2, ShieldAlert, Sparkles, CheckCircle2, Loader2, Info, Save, Settings } from 'lucide-react'
 
 interface ClassItem {
   id: string
@@ -20,6 +20,7 @@ interface Allocation {
   class_id: string
   teacher_id: string
   subject_id: string | null
+  periods_per_week: number
   profiles?: {
     first_name: string
     last_name: string
@@ -73,7 +74,7 @@ const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 export default function TimetableClient({
   classes,
   teachers,
-  allocations
+  allocations: initialAllocations
 }: TimetableClientProps) {
   // Config state
   const [selectedClassId, setSelectedClassId] = useState<string>(classes[0]?.id || '')
@@ -83,9 +84,14 @@ export default function TimetableClient({
   // Slots & Entries state
   const [slots, setSlots] = useState<Slot[]>([])
   const [entries, setEntries] = useState<TimetableEntry[]>([])
+  const [allocations, setAllocations] = useState<Allocation[]>(initialAllocations)
+  
+  // Loading states
   const [loading, setLoading] = useState(false)
   const [savingSlots, setSavingSlots] = useState(false)
   const [savingEntry, setSavingEntry] = useState(false)
+  const [updatingPeriods, setUpdatingPeriods] = useState(false)
+  const [generatingTimetable, setGeneratingTimetable] = useState(false)
 
   // AI input state
   const [aiInput, setAiInput] = useState('8am start, 40min lessons, 10min break after 2nd, 20min after 4th, 1hr lunch after 6th')
@@ -104,7 +110,6 @@ export default function TimetableClient({
   const fetchSlots = async () => {
     setLoading(true)
     try {
-      // We load either class-specific or default global slots
       const res = await fetch(`/api/timetable/slots?class_id=${viewType === 'class' ? selectedClassId : ''}`)
       if (res.ok) {
         const data = await res.json()
@@ -125,6 +130,15 @@ export default function TimetableClient({
         const data = await res.json()
         setEntries(data.entries || [])
       }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  // Fetch Allocations (to ensure sync updates)
+  const refreshAllocations = async () => {
+    try {
+      const res = await fetch('/api/timetable/entries') // we get allocations from the server page props, but we can also fetch fresh data from allocations page or local server action. Let's update locally on PUT.
     } catch (e) {
       console.error(e)
     }
@@ -155,7 +169,7 @@ export default function TimetableClient({
       if (res.ok) {
         const data = await res.json()
         setSlots(data.slots || [])
-        alert('Slots generated and saved successfully!')
+        alert('Period slots generated and saved successfully!')
       }
     } catch (e) {
       console.error(e)
@@ -164,10 +178,63 @@ export default function TimetableClient({
     }
   }
 
-  // Allocations corresponding to selected view
+  // Filter allocations for selected class
   const classAllocations = useMemo(() => {
     return allocations.filter(a => a.class_id === selectedClassId)
   }, [allocations, selectedClassId])
+
+  // Update locally changed periods_per_week before submitting to database
+  const handlePeriodChange = (allocId: string, value: number) => {
+    setAllocations(prev => 
+      prev.map(a => a.id === allocId ? { ...a, periods_per_week: value } : a)
+    )
+  }
+
+  // Save allocations config (PUT)
+  const handleSavePeriodsConfig = async () => {
+    setUpdatingPeriods(true)
+    try {
+      const res = await fetch('/api/timetable/entries', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allocations: classAllocations.map(a => ({ id: a.id, periods_per_week: a.periods_per_week })) })
+      })
+      if (res.ok) {
+        alert('Periods per subject config saved successfully!')
+      } else {
+        alert('Failed to save configuration')
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setUpdatingPeriods(false)
+    }
+  }
+
+  // Generate timetable using auto-scheduler algorithm (POST action: generate)
+  const handleAutoGenerateTimetable = async () => {
+    if (!confirm('Generating a new timetable will overwrite all manual entries for this class. Proceed?')) return
+    setGeneratingTimetable(true)
+    try {
+      const res = await fetch('/api/timetable/entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate', class_id: selectedClassId })
+      })
+
+      const data = await res.json()
+      if (res.ok) {
+        await fetchEntries()
+        alert(data.message || 'Timetable generated successfully!')
+      } else {
+        alert(data.error || 'Failed to auto-generate timetable')
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setGeneratingTimetable(false)
+    }
+  }
 
   // Get active class info name
   const currentClassName = useMemo(() => {
@@ -255,20 +322,28 @@ export default function TimetableClient({
 
   // Check conflicts locally to show inline alert icons in UI
   const getConflictWarning = (day: string, slotId: string, entry: TimetableEntry) => {
-    // A teacher conflict occurs if this teacher is scheduled in another class at the same day + slot
-    const teacherId = entry.class_subjects?.teacher_id
+    const cs = Array.isArray(entry.class_subjects) ? entry.class_subjects[0] : entry.class_subjects
+    const teacherId = cs?.teacher_id
     const classId = entry.class_id
     
     const otherEntry = entries.find(e => 
       e.id !== entry.id &&
       e.day_of_week.toLowerCase() === day.toLowerCase() &&
       e.slot_id === slotId &&
-      (e.class_subjects?.teacher_id === teacherId || e.class_id === classId)
+      (
+        (() => {
+          const otherCs = Array.isArray(e.class_subjects) ? e.class_subjects[0] : e.class_subjects
+          return otherCs?.teacher_id === teacherId
+        })() ||
+        e.class_id === classId
+      )
     )
 
     if (otherEntry) {
-      if (otherEntry.class_subjects?.teacher_id === teacherId && otherEntry.class_id !== classId) {
-        const otherClassName = otherEntry.classes ? `${otherEntry.classes.name} ${otherEntry.classes.section || ''}`.trim() : 'Another class'
+      const otherCs = Array.isArray(otherEntry.class_subjects) ? otherEntry.class_subjects[0] : otherEntry.class_subjects
+      if (otherCs?.teacher_id === teacherId && otherEntry.class_id !== classId) {
+        const otherCls = Array.isArray(otherEntry.classes) ? otherEntry.classes[0] : otherEntry.classes
+        const otherClassName = otherCls ? `${otherCls.name} ${otherCls.section || ''}`.trim() : 'Another class'
         return `Conflict: Teacher is also scheduled in ${otherClassName}`
       }
       if (otherEntry.class_id === classId && otherEntry.class_subject_id !== entry.class_subject_id) {
@@ -334,7 +409,7 @@ export default function TimetableClient({
                 style={{ width: '100%', padding: '0.65rem 0.85rem', fontSize: '0.85rem' }} 
                 value={aiInput}
                 onChange={e => setAiInput(e.target.value)}
-                placeholder="e.g. 8am start, 45min lessons, 10min break after 2nd, 20min after 4th, 1hr lunch after 6th"
+                placeholder="e.g. 8am start, 40min lessons, 10min break after 2nd, 20min after 4th, 1hr lunch after 6th"
               />
             </div>
             <div style={{ width: '120px' }}>
@@ -366,16 +441,84 @@ export default function TimetableClient({
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             <Info size={14} />
-            <span>This configures the school default timeline. Generating new slots clears previous slots configuration.</span>
+            <span>This configures the default periods timeline. Generating new slots clears previous slots configuration.</span>
           </div>
         </div>
       </div>
 
-      {/* 3. Filter Toggle & Views */}
+      {/* 3. Class Subjects Allocation Config (Periods per subject count) */}
+      {viewType === 'class' && (
+        <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Settings size={16} style={{ color: '#00264b' }} />
+              Periods per Subject Configuration ({currentClassName})
+            </h3>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={handleSavePeriodsConfig}
+                disabled={updatingPeriods}
+                className="btn btn-secondary"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', padding: '0.45rem 1rem', cursor: 'pointer' }}
+              >
+                {updatingPeriods ? <Loader2 size={12} className="animate-spin" /> : <Save size={14} />}
+                Save Periods Config
+              </button>
+              <button
+                type="button"
+                onClick={handleAutoGenerateTimetable}
+                disabled={generatingTimetable || slots.length === 0}
+                className="btn btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', padding: '0.45rem 1rem', cursor: 'pointer', backgroundColor: '#0f766e', borderColor: '#0f766e' }}
+              >
+                {generatingTimetable ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={14} />}
+                Auto-Generate Timetable
+              </button>
+            </div>
+          </div>
+
+          {classAllocations.length === 0 ? (
+            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', textAlign: 'center', padding: '1rem' }}>
+              No subject allocations configured for this class yet. Go to Teacher Assignments to link teachers first.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+              {classAllocations.map(alloc => {
+                const sub = Array.isArray(alloc.subjects) ? alloc.subjects[0] : alloc.subjects
+                const prof = Array.isArray(alloc.profiles) ? alloc.profiles[0] : alloc.profiles
+                const name = sub?.name || 'Homeroom'
+                const tName = prof ? `${prof.first_name} ${prof.last_name}` : 'Teacher'
+
+                return (
+                  <div key={alloc.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'rgba(0,0,0,0.02)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{name}</span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>{tName}</span>
+                    </div>
+                    <div style={{ width: '65px' }}>
+                      <input 
+                        type="number"
+                        min={0}
+                        max={15}
+                        className="input-field"
+                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', textAlign: 'center' }}
+                        value={alloc.periods_per_week}
+                        onChange={e => handlePeriodChange(alloc.id, Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 4. Filter Toggle Options */}
       <div className="glass-panel" style={{ padding: '1.25rem', borderRadius: 'var(--radius-lg)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           
-          {/* Toggle buttons */}
           <div style={{ display: 'flex', gap: '0.5rem', backgroundColor: 'rgba(0,0,0,0.04)', padding: '0.25rem', borderRadius: 'var(--radius-md)' }}>
             <button
               onClick={() => setViewType('class')}
@@ -424,7 +567,6 @@ export default function TimetableClient({
             </button>
           </div>
 
-          {/* Filtering Dropdown inputs */}
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
             {viewType === 'class' && (
               <div>
@@ -466,151 +608,185 @@ export default function TimetableClient({
         </div>
       </div>
 
-      {/* 4. Weekly Grid Schedule Board */}
+      {/* 5. Weekly Grid Schedule Board (DAYS AS ROWS, PERIODS AS COLUMNS) */}
       <div className="glass-panel" style={{ overflowX: 'auto', borderRadius: 'var(--radius-lg)' }}>
         {slots.length === 0 ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
             No periods slots generated. Use the AI Shorthand Time Slot Generator panel above to configure period times.
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '850px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '950px' }}>
             <thead>
               <tr style={{ backgroundColor: '#00264b', borderBottom: '1px solid var(--color-border)' }}>
-                <th style={{ color: '#ffffff', width: '130px', padding: '1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.85rem' }}>TIME SLOT</th>
-                {DAYS_OF_WEEK.map(day => (
-                  <th key={day} style={{ color: '#ffffff', padding: '1rem', textAlign: 'center', fontWeight: 600, fontSize: '0.85rem' }}>
-                    {day.toUpperCase()}
-                  </th>
-                ))}
+                <th style={{ color: '#ffffff', width: '100px', padding: '1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.85rem' }}>DAY</th>
+                {slots.map(slot => {
+                  const timeRangeStr = `${slot.start_time.substring(0, 5)} - ${slot.end_time.substring(0, 5)}`
+                  return (
+                    <th key={slot.id} style={{ color: '#ffffff', padding: '0.75rem', textAlign: 'center', fontWeight: 600, fontSize: '0.8rem' }}>
+                      <div style={{ fontSize: '0.8rem' }}>{slot.name.toUpperCase()}</div>
+                      <div style={{ fontSize: '0.65rem', color: '#cbd5e1', fontWeight: 400 }}>{timeRangeStr}</div>
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
-              {slots.map((slot, sIdx) => {
-                if (slot.is_break) {
-                  return (
-                    <tr key={slot.id} style={{ backgroundColor: 'rgba(0,0,0,0.03)', borderBottom: '1px solid var(--color-border)' }}>
-                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text)' }}>
-                        <span style={{ color: 'var(--color-text-muted)' }}>{slot.start_time.substring(0, 5)} - {slot.end_time.substring(0, 5)}</span>
-                      </td>
-                      <td colSpan={5} style={{ padding: '0.75rem 1rem', textAlign: 'center', fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-text-muted)', letterSpacing: '0.05em' }}>
-                        {slot.name.toUpperCase()} (BREAKTIME)
-                      </td>
-                    </tr>
-                  )
-                }
+              {DAYS_OF_WEEK.map(day => (
+                <tr key={day} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                  
+                  {/* Day cell (row header) */}
+                  <td style={{ padding: '1.25rem 1rem', fontWeight: 700, color: '#00264b', backgroundColor: 'rgba(0,0,0,0.01)', borderRight: '1px solid var(--color-border)' }}>
+                    {day.toUpperCase()}
+                  </td>
 
-                return (
-                  <tr key={slot.id} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: sIdx % 2 === 1 ? 'rgba(0,0,0,0.01)' : 'transparent' }}>
-                    
-                    {/* Time cell */}
-                    <td style={{ padding: '1rem', borderRight: '1px solid var(--color-border)' }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#00264b' }}>{slot.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{slot.start_time.substring(0, 5)} - {slot.end_time.substring(0, 5)}</div>
-                    </td>
+                  {/* Period Slot Columns */}
+                  {slots.map(slot => {
+                    // Filter entry for this slot + day + selected entity
+                    const entry = entries.find(e => {
+                      const matchesDay = e.day_of_week.toLowerCase() === day.toLowerCase()
+                      const matchesSlot = e.slot_id === slot.id
+                      if (!matchesDay || !matchesSlot) return false
 
-                    {/* Monday to Friday columns */}
-                    {DAYS_OF_WEEK.map(day => {
-                      // Filter entry for this slot + day + selected entity
-                      const entry = entries.find(e => {
-                        const matchesDay = e.day_of_week.toLowerCase() === day.toLowerCase()
-                        const matchesSlot = e.slot_id === slot.id
-                        if (!matchesDay || !matchesSlot) return false
+                      if (viewType === 'class') {
+                        return e.class_id === selectedClassId
+                      } else if (viewType === 'teacher') {
+                        const cs = Array.isArray(e.class_subjects) ? e.class_subjects[0] : e.class_subjects
+                        return cs?.teacher_id === selectedTeacherId
+                      }
+                      return true // Summary view matches everything
+                    })
 
-                        if (viewType === 'class') {
-                          return e.class_id === selectedClassId
-                        } else if (viewType === 'teacher') {
-                          return e.class_subjects?.teacher_id === selectedTeacherId
-                        }
-                        return true // Summary view matches everything
-                      })
+                    const conflictMsg = entry ? getConflictWarning(day, slot.id, entry) : null
 
-                      const conflictMsg = entry ? getConflictWarning(day, slot.id, entry) : null
-
+                    if (slot.is_break) {
                       return (
-                        <td 
-                          key={day}
-                          onClick={() => viewType !== 'teacher' && openScheduler(day, slot)}
+                        <td
+                          key={slot.id}
                           style={{
                             padding: '0.75rem',
                             textAlign: 'center',
-                            cursor: viewType === 'teacher' ? 'default' : 'pointer',
+                            backgroundColor: '#f1f5f9',
+                            color: '#64748b',
+                            fontWeight: 700,
+                            fontSize: '0.8rem',
                             borderRight: '1px solid var(--color-border)',
-                            backgroundColor: entry ? 'rgba(30, 58, 138, 0.02)' : 'transparent',
-                            transition: 'background-color 0.15s ease',
-                            verticalAlign: 'middle'
+                            verticalAlign: 'middle',
+                            cursor: 'default',
+                            userSelect: 'none'
                           }}
-                          className="hover-grid-cell"
                         >
-                          {entry ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', position: 'relative' }}>
-                              
-                              {/* Inline Conflict Warning Badge */}
-                              {conflictMsg && (
-                                <div 
-                                  title={conflictMsg} 
-                                  style={{ position: 'absolute', top: '-6px', right: '-4px', color: 'var(--color-error)' }}
-                                >
-                                  <ShieldAlert size={14} />
-                                </div>
-                              )}
-
-                              {viewType === 'class' && (
-                                <>
-                                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text)' }}>
-                                    {entry.class_subjects?.subjects?.name || 'Lesson'}
-                                  </div>
-                                  <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                                    {entry.class_subjects?.profiles ? `${entry.class_subjects.profiles.first_name} ${entry.class_subjects.profiles.last_name}` : ''}
-                                  </div>
-                                </>
-                              )}
-
-                              {viewType === 'teacher' && (
-                                <>
-                                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text)' }}>
-                                    {entry.classes ? `${entry.classes.name} ${entry.classes.section || ''}`.trim() : 'Class'}
-                                  </div>
-                                  <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                                    {entry.class_subjects?.subjects?.name || ''}
-                                  </div>
-                                </>
-                              )}
-
-                              {viewType === 'summary' && (
-                                <>
-                                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text)' }}>
-                                    {entry.classes ? `${entry.classes.name} ${entry.classes.section || ''}`.trim() : 'Class'}
-                                  </div>
-                                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                                    {entry.class_subjects?.subjects?.name || ''}
-                                  </div>
-                                </>
-                              )}
-
-                              {entry.room && (
-                                <div style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem', borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.04)', alignSelf: 'center', color: 'var(--color-text-muted)' }}>
-                                  Room: {entry.room}
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="add-indicator" style={{ display: 'none', color: 'var(--color-text-muted)' }}>
-                              <Plus size={16} style={{ margin: 'auto' }} />
-                            </div>
-                          )}
+                          {slot.name.toUpperCase()}
                         </td>
                       )
-                    })}
+                    }
 
-                  </tr>
-                )
-              })}
+                    return (
+                      <td 
+                        key={slot.id}
+                        onClick={() => viewType !== 'teacher' && openScheduler(day, slot)}
+                        style={{
+                          padding: '0.75rem',
+                          textAlign: 'center',
+                          cursor: viewType === 'teacher' ? 'default' : 'pointer',
+                          borderRight: '1px solid var(--color-border)',
+                          backgroundColor: entry ? 'rgba(30, 58, 138, 0.02)' : 'transparent',
+                          transition: 'background-color 0.15s ease',
+                          verticalAlign: 'middle',
+                          height: '65px'
+                        }}
+                        className="hover-grid-cell"
+                      >
+                        {entry ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', position: 'relative' }}>
+                            
+                            {/* Inline Conflict Warning Badge */}
+                            {conflictMsg && (
+                              <div 
+                                title={conflictMsg} 
+                                style={{ position: 'absolute', top: '-10px', right: '-4px', color: 'var(--color-error)' }}
+                              >
+                                <ShieldAlert size={14} />
+                              </div>
+                            )}
+
+                            {viewType === 'class' && (
+                              <>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text)' }}>
+                                  {(() => {
+                                    const cs = Array.isArray(entry.class_subjects) ? entry.class_subjects[0] : entry.class_subjects
+                                    const sub = cs ? (Array.isArray(cs.subjects) ? cs.subjects[0] : cs.subjects) : null
+                                    return sub?.name || 'Lesson'
+                                  })()}
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+                                  {(() => {
+                                    const cs = Array.isArray(entry.class_subjects) ? entry.class_subjects[0] : entry.class_subjects
+                                    const prof = cs ? (Array.isArray(cs.profiles) ? cs.profiles[0] : cs.profiles) : null
+                                    return prof ? `${prof.first_name} ${prof.last_name}` : ''
+                                  })()}
+                                </div>
+                              </>
+                            )}
+
+                            {viewType === 'teacher' && (
+                              <>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text)' }}>
+                                  {(() => {
+                                    const cls = Array.isArray(entry.classes) ? entry.classes[0] : entry.classes
+                                    return cls ? `${cls.name} ${cls.section || ''}`.trim() : 'Class'
+                                  })()}
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+                                  {(() => {
+                                    const cs = Array.isArray(entry.class_subjects) ? entry.class_subjects[0] : entry.class_subjects
+                                    const sub = cs ? (Array.isArray(cs.subjects) ? cs.subjects[0] : cs.subjects) : null
+                                    return sub?.name || ''
+                                  })()}
+                                </div>
+                              </>
+                            )}
+
+                            {viewType === 'summary' && (
+                              <>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text)' }}>
+                                  {(() => {
+                                    const cls = Array.isArray(entry.classes) ? entry.classes[0] : entry.classes
+                                    return cls ? `${cls.name} ${cls.section || ''}`.trim() : 'Class'
+                                  })()}
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+                                  {(() => {
+                                    const cs = Array.isArray(entry.class_subjects) ? entry.class_subjects[0] : entry.class_subjects
+                                    const sub = cs ? (Array.isArray(cs.subjects) ? cs.subjects[0] : cs.subjects) : null
+                                    return sub?.name || ''
+                                  })()}
+                                </div>
+                              </>
+                            )}
+
+                            {entry.room && (
+                              <div style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem', borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.04)', alignSelf: 'center', color: 'var(--color-text-muted)' }}>
+                                Room: {entry.room}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="add-indicator" style={{ display: 'none', color: 'var(--color-text-muted)' }}>
+                            <Plus size={16} style={{ margin: 'auto' }} />
+                          </div>
+                        )}
+                      </td>
+                    )
+                  })}
+
+                </tr>
+              ))}
             </tbody>
           </table>
         )}
       </div>
 
-      {/* 5. Schedule Allocation Modal */}
+      {/* 6. Schedule Allocation Modal */}
       {showScheduleModal && modalCell && (
         <div style={{
           position: 'fixed',
@@ -687,14 +863,16 @@ export default function TimetableClient({
                 >
                   <option value="">Select subject allocation...</option>
                   {(viewType === 'class' ? classAllocations : allocations).map(alloc => {
-                    const subj = alloc.subjects?.name || 'Homeroom'
-                    const teacher = alloc.profiles ? `${alloc.profiles.first_name} ${alloc.profiles.last_name}` : ''
+                    const sub = Array.isArray(alloc.subjects) ? alloc.subjects[0] : alloc.subjects
+                    const prof = Array.isArray(alloc.profiles) ? alloc.profiles[0] : alloc.profiles
+                    const name = sub?.name || 'Homeroom'
+                    const tName = prof ? `${prof.first_name} ${prof.last_name}` : 'Teacher'
                     const cls = classes.find(c => c.id === alloc.class_id)
                     const classNameStr = cls ? ` [${cls.name} ${cls.section || ''}]` : ''
                     
                     return (
                       <option key={alloc.id} value={alloc.id}>
-                        {subj} - {teacher} {classNameStr}
+                        {name} - {tName} {classNameStr}
                       </option>
                     )
                   })}

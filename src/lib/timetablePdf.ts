@@ -75,106 +75,117 @@ export async function generateTimetablePdf(opts: TimetablePDFOptions): Promise<B
   // Separator Line
   doc.lineWidth(1).strokeColor('#00264b').moveTo(startX, startY + 48).lineTo(startX + contentWidth, startY + 48).stroke()
 
-  // 2. Timetable Grid Layout
+  // 2. Timetable Grid Layout (Days as Rows, Periods as Columns)
   const gridStartY = startY + 62
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-  
-  // Column sizing
-  // 1. Time / Slot column: 110pt
-  // 2. Monday-Friday columns: (762 - 110) / 5 = 130pt each
-  const timeColWidth = 110
-  const dayColWidth = (contentWidth - timeColWidth) / 5
+  const slotsCount = opts.slots.length
 
-  // Draw Grid Header row
-  doc.rect(startX, gridStartY, contentWidth, 22).fill('#00264b')
+  // Sizing:
+  // First column (Day name): 85pt
+  // Other columns (Slots): remaining space divided by slots count
+  const dayColWidth = 85
+  const slotColWidth = slotsCount > 0 ? (contentWidth - dayColWidth) / slotsCount : 0
+
+  // Draw Grid Header Row (Slots headers)
+  const headerHeight = 32
+  doc.rect(startX, gridStartY, contentWidth, headerHeight).fill('#00264b')
   
   doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#ffffff')
-  doc.text('TIME SLOT', startX + 10, gridStartY + 7, { width: timeColWidth - 15 })
+  doc.text('DAY', startX + 10, gridStartY + 12, { width: dayColWidth - 15 })
 
-  days.forEach((day, idx) => {
-    const x = startX + timeColWidth + idx * dayColWidth
-    doc.text(day.toUpperCase(), x, gridStartY + 7, { width: dayColWidth, align: 'center' })
+  opts.slots.forEach((slot, idx) => {
+    const x = startX + dayColWidth + idx * slotColWidth
+    const timeStr = `${slot.start_time.substring(0, 5)}-${slot.end_time.substring(0, 5)}`
+    
+    doc.fontSize(8).font('Helvetica-Bold').fillColor('#ffffff')
+       .text(slot.name.toUpperCase(), x, gridStartY + 5, { width: slotColWidth, align: 'center' })
+    doc.fontSize(7).font('Helvetica').fillColor('#cbd5e1')
+       .text(timeStr, x, gridStartY + 18, { width: slotColWidth, align: 'center' })
   })
 
-  let currentY = gridStartY + 22
-  const rowHeight = 44
+  let currentY = gridStartY + headerHeight
+  const rowHeight = 60 // Generous row height for multi-line details
 
-  opts.slots.forEach((slot, rowIdx) => {
-    // Row Fill
-    if (slot.is_break) {
-      doc.rect(startX, currentY, contentWidth, rowHeight - 12).fill('#f1f5f9')
-    } else if (rowIdx % 2 === 1) {
+  days.forEach((day, dayIdx) => {
+    // Alternate row shading (light gray-blue background)
+    if (dayIdx % 2 === 1) {
       doc.rect(startX, currentY, contentWidth, rowHeight).fill('#f8fafc')
     }
 
-    const currentHeight = slot.is_break ? rowHeight - 12 : rowHeight
-
-    // Draw grid horizontal line
-    doc.lineWidth(0.5).strokeColor('#cbd5e1')
-       .moveTo(startX, currentY + currentHeight)
-       .lineTo(startX + contentWidth, currentY + currentHeight).stroke()
-
-    // 1. Render Time slot
-    const timeRangeStr = `${slot.start_time.substring(0, 5)} - ${slot.end_time.substring(0, 5)}`
-    doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#00264b')
-       .text(slot.name, startX + 10, currentY + 5, { width: timeColWidth - 15 })
-    doc.fontSize(7.5).font('Helvetica').fillColor('#475569')
-       .text(timeRangeStr, startX + 10, currentY + 17, { width: timeColWidth - 15 })
-
-    // 2. Render schedule for each day
-    days.forEach((day, colIdx) => {
-      const x = startX + timeColWidth + colIdx * dayColWidth
-      const entry = opts.entries.find(e => e.day_of_week.toLowerCase() === day.toLowerCase() && e.slot_id === slot.id)
-
+    // Render breaks on this day row
+    opts.slots.forEach((slot, sIdx) => {
       if (slot.is_break) {
-        doc.fontSize(8).font('Helvetica-Bold').fillColor('#64748b')
-           .text(slot.name.toUpperCase(), x, currentY + 8, { width: dayColWidth, align: 'center' })
-      } else if (entry) {
-        // Draw Lesson Box content
-        if (opts.type === 'class') {
-          doc.fontSize(8).font('Helvetica-Bold').fillColor('#0f172a')
-             .text(entry.subjectName || 'Lesson', x + 5, currentY + 6, { width: dayColWidth - 10, align: 'center' })
-          doc.fontSize(7).font('Helvetica-Oblique').fillColor('#475569')
-             .text(entry.teacherName || '', x + 5, currentY + 18, { width: dayColWidth - 10, align: 'center' })
-          if (entry.room) {
-            doc.fontSize(6).font('Helvetica').fillColor('#64748b')
-               .text(`[Room: ${entry.room}]`, x + 5, currentY + 28, { width: dayColWidth - 10, align: 'center' })
-          }
-        } else if (opts.type === 'teacher') {
-          doc.fontSize(8).font('Helvetica-Bold').fillColor('#0f172a')
-             .text(entry.className || 'Class', x + 5, currentY + 6, { width: dayColWidth - 10, align: 'center' })
-          doc.fontSize(7).font('Helvetica-Oblique').fillColor('#475569')
-             .text(entry.subjectName || '', x + 5, currentY + 18, { width: dayColWidth - 10, align: 'center' })
-          if (entry.room) {
-            doc.fontSize(6).font('Helvetica').fillColor('#64748b')
-               .text(`[Room: ${entry.room}]`, x + 5, currentY + 28, { width: dayColWidth - 10, align: 'center' })
-          }
-        } else {
-          // Summary view
-          doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#0f172a')
-             .text(`${entry.className || 'Class'} (${entry.room || ''})`, x + 5, currentY + 6, { width: dayColWidth - 10, align: 'center' })
-          doc.fontSize(7).font('Helvetica').fillColor('#475569')
-             .text(`${entry.subjectName || ''}`, x + 5, currentY + 18, { width: dayColWidth - 10, align: 'center' })
-        }
-      } else {
-        // Empty Slot
-        doc.fontSize(7).font('Helvetica').fillColor('#cbd5e1')
-           .text('-', x, currentY + 16, { width: dayColWidth, align: 'center' })
+        const x = startX + dayColWidth + sIdx * slotColWidth
+        doc.rect(x, currentY, slotColWidth, rowHeight).fill('#f1f5f9')
       }
     })
 
-    // Draw Column boundary separator lines
-    let xOffset = startX
-    const cols = [timeColWidth, dayColWidth, dayColWidth, dayColWidth, dayColWidth, dayColWidth]
-    cols.forEach(w => {
-      xOffset += w
-      doc.lineWidth(0.5).strokeColor('#cbd5e1').moveTo(xOffset, currentY).lineTo(xOffset, currentY + currentHeight).stroke()
+    // Draw horizontal line separator
+    doc.lineWidth(0.5).strokeColor('#cbd5e1')
+       .moveTo(startX, currentY + rowHeight)
+       .lineTo(startX + contentWidth, currentY + rowHeight).stroke()
+
+    // 1. Day Column Text
+    doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#00264b')
+       .text(day.toUpperCase(), startX + 10, currentY + (rowHeight - 10) / 2, { width: dayColWidth - 15 })
+
+    // 2. Slots Columns Text
+    opts.slots.forEach((slot, sIdx) => {
+      const x = startX + dayColWidth + sIdx * slotColWidth
+      const entry = opts.entries.find(e => e.day_of_week.toLowerCase() === day.toLowerCase() && e.slot_id === slot.id)
+
+      if (slot.is_break) {
+        // Render break/lunch name centered
+        doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#64748b')
+           .text(slot.name.toUpperCase(), x + 5, currentY + (rowHeight - 10) / 2, { width: slotColWidth - 10, align: 'center' })
+      } else if (entry) {
+        if (opts.type === 'class') {
+          doc.fontSize(8).font('Helvetica-Bold').fillColor('#0f172a')
+             .text(entry.subjectName || 'Lesson', x + 5, currentY + 12, { width: slotColWidth - 10, align: 'center' })
+          doc.fontSize(7).font('Helvetica-Oblique').fillColor('#475569')
+             .text(entry.teacherName || '', x + 5, currentY + 26, { width: slotColWidth - 10, align: 'center' })
+          if (entry.room) {
+            doc.fontSize(6).font('Helvetica').fillColor('#64748b')
+               .text(`[Room: ${entry.room}]`, x + 5, currentY + 38, { width: slotColWidth - 10, align: 'center' })
+          }
+        } else if (opts.type === 'teacher') {
+          doc.fontSize(8).font('Helvetica-Bold').fillColor('#0f172a')
+             .text(entry.className || 'Class', x + 5, currentY + 12, { width: slotColWidth - 10, align: 'center' })
+          doc.fontSize(7).font('Helvetica-Oblique').fillColor('#475569')
+             .text(entry.subjectName || '', x + 5, currentY + 26, { width: slotColWidth - 10, align: 'center' })
+          if (entry.room) {
+            doc.fontSize(6).font('Helvetica').fillColor('#64748b')
+               .text(`[Room: ${entry.room}]`, x + 5, currentY + 38, { width: slotColWidth - 10, align: 'center' })
+          }
+        } else {
+          // School Summary
+          doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#0f172a')
+             .text(`${entry.className || 'Class'} (${entry.room || ''})`, x + 5, currentY + 12, { width: slotColWidth - 10, align: 'center' })
+          doc.fontSize(7).font('Helvetica').fillColor('#475569')
+             .text(entry.subjectName || '', x + 5, currentY + 26, { width: slotColWidth - 10, align: 'center' })
+        }
+      } else {
+        // Empty slot cell
+        doc.fontSize(7.5).font('Helvetica').fillColor('#cbd5e1')
+           .text('-', x, currentY + (rowHeight - 8) / 2, { width: slotColWidth, align: 'center' })
+      }
     })
 
-    currentY += currentHeight
+    // Draw vertical cell separator lines
+    let xOffset = startX
+    doc.lineWidth(0.5).strokeColor('#cbd5e1').moveTo(xOffset, currentY).lineTo(xOffset, currentY + rowHeight).stroke()
+    xOffset += dayColWidth
+    doc.lineWidth(0.5).strokeColor('#cbd5e1').moveTo(xOffset, currentY).lineTo(xOffset, currentY + rowHeight).stroke()
+
+    for (let c = 0; c < slotsCount; c++) {
+      xOffset += slotColWidth
+      doc.lineWidth(0.5).strokeColor('#cbd5e1').moveTo(xOffset, currentY).lineTo(xOffset, currentY + rowHeight).stroke()
+    }
+
+    currentY += rowHeight
   })
 
-  // Outer border box
+  // Outer border box around grid
   doc.lineWidth(1).strokeColor('#00264b').rect(startX, gridStartY, contentWidth, currentY - gridStartY).stroke()
 
   // 3. Footer Page Numbers
