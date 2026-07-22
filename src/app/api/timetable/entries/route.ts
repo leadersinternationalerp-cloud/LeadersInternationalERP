@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Missing class_id for timetable generation' }, { status: 400 })
       }
 
-      // 1. Fetch Slots (target class slots or fallback to school default slots)
+      // 1. Fetch Slots
       let slotQuery = supabase.from('timetable_slots').select('*').order('period_number', { ascending: true })
       let { data: slots, error: slotErr } = await slotQuery.eq('class_id', class_id)
       if (slotErr) return NextResponse.json({ error: slotErr.message }, { status: 500 })
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'No period slots configured. Generate time slots first.' }, { status: 400 })
       }
 
-      // 2. Fetch subject allocations for this class
+      // 2. Fetch allocations
       const { data: allocations, error: allocErr } = await supabase
         .from('class_subjects')
         .select('id, teacher_id, periods_per_week, profiles(first_name, last_name), subjects(name)')
@@ -89,10 +89,10 @@ export async function POST(request: NextRequest) {
 
       if (allocErr) return NextResponse.json({ error: allocErr.message }, { status: 500 })
       if (!allocations || allocations.length === 0) {
-        return NextResponse.json({ error: 'No subject allocations found for this class. Assign teachers to subjects first.' }, { status: 400 })
+        return NextResponse.json({ error: 'No subject allocations found. Assign teachers to subjects first.' }, { status: 400 })
       }
 
-      // 3. Fetch all existing entries across the school (to prevent teacher double bookings)
+      // 3. Fetch all entries
       const { data: allEntries, error: entriesErr } = await supabase
         .from('timetable_entries')
         .select(`
@@ -110,10 +110,8 @@ export async function POST(request: NextRequest) {
       // Clear previous timetable entries for this class
       await supabase.from('timetable_entries').delete().eq('class_id', class_id)
 
-      // Active entries list (excluding the ones we just deleted)
       const activeOtherEntries = (allEntries || []).filter(e => e.class_id !== class_id)
 
-      // Build period checklist: repeat allocation ID based on target periods_per_week
       const lessonPool: { id: string; teacher_id: string }[] = []
       allocations.forEach(alloc => {
         const periods = alloc.periods_per_week || 4
@@ -122,30 +120,23 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      // We schedule lessons across Days and Slots
       const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
       const nonBreakSlots = slots.filter(s => !s.is_break)
-
       const newlyScheduledEntries = []
       
-      // Tracking daily subject distribution to avoid scheduling the same subject multiple times in a single day
-      const dailyAllocationCounts: Record<string, Record<string, number>> = {} // { day: { allocId: count } }
+      const dailyAllocationCounts: Record<string, Record<string, number>> = {}
       DAYS.forEach(d => { dailyAllocationCounts[d] = {} })
 
-      // Try to assign lessons to slots day by day, period by period
       for (const day of DAYS) {
         for (const slot of nonBreakSlots) {
           if (lessonPool.length === 0) break
 
-          // Try to find a lesson that has no teacher conflict at this day + slot, prioritizing the one with lower daily count
           let selectedIdx = -1
 
-          // First pass: Respect daily limits (max 1 or 2 per day if possible) and check teacher availability
           for (let idx = 0; idx < lessonPool.length; idx++) {
             const lesson = lessonPool[idx]
             const teacherId = lesson.teacher_id
 
-            // Check if teacher is already booked in another class at this slot + day
             const hasTeacherConflict = activeOtherEntries.some(e => {
               const cs = Array.isArray(e.class_subjects) ? e.class_subjects[0] : e.class_subjects
               return e.day_of_week.toLowerCase() === day.toLowerCase() &&
@@ -155,7 +146,6 @@ export async function POST(request: NextRequest) {
 
             if (!hasTeacherConflict) {
               const dailyCount = dailyAllocationCounts[day][lesson.id] || 0
-              // Prefer subjects not yet taught today
               if (dailyCount === 0) {
                 selectedIdx = idx
                 break
@@ -163,7 +153,6 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // Second pass: Relax daily count limit if needed (allow double periods), but still enforce absolute teacher conflict
           if (selectedIdx === -1) {
             for (let idx = 0; idx < lessonPool.length; idx++) {
               const lesson = lessonPool[idx]
@@ -186,7 +175,6 @@ export async function POST(request: NextRequest) {
           if (selectedIdx !== -1) {
             const scheduledLesson = lessonPool.splice(selectedIdx, 1)[0]
             
-            // Record scheduling
             newlyScheduledEntries.push({
               class_id,
               class_subject_id: scheduledLesson.id,
@@ -199,7 +187,6 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Bulk insert generated entries
       if (newlyScheduledEntries.length > 0) {
         const { error: bulkInsertErr } = await supabase
           .from('timetable_entries')
@@ -225,7 +212,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required parameters: class_id, class_subject_id, day_of_week, slot_id are required' }, { status: 400 })
     }
 
-    // Fetch details of the class subject allocation
     const { data: alloc, error: allocErr } = await supabase
       .from('class_subjects')
       .select('id, teacher_id, subject_id, profiles(first_name, last_name), subjects(name)')
@@ -243,7 +229,6 @@ export async function POST(request: NextRequest) {
     const subjectName = subObj?.name || 'Subject'
     const teacherName = profObj ? `${profObj.first_name} ${profObj.last_name}` : 'Teacher'
 
-    // Fetch slot info
     const { data: slot } = await supabase
       .from('timetable_slots')
       .select('*')
@@ -254,7 +239,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Target time slot not found' }, { status: 404 })
     }
 
-    // 1. Conflict Check: Class conflict (is the class already scheduled at this slot & day?)
     const { data: classConflict } = await supabase
       .from('timetable_entries')
       .select(`
@@ -279,7 +263,6 @@ export async function POST(request: NextRequest) {
       }, { status: 409 })
     }
 
-    // 2. Conflict Check: Teacher conflict (is the teacher already teaching elsewhere at this slot & day?)
     const { data: teacherConflicts } = await supabase
       .from('timetable_entries')
       .select(`
@@ -311,7 +294,6 @@ export async function POST(request: NextRequest) {
       }, { status: 409 })
     }
 
-    // If we have conflicts and "force" is true, clear the conflicting entries first
     if (force) {
       if (classConflict) {
         await supabase.from('timetable_entries').delete().eq('id', classConflict.id)
@@ -321,7 +303,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Insert or update entries
     const { data: entry, error: insertError } = await supabase
       .from('timetable_entries')
       .insert({
@@ -365,13 +346,12 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { allocations } = body // Expects Array of { id: string, periods_per_week: number }
+    const { allocations } = body
 
     if (!allocations || !Array.isArray(allocations)) {
       return NextResponse.json({ error: 'Missing allocations array' }, { status: 400 })
     }
 
-    // Perform bulk updates sequentially
     for (const alloc of allocations) {
       await supabase
         .from('class_subjects')
@@ -380,6 +360,120 @@ export async function PUT(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+
+    // Auth & Admin Check
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { data: prof } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
+    const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
+      ? prof.roles
+      : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
+
+    const isAdmin = userRoles.some(r => ['System Admin', 'Director', 'Principal', 'Dean', 'HOS'].includes(r))
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const { id, day_of_week, slot_id, force } = body
+
+    if (!id || !day_of_week || !slot_id) {
+      return NextResponse.json({ error: 'Missing required parameters: id, day_of_week, slot_id are required' }, { status: 400 })
+    }
+
+    // 1. Fetch current entry
+    const { data: entry, error: fetchErr } = await supabase
+      .from('timetable_entries')
+      .select('*, class_subjects(teacher_id)')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (fetchErr || !entry) {
+      return NextResponse.json({ error: 'Timetable entry not found' }, { status: 404 })
+    }
+
+    const cs = Array.isArray(entry.class_subjects) ? entry.class_subjects[0] : entry.class_subjects
+    const teacherId = cs?.teacher_id
+    const classId = entry.class_id
+
+    // 2. Class conflict check
+    const { data: classConflict } = await supabase
+      .from('timetable_entries')
+      .select('id, class_subjects(subjects(name))')
+      .eq('class_id', classId)
+      .eq('day_of_week', day_of_week)
+      .eq('slot_id', slot_id)
+      .neq('id', id)
+      .maybeSingle()
+
+    if (classConflict && !force) {
+      const conflictCs = Array.isArray(classConflict.class_subjects) ? classConflict.class_subjects[0] : classConflict.class_subjects
+      const sub = conflictCs ? (Array.isArray(conflictCs.subjects) ? conflictCs.subjects[0] : conflictCs.subjects) : null
+      return NextResponse.json({
+        conflict: true,
+        type: 'class',
+        message: `Class conflict: This class is already scheduled for ${sub?.name || 'Another lesson'} at this time.`
+      }, { status: 409 })
+    }
+
+    // 3. Teacher conflict check
+    const { data: teacherConflicts } = await supabase
+      .from('timetable_entries')
+      .select('id, classes(name, section), class_subjects(teacher_id, subjects(name))')
+      .eq('day_of_week', day_of_week)
+      .eq('slot_id', slot_id)
+      .neq('id', id)
+
+    const teacherConflict = (teacherConflicts || []).find(tc => {
+      const tcCs = Array.isArray(tc.class_subjects) ? tc.class_subjects[0] : tc.class_subjects
+      return tcCs?.teacher_id === teacherId
+    })
+
+    if (teacherConflict && !force) {
+      const tcCs = Array.isArray(teacherConflict.class_subjects) ? teacherConflict.class_subjects[0] : teacherConflict.class_subjects
+      const sub = tcCs ? (Array.isArray(tcCs.subjects) ? tcCs.subjects[0] : tcCs.subjects) : null
+      const tcCls = Array.isArray(teacherConflict.classes) ? teacherConflict.classes[0] : teacherConflict.classes
+      const className = tcCls ? `${tcCls.name} ${tcCls.section || ''}`.trim() : 'Another class'
+      return NextResponse.json({
+        conflict: true,
+        type: 'teacher',
+        message: `Teacher conflict: The teacher is already teaching ${sub?.name || 'lesson'} in ${className} at this time.`
+      }, { status: 409 })
+    }
+
+    if (force) {
+      if (classConflict) {
+        await supabase.from('timetable_entries').delete().eq('id', classConflict.id)
+      }
+      if (teacherConflict) {
+        await supabase.from('timetable_entries').delete().eq('id', teacherConflict.id)
+      }
+    }
+
+    // Update cell entry
+    const { data: updatedEntry, error: updateErr } = await supabase
+      .from('timetable_entries')
+      .update({ day_of_week, slot_id })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateErr) {
+      return NextResponse.json({ error: updateErr.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, entry: updatedEntry })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }

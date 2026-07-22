@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Calendar, Users, FileDown, Plus, Trash2, ShieldAlert, Sparkles, CheckCircle2, Loader2, Info, Save, Settings } from 'lucide-react'
+import { Calendar, Users, FileDown, Plus, Trash2, ShieldAlert, Sparkles, CheckCircle2, Loader2, Info, Save, Settings, Edit3, X, ArrowRight } from 'lucide-react'
 
 interface ClassItem {
   id: string
@@ -97,6 +97,10 @@ export default function TimetableClient({
   const [aiInput, setAiInput] = useState('8am start, 40min lessons, 10min break after 2nd, 20min after 4th, 1hr lunch after 6th')
   const [totalPeriods, setTotalPeriods] = useState(8)
 
+  // Manual Slot Adjustment Panel state
+  const [showSlotEditor, setShowSlotEditor] = useState(false)
+  const [editingSlots, setEditingSlots] = useState<(Omit<Slot, 'id'> & { id?: string })[]>([])
+
   // Scheduling Modal state
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [modalCell, setModalCell] = useState<{ day: string; slot: Slot } | null>(null)
@@ -105,6 +109,15 @@ export default function TimetableClient({
   
   // Conflict warning state
   const [conflictWarning, setConflictWarning] = useState<string | null>(null)
+
+  // Drag and Drop State
+  const [draggedEntryId, setDraggedEntryId] = useState<string | null>(null)
+  const [dropConflict, setDropConflict] = useState<{
+    entryId: string;
+    day: string;
+    slotId: string;
+    message: string;
+  } | null>(null)
 
   // Fetch Slots
   const fetchSlots = async () => {
@@ -130,15 +143,6 @@ export default function TimetableClient({
         const data = await res.json()
         setEntries(data.entries || [])
       }
-    } catch (e) {
-      console.error(e)
-    }
-  }
-
-  // Fetch Allocations (to ensure sync updates)
-  const refreshAllocations = async () => {
-    try {
-      const res = await fetch('/api/timetable/entries') // we get allocations from the server page props, but we can also fetch fresh data from allocations page or local server action. Let's update locally on PUT.
     } catch (e) {
       console.error(e)
     }
@@ -178,12 +182,66 @@ export default function TimetableClient({
     }
   }
 
+  // Initialize slots editor with existing values
+  const handleOpenSlotEditor = () => {
+    setEditingSlots(slots.map(s => ({ ...s })))
+    setShowSlotEditor(true)
+  }
+
+  // Save manually updated slots
+  const handleSaveManualSlots = async () => {
+    setSavingSlots(true)
+    try {
+      const res = await fetch('/api/timetable/slots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          class_id: viewType === 'class' ? selectedClassId : null,
+          slots: editingSlots
+        })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setSlots(data.slots || [])
+        setShowSlotEditor(false)
+        alert('Time slots adjustments saved successfully!')
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSavingSlots(false)
+    }
+  }
+
+  const handleAddCustomSlot = () => {
+    const lastSlot = editingSlots[editingSlots.length - 1]
+    const nextPeriodNum = lastSlot ? lastSlot.period_number + 1 : 1
+    setEditingSlots([
+      ...editingSlots,
+      {
+        period_number: nextPeriodNum,
+        name: `Period ${nextPeriodNum}`,
+        start_time: lastSlot ? lastSlot.end_time : '08:00',
+        end_time: '09:00',
+        is_break: false
+      }
+    ])
+  }
+
+  const handleUpdateEditingSlot = (idx: number, fields: Partial<Slot>) => {
+    setEditingSlots(prev => prev.map((s, i) => i === idx ? { ...s, ...fields } : s))
+  }
+
+  const handleRemoveEditingSlot = (idx: number) => {
+    setEditingSlots(prev => prev.filter((_, i) => i !== idx))
+  }
+
   // Filter allocations for selected class
   const classAllocations = useMemo(() => {
     return allocations.filter(a => a.class_id === selectedClassId)
   }, [allocations, selectedClassId])
 
-  // Update locally changed periods_per_week before submitting to database
+  // Update locally changed periods_per_week
   const handlePeriodChange = (allocId: string, value: number) => {
     setAllocations(prev => 
       prev.map(a => a.id === allocId ? { ...a, periods_per_week: value } : a)
@@ -320,6 +378,51 @@ export default function TimetableClient({
     }
   }
 
+  // Drag and Drop Handlers
+  const handleDragStart = (e: React.DragEvent, entryId: string) => {
+    setDraggedEntryId(entryId)
+    e.dataTransfer.setData('entryId', entryId)
+  }
+
+  const handleDrop = async (e: React.DragEvent, targetDay: string, targetSlotId: string, force = false) => {
+    e.preventDefault()
+    const entryId = e.dataTransfer.getData('entryId') || draggedEntryId
+    if (!entryId) return
+
+    try {
+      const res = await fetch('/api/timetable/entries', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: entryId,
+          day_of_week: targetDay,
+          slot_id: targetSlotId,
+          force
+        })
+      })
+
+      if (res.ok) {
+        await fetchEntries()
+        setDropConflict(null)
+      } else if (res.status === 409) {
+        const data = await res.json()
+        setDropConflict({
+          entryId,
+          day: targetDay,
+          slotId: targetSlotId,
+          message: data.message
+        })
+      } else {
+        const data = await res.json()
+        alert(data.error || 'Failed to move lesson')
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setDraggedEntryId(null)
+    }
+  }
+
   // Check conflicts locally to show inline alert icons in UI
   const getConflictWarning = (day: string, slotId: string, entry: TimetableEntry) => {
     const cs = Array.isArray(entry.class_subjects) ? entry.class_subjects[0] : entry.class_subjects
@@ -393,10 +496,22 @@ export default function TimetableClient({
 
       {/* 2. AI Time Slot Generator Configuration */}
       <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
-        <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-text)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <Sparkles size={16} style={{ color: '#f59e0b' }} />
-          AI-Assisted Time Slot Generator
-        </h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+            <Sparkles size={16} style={{ color: '#f59e0b' }} />
+            AI-Assisted Time Slot Generator
+          </h3>
+          <button
+            type="button"
+            onClick={handleOpenSlotEditor}
+            className="btn"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', padding: '0.45rem 0.85rem', border: '1px solid var(--color-border)', backgroundColor: 'transparent', cursor: 'pointer', color: 'var(--color-text)' }}
+          >
+            <Edit3 size={14} />
+            Adjust Slots Manually
+          </button>
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ flex: 1, minWidth: '300px' }}>
@@ -622,7 +737,7 @@ export default function TimetableClient({
                 {slots.map(slot => {
                   const timeRangeStr = `${slot.start_time.substring(0, 5)} - ${slot.end_time.substring(0, 5)}`
                   return (
-                    <th key={slot.id} style={{ color: '#ffffff', padding: '0.75rem', textAlign: 'center', fontWeight: 600, fontSize: '0.8rem' }}>
+                    <th key={slot.id} style={{ color: '#ffffff', padding: '0.75rem', textAlign: 'center', fontWeight: 600, fontSize: '0.8' }}>
                       <div style={{ fontSize: '0.8rem' }}>{slot.name.toUpperCase()}</div>
                       <div style={{ fontSize: '0.65rem', color: '#cbd5e1', fontWeight: 400 }}>{timeRangeStr}</div>
                     </th>
@@ -641,8 +756,8 @@ export default function TimetableClient({
 
                   {/* Period Slot Columns */}
                   {slots.map(slot => {
-                    // Filter entry for this slot + day + selected entity
-                    const entry = entries.find(e => {
+                    // Filter entries for this slot + day + selected entity
+                    const cellEntries = entries.filter(e => {
                       const matchesDay = e.day_of_week.toLowerCase() === day.toLowerCase()
                       const matchesSlot = e.slot_id === slot.id
                       if (!matchesDay || !matchesSlot) return false
@@ -653,10 +768,8 @@ export default function TimetableClient({
                         const cs = Array.isArray(e.class_subjects) ? e.class_subjects[0] : e.class_subjects
                         return cs?.teacher_id === selectedTeacherId
                       }
-                      return true // Summary view matches everything
+                      return true // Summary matches all
                     })
-
-                    const conflictMsg = entry ? getConflictWarning(day, slot.id, entry) : null
 
                     if (slot.is_break) {
                       return (
@@ -684,97 +797,127 @@ export default function TimetableClient({
                       <td 
                         key={slot.id}
                         onClick={() => viewType !== 'teacher' && openScheduler(day, slot)}
+                        onDragOver={e => e.preventDefault()}
+                        onDrop={e => viewType !== 'teacher' && handleDrop(e, day, slot.id)}
                         style={{
                           padding: '0.75rem',
                           textAlign: 'center',
                           cursor: viewType === 'teacher' ? 'default' : 'pointer',
                           borderRight: '1px solid var(--color-border)',
-                          backgroundColor: entry ? 'rgba(30, 58, 138, 0.02)' : 'transparent',
+                          backgroundColor: cellEntries.length > 0 ? 'rgba(30, 58, 138, 0.02)' : 'transparent',
                           transition: 'background-color 0.15s ease',
                           verticalAlign: 'middle',
-                          height: '65px'
+                          minHeight: '65px'
                         }}
                         className="hover-grid-cell"
                       >
-                        {entry ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', position: 'relative' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {cellEntries.map(entry => {
+                            const conflictMsg = getConflictWarning(day, slot.id, entry)
                             
-                            {/* Inline Conflict Warning Badge */}
-                            {conflictMsg && (
+                            return (
                               <div 
-                                title={conflictMsg} 
-                                style={{ position: 'absolute', top: '-10px', right: '-4px', color: 'var(--color-error)' }}
+                                key={entry.id}
+                                draggable={viewType !== 'teacher'}
+                                onDragStart={e => handleDragStart(e, entry.id)}
+                                onClick={ev => {
+                                  // Stop click triggering cell schedule modal when clicking specific card
+                                  ev.stopPropagation()
+                                  if (viewType !== 'teacher') openScheduler(day, slot)
+                                }}
+                                style={{ 
+                                  display: 'flex', 
+                                  flexDirection: 'column', 
+                                  gap: '0.1rem', 
+                                  position: 'relative', 
+                                  backgroundColor: 'var(--color-bg)', 
+                                  padding: '0.4rem', 
+                                  borderRadius: 'var(--radius-sm)', 
+                                  border: '1px solid var(--color-border)',
+                                  boxShadow: 'var(--shadow-sm)',
+                                  cursor: viewType === 'teacher' ? 'default' : 'grab'
+                                }}
                               >
-                                <ShieldAlert size={14} />
+                                
+                                {conflictMsg && (
+                                  <div 
+                                    title={conflictMsg} 
+                                    style={{ position: 'absolute', top: '-6px', right: '-4px', color: 'var(--color-error)' }}
+                                  >
+                                    <ShieldAlert size={12} />
+                                  </div>
+                                )}
+
+                                {viewType === 'class' && (
+                                  <>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text)' }}>
+                                      {(() => {
+                                        const cs = Array.isArray(entry.class_subjects) ? entry.class_subjects[0] : entry.class_subjects
+                                        const sub = cs ? (Array.isArray(cs.subjects) ? cs.subjects[0] : cs.subjects) : null
+                                        return sub?.name || 'Lesson'
+                                      })()}
+                                    </div>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>
+                                      {(() => {
+                                        const cs = Array.isArray(entry.class_subjects) ? entry.class_subjects[0] : entry.class_subjects
+                                        const prof = cs ? (Array.isArray(cs.profiles) ? cs.profiles[0] : cs.profiles) : null
+                                        return prof ? `${prof.first_name} ${prof.last_name}` : ''
+                                      })()}
+                                    </div>
+                                  </>
+                                )}
+
+                                {viewType === 'teacher' && (
+                                  <>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text)' }}>
+                                      {(() => {
+                                        const cls = Array.isArray(entry.classes) ? entry.classes[0] : entry.classes
+                                        return cls ? `${cls.name} ${cls.section || ''}`.trim() : 'Class'
+                                      })()}
+                                    </div>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>
+                                      {(() => {
+                                        const cs = Array.isArray(entry.class_subjects) ? entry.class_subjects[0] : entry.class_subjects
+                                        const sub = cs ? (Array.isArray(cs.subjects) ? cs.subjects[0] : cs.subjects) : null
+                                        return sub?.name || ''
+                                      })()}
+                                    </div>
+                                  </>
+                                )}
+
+                                {viewType === 'summary' && (
+                                  <>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text)' }}>
+                                      {(() => {
+                                        const cls = Array.isArray(entry.classes) ? entry.classes[0] : entry.classes
+                                        return cls ? `${cls.name} ${cls.section || ''}`.trim() : 'Class'
+                                      })()}
+                                    </div>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>
+                                      {(() => {
+                                        const cs = Array.isArray(entry.class_subjects) ? entry.class_subjects[0] : entry.class_subjects
+                                        const sub = cs ? (Array.isArray(cs.subjects) ? cs.subjects[0] : cs.subjects) : null
+                                        return sub?.name || ''
+                                      })()}
+                                    </div>
+                                  </>
+                                )}
+
+                                {entry.room && (
+                                  <div style={{ fontSize: '0.6rem', padding: '0.05rem 0.25rem', borderRadius: '3px', backgroundColor: 'rgba(0,0,0,0.03)', alignSelf: 'center', color: 'var(--color-text-muted)' }}>
+                                    {entry.room}
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            )
+                          })}
 
-                            {viewType === 'class' && (
-                              <>
-                                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text)' }}>
-                                  {(() => {
-                                    const cs = Array.isArray(entry.class_subjects) ? entry.class_subjects[0] : entry.class_subjects
-                                    const sub = cs ? (Array.isArray(cs.subjects) ? cs.subjects[0] : cs.subjects) : null
-                                    return sub?.name || 'Lesson'
-                                  })()}
-                                </div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                                  {(() => {
-                                    const cs = Array.isArray(entry.class_subjects) ? entry.class_subjects[0] : entry.class_subjects
-                                    const prof = cs ? (Array.isArray(cs.profiles) ? cs.profiles[0] : cs.profiles) : null
-                                    return prof ? `${prof.first_name} ${prof.last_name}` : ''
-                                  })()}
-                                </div>
-                              </>
-                            )}
-
-                            {viewType === 'teacher' && (
-                              <>
-                                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text)' }}>
-                                  {(() => {
-                                    const cls = Array.isArray(entry.classes) ? entry.classes[0] : entry.classes
-                                    return cls ? `${cls.name} ${cls.section || ''}`.trim() : 'Class'
-                                  })()}
-                                </div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                                  {(() => {
-                                    const cs = Array.isArray(entry.class_subjects) ? entry.class_subjects[0] : entry.class_subjects
-                                    const sub = cs ? (Array.isArray(cs.subjects) ? cs.subjects[0] : cs.subjects) : null
-                                    return sub?.name || ''
-                                  })()}
-                                </div>
-                              </>
-                            )}
-
-                            {viewType === 'summary' && (
-                              <>
-                                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text)' }}>
-                                  {(() => {
-                                    const cls = Array.isArray(entry.classes) ? entry.classes[0] : entry.classes
-                                    return cls ? `${cls.name} ${cls.section || ''}`.trim() : 'Class'
-                                  })()}
-                                </div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                                  {(() => {
-                                    const cs = Array.isArray(entry.class_subjects) ? entry.class_subjects[0] : entry.class_subjects
-                                    const sub = cs ? (Array.isArray(cs.subjects) ? cs.subjects[0] : cs.subjects) : null
-                                    return sub?.name || ''
-                                  })()}
-                                </div>
-                              </>
-                            )}
-
-                            {entry.room && (
-                              <div style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem', borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.04)', alignSelf: 'center', color: 'var(--color-text-muted)' }}>
-                                Room: {entry.room}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="add-indicator" style={{ display: 'none', color: 'var(--color-text-muted)' }}>
-                            <Plus size={16} style={{ margin: 'auto' }} />
-                          </div>
-                        )}
+                          {cellEntries.length === 0 && (
+                            <div className="add-indicator" style={{ display: 'none', color: 'var(--color-text-muted)' }}>
+                              <Plus size={16} style={{ margin: 'auto' }} />
+                            </div>
+                          )}
+                        </div>
                       </td>
                     )
                   })}
@@ -786,7 +929,217 @@ export default function TimetableClient({
         )}
       </div>
 
-      {/* 6. Schedule Allocation Modal */}
+      {/* 6. Manual Slots Configuration Modal */}
+      {showSlotEditor && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100,
+          padding: '1.5rem'
+        }}>
+          <div className="glass-panel" style={{
+            width: '100%',
+            maxWidth: '750px',
+            maxHeight: '85vh',
+            borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'var(--color-bg)',
+            border: '1px solid var(--color-border)',
+            padding: '1.75rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.25rem',
+            overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>
+                  Adjust Time Slots Configuration
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+                  Define custom periods and breaks. Overwrites slots setup.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSlotEditor(false)}
+                style={{ border: 'none', backgroundColor: 'transparent', cursor: 'pointer', color: 'var(--color-text-muted)' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-muted)', fontSize: '0.8rem', fontWeight: 600 }}>
+                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>No.</th>
+                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Name / Label</th>
+                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Start Time</th>
+                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>End Time</th>
+                    <th style={{ textAlign: 'center', padding: '0.5rem' }}>Is Break</th>
+                    <th style={{ textAlign: 'right', padding: '0.5rem' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {editingSlots.map((slot, sIdx) => (
+                    <tr key={sIdx} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '0.5rem', width: '60px' }}>
+                        <input
+                          type="number"
+                          className="input-field"
+                          style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
+                          value={slot.period_number}
+                          onChange={e => handleUpdateEditingSlot(sIdx, { period_number: Number(e.target.value) })}
+                        />
+                      </td>
+                      <td style={{ padding: '0.5rem' }}>
+                        <input
+                          type="text"
+                          className="input-field"
+                          style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem', width: '100%' }}
+                          value={slot.name}
+                          onChange={e => handleUpdateEditingSlot(sIdx, { name: e.target.value })}
+                        />
+                      </td>
+                      <td style={{ padding: '0.5rem', width: '100px' }}>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="HH:MM"
+                          style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
+                          value={slot.start_time.substring(0, 5)}
+                          onChange={e => handleUpdateEditingSlot(sIdx, { start_time: e.target.value })}
+                        />
+                      </td>
+                      <td style={{ padding: '0.5rem', width: '100px' }}>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="HH:MM"
+                          style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
+                          value={slot.end_time.substring(0, 5)}
+                          onChange={e => handleUpdateEditingSlot(sIdx, { end_time: e.target.value })}
+                        />
+                      </td>
+                      <td style={{ padding: '0.5rem', textAlign: 'center', width: '80px' }}>
+                        <input
+                          type="checkbox"
+                          checked={slot.is_break}
+                          onChange={e => handleUpdateEditingSlot(sIdx, { is_break: e.target.checked })}
+                        />
+                      </td>
+                      <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEditingSlot(sIdx)}
+                          style={{ border: 'none', backgroundColor: 'transparent', color: 'var(--color-error)', cursor: 'pointer' }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              
+              <button
+                type="button"
+                onClick={handleAddCustomSlot}
+                className="btn"
+                style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', padding: '0.45rem 0.85rem', border: '1px solid var(--color-border)', backgroundColor: 'transparent', cursor: 'pointer', color: 'var(--color-text)' }}
+              >
+                <Plus size={14} />
+                Add New Time Slot
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
+              <button
+                type="button"
+                onClick={() => setShowSlotEditor(false)}
+                className="btn"
+                style={{ backgroundColor: 'transparent', border: '1px solid var(--color-border)', padding: '0.5rem 1rem', fontSize: '0.85rem', color: 'var(--color-text)', cursor: 'pointer', borderRadius: 'var(--radius-md)' }}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveManualSlots}
+                disabled={savingSlots}
+                className="btn btn-primary"
+                style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
+              >
+                {savingSlots && <Loader2 size={14} className="animate-spin" />}
+                Save Changes
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Drag-and-Drop Conflict Warning Dialog */}
+      {dropConflict && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 110,
+          padding: '1.5rem'
+        }}>
+          <div className="glass-panel" style={{
+            width: '100%',
+            maxWidth: '450px',
+            borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'var(--color-bg)',
+            border: '1px solid var(--color-border)',
+            padding: '1.75rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.25rem'
+          }}>
+            <div>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                <ShieldAlert size={20} style={{ color: 'var(--color-error)' }} />
+                Conflict detected on move
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-text)', marginTop: '0.5rem' }}>
+                {dropConflict.message}
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setDropConflict(null)}
+                className="btn"
+                style={{ backgroundColor: 'transparent', border: '1px solid var(--color-border)', padding: '0.5rem 1rem', fontSize: '0.85rem', color: 'var(--color-text)', cursor: 'pointer', borderRadius: 'var(--radius-md)' }}
+              >
+                Cancel Move
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDrop(null as any, dropConflict.day, dropConflict.slotId, true)}
+                className="btn"
+                style={{ backgroundColor: 'var(--color-error)', color: '#ffffff', border: 'none', padding: '0.5rem 1.25rem', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', borderRadius: 'var(--radius-md)' }}
+              >
+                Force Move (Overwrite)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. Schedule Allocation Modal */}
       {showScheduleModal && modalCell && (
         <div style={{
           position: 'fixed',
