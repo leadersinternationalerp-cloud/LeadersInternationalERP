@@ -67,7 +67,10 @@ export async function GET(request: NextRequest) {
       const { data: cls } = await supabase.from('classes').select('name, section').eq('id', classId).single()
       entityName = cls ? `${cls.name} ${cls.section || ''}`.trim() : 'Class'
     } else if (teacherId) {
-      filteredEntries = filteredEntries.filter(e => e.class_subjects?.teacher_id === teacherId)
+      filteredEntries = filteredEntries.filter(e => {
+        const cs = Array.isArray(e.class_subjects) ? e.class_subjects[0] : e.class_subjects
+        return cs?.teacher_id === teacherId
+      })
       type = 'teacher'
       title = 'Teacher Timetable'
 
@@ -89,14 +92,21 @@ export async function GET(request: NextRequest) {
       is_break: s.is_break
     }))
 
-    const pdfEntries = filteredEntries.map(e => ({
-      day_of_week: e.day_of_week,
-      slot_id: e.slot_id,
-      room: e.room || undefined,
-      subjectName: e.class_subjects?.subjects?.name || undefined,
-      teacherName: e.class_subjects?.profiles ? `${e.class_subjects.profiles.first_name} ${e.class_subjects.profiles.last_name}` : undefined,
-      className: e.classes ? `${e.classes.name} ${e.classes.section || ''}`.trim() : undefined
-    }))
+    const pdfEntries = filteredEntries.map(e => {
+      const cs = Array.isArray(e.class_subjects) ? e.class_subjects[0] : e.class_subjects
+      const sub = cs ? (Array.isArray(cs.subjects) ? cs.subjects[0] : cs.subjects) : null
+      const prof = cs ? (Array.isArray(cs.profiles) ? cs.profiles[0] : cs.profiles) : null
+      const cls = Array.isArray(e.classes) ? e.classes[0] : e.classes
+
+      return {
+        day_of_week: e.day_of_week,
+        slot_id: e.slot_id,
+        room: e.room || undefined,
+        subjectName: sub?.name || undefined,
+        teacherName: prof ? `${prof.first_name} ${prof.last_name}` : undefined,
+        className: cls ? `${cls.name} ${cls.section || ''}`.trim() : undefined
+      }
+    })
 
     const pdfBuffer = await generateTimetablePdf({
       title,

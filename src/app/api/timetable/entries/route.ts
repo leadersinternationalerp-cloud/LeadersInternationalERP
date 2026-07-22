@@ -72,13 +72,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Class subject allocation not found' }, { status: 404 })
     }
 
+    const subObj = Array.isArray(alloc.subjects) ? alloc.subjects[0] : alloc.subjects
+    const profObj = Array.isArray(alloc.profiles) ? alloc.profiles[0] : alloc.profiles
+
     const teacherId = alloc.teacher_id
-    const subjectName = alloc.subjects?.name || 'Subject'
-    const teacherName = alloc.profiles ? `${alloc.profiles.first_name} ${alloc.profiles.last_name}` : 'Teacher'
+    const subjectName = subObj?.name || 'Subject'
+    const teacherName = profObj ? `${profObj.first_name} ${profObj.last_name}` : 'Teacher'
 
     // Fetch slot info
     const { data: slot } = await supabase
       .from('timetable_slots')
+      .select('*')
       .eq('id', slot_id)
       .maybeSingle()
 
@@ -101,7 +105,9 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     if (classConflict && !force) {
-      const scheduledSubjName = classConflict.class_subjects?.subjects?.name || 'Another lesson'
+      const csObj = Array.isArray(classConflict.class_subjects) ? classConflict.class_subjects[0] : classConflict.class_subjects
+      const csSubObj = csObj ? (Array.isArray(csObj.subjects) ? csObj.subjects[0] : csObj.subjects) : null
+      const scheduledSubjName = csSubObj?.name || 'Another lesson'
       return NextResponse.json({
         conflict: true,
         type: 'class',
@@ -123,11 +129,17 @@ export async function POST(request: NextRequest) {
       .eq('day_of_week', day_of_week)
       .eq('slot_id', slot_id)
 
-    const teacherConflict = (teacherConflicts || []).find(tc => tc.class_subjects?.teacher_id === teacherId)
+    const teacherConflict = (teacherConflicts || []).find(tc => {
+      const tcCs = Array.isArray(tc.class_subjects) ? tc.class_subjects[0] : tc.class_subjects
+      return tcCs?.teacher_id === teacherId
+    })
 
     if (teacherConflict && !force) {
-      const conflictClassName = teacherConflict.classes ? `${teacherConflict.classes.name} ${teacherConflict.classes.section || ''}`.trim() : 'Another class'
-      const conflictSubject = teacherConflict.class_subjects?.subjects?.name || 'lesson'
+      const tcCs = Array.isArray(teacherConflict.class_subjects) ? teacherConflict.class_subjects[0] : teacherConflict.class_subjects
+      const tcSub = tcCs ? (Array.isArray(tcCs.subjects) ? tcCs.subjects[0] : tcCs.subjects) : null
+      const tcCls = Array.isArray(teacherConflict.classes) ? teacherConflict.classes[0] : teacherConflict.classes
+      const conflictClassName = tcCls ? `${tcCls.name} ${tcCls.section || ''}`.trim() : 'Another class'
+      const conflictSubject = tcSub?.name || 'lesson'
       return NextResponse.json({
         conflict: true,
         type: 'teacher',
