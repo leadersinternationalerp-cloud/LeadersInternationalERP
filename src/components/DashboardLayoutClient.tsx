@@ -182,9 +182,14 @@ export default function DashboardLayoutClient({
       )}
 
       {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal') || userRoles.includes('Accountant')) && (
-        <NavLink href="/dashboard/accountant/fee-balances" icon={Scale}>
-          Fee Balances
-        </NavLink>
+        <>
+          <NavLink href="/dashboard/accountant/fee-balances" icon={Scale}>
+            Fee Balances
+          </NavLink>
+          <NavLink href="/dashboard/accountant/fee-structures" icon={FileSpreadsheet}>
+            Fee Structures
+          </NavLink>
+        </>
       )}
 
       {userRoles.includes('System Admin') && (

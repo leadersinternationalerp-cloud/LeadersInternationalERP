@@ -20,6 +20,18 @@ export async function saveFeeStructureAction(formData: FormData) {
   }
 
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // Check roles
+  const { data: prof } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
+  const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
+    ? prof.roles
+    : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
+
+  const isAllowed = userRoles.some(r => ['System Admin', 'Director', 'Principal'].includes(r))
+  if (!isAllowed) {
+    return { error: 'Forbidden: You do not have permission to modify fee structures.' }
+  }
 
   const { error } = await supabase.from('fee_structures').insert({
     academic_year,
@@ -39,9 +51,22 @@ export async function saveFeeStructureAction(formData: FormData) {
   return { success: true }
 }
 
-// Delete Fee Structure
 export async function deleteFeeStructureAction(id: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // Check roles
+  const { data: prof } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
+  const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
+    ? prof.roles
+    : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
+
+  const isAllowed = userRoles.some(r => ['System Admin', 'Director', 'Principal'].includes(r))
+  if (!isAllowed) {
+    return { error: 'Forbidden: You do not have permission to delete fee structures.' }
+  }
+
   const { error } = await supabase.from('fee_structures').delete().eq('id', id)
   if (error) {
     return { error: error.message }
