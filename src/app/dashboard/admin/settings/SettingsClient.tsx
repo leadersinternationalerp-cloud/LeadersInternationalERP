@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { saveSystemSettingsAction, saveAcademicYearAction, saveClassAction, deleteClassAction } from './actions'
 import { formatDate } from '@/utils/date'
+import { Info } from 'lucide-react'
 import {
   parseGradingLevels,
   validateGradingLevels,
@@ -35,8 +36,11 @@ export default function SettingsClient({
   initialSettings,
   initialAcademicYears,
   initialClasses,
-  teachers
+  teachers,
 }: SettingsClientProps) {
+  // Navigation Tabs State
+  const [activeTab, setActiveTab] = useState<'general' | 'calendar' | 'grading' | 'classes'>('general')
+
   // General settings state
   const [schoolName, setSchoolName] = useState(initialSettings.school_name || '')
   const [schoolMotto, setSchoolMotto] = useState(initialSettings.school_motto || '')
@@ -53,166 +57,9 @@ export default function SettingsClient({
   const [savingScale, setSavingScale] = useState(false)
   const [scaleMessage, setScaleMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  // Class management state
-  const [classesList, setClassesList] = useState<any[]>(initialClasses)
-  const [classId, setClassId] = useState<string | null>(null)
-  const [className, setClassName] = useState('')
-  const [classSection, setClassSection] = useState('')
-  const [isEarlyYears, setIsEarlyYears] = useState(false)
-  const [ageGroup, setAgeGroup] = useState('')
-  const [classTeacherId, setClassTeacherId] = useState('')
-
-  const [savingClass, setSavingClass] = useState(false)
-  const [classMessage, setClassMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-
-  // Handle editing class
-  function handleEditClass(cls: any) {
-    setClassId(cls.id)
-    setClassName(cls.name || '')
-    setClassSection(cls.section || '')
-    setIsEarlyYears(cls.is_early_years || false)
-    setAgeGroup(cls.age_group || '')
-    setClassTeacherId(cls.class_teacher_id || '')
-    setClassMessage(null)
-  }
-
-  // Reset Class Form
-  function resetClassForm() {
-    setClassId(null)
-    setClassName('')
-    setClassSection('')
-    setIsEarlyYears(false)
-    setAgeGroup('')
-    setClassTeacherId('')
-  }
-
-  // Handle saving class
-  async function handleSaveClass(e: React.FormEvent) {
-    e.preventDefault()
-    setSavingClass(true)
-    setClassMessage(null)
-
-    if (!className.trim()) {
-      setClassMessage({ type: 'error', text: 'Class name is required.' })
-      setSavingClass(false)
-      return
-    }
-
-    try {
-      const res = await saveClassAction({
-        id: classId || undefined,
-        name: className,
-        section: classSection,
-        is_early_years: isEarlyYears,
-        age_group: isEarlyYears ? ageGroup : undefined,
-        class_teacher_id: classTeacherId || null
-      })
-
-      if (res.error) {
-        throw new Error(res.error)
-      }
-
-      setClassMessage({
-        type: 'success',
-        text: `Class "${className}" saved successfully!`
-      })
-
-      // Fetch fresh list of classes from client query to update UI cleanly
-      const supabase = createClient()
-      const { data: freshClasses } = await supabase
-        .from('classes')
-        .select(`
-          *,
-          class_teacher:class_teacher_id(id, first_name, last_name)
-        `)
-        .order('name', { ascending: true })
-
-      if (freshClasses) {
-        setClassesList(freshClasses)
-      }
-
-      resetClassForm()
-    } catch (err: any) {
-      console.error(err)
-      setClassMessage({ type: 'error', text: err.message || 'Failed to save class' })
-    } finally {
-      setSavingClass(false)
-    }
-  }
-
-  // Handle deleting class
-  async function handleDeleteClass(id: string, name: string) {
-    if (!confirm(`Are you sure you want to delete class "${name}"? All associated data like timetables and assignments will be affected.`)) {
-      return
-    }
-
-    try {
-      const res = await deleteClassAction(id)
-      if (res.error) {
-        throw new Error(res.error)
-      }
-
-      setClassesList(classesList.filter(c => c.id !== id))
-    } catch (err: any) {
-      alert(`Delete failed: ${err.message}`)
-    }
-  }
-
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsMessage, setSettingsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [uploadingLogo, setUploadingLogo] = useState(false)
-
-  // Exam Types & Weights state
-  const [examTypes, setExamTypes] = useState<any[]>(() => {
-    return initialSettings.exam_types || [
-      { id: 'test_1', name: 'Test 1', weight: 20 },
-      { id: 'opener', name: 'Opener', weight: 20 },
-      { id: 'terminal', name: 'Terminal', weight: 60 }
-    ]
-  })
-  const [savingExamTypes, setSavingExamTypes] = useState(false)
-  const [examTypesMessage, setExamTypesMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [newTypeName, setNewTypeName] = useState('')
-  const [newTypeWeight, setNewTypeWeight] = useState(0)
-
-  const handleAddExamType = () => {
-    if (!newTypeName.trim()) return
-    const id = newTypeName.toLowerCase().replace(/[^a-z0-9]/g, '_')
-    if (examTypes.some(t => t.id === id)) {
-      alert('An exam type with this name already exists.')
-      return
-    }
-    setExamTypes([...examTypes, { id, name: newTypeName, weight: Number(newTypeWeight) }])
-    setNewTypeName('')
-    setNewTypeWeight(0)
-  }
-
-  const handleRemoveExamType = (id: string) => {
-    setExamTypes(examTypes.filter(t => t.id !== id))
-  }
-
-  const handleSaveExamTypes = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const totalWeight = examTypes.reduce((sum, t) => sum + Number(t.weight), 0)
-    if (totalWeight !== 100) {
-      setExamTypesMessage({ type: 'error', text: `Failed: Total weight must equal exactly 100% (currently ${totalWeight}%).` })
-      return
-    }
-
-    setSavingExamTypes(true)
-    setExamTypesMessage(null)
-    try {
-      const res = await saveSystemSettingsAction('exam_types', examTypes)
-      if (res.error) {
-        throw new Error(res.error)
-      }
-      setExamTypesMessage({ type: 'success', text: 'Exam types and weights saved successfully!' })
-    } catch (err: any) {
-      setExamTypesMessage({ type: 'error', text: err.message || 'Failed to save settings' })
-    } finally {
-      setSavingExamTypes(false)
-    }
-  }
 
   // Academic Year State
   const [academicYears, setAcademicYears] = useState<any[]>(initialAcademicYears)
@@ -230,6 +77,18 @@ export default function SettingsClient({
   const [savingYear, setSavingYear] = useState(false)
   const [yearMessage, setYearMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  // Class management state
+  const [classesList, setClassesList] = useState<any[]>(initialClasses)
+  const [classId, setClassId] = useState<string | null>(null)
+  const [className, setClassName] = useState('')
+  const [classSection, setClassSection] = useState('')
+  const [isEarlyYears, setIsEarlyYears] = useState(false)
+  const [ageGroup, setAgeGroup] = useState('')
+  const [classTeacherId, setClassTeacherId] = useState('')
+
+  const [savingClass, setSavingClass] = useState(false)
+  const [classMessage, setClassMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
   // Handle Logo upload
   async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -243,7 +102,6 @@ export default function SettingsClient({
       const fileExt = file.name.split('.').pop()
       const fileName = `logo-${Date.now()}.${fileExt}`
 
-      // Create bucket if not exists, then upload
       let uploadResult = await supabase.storage.from('logos').upload(fileName, file)
       if (uploadResult.error && uploadResult.error.message.includes('not found')) {
         await supabase.storage.createBucket('logos', { public: true })
@@ -275,7 +133,6 @@ export default function SettingsClient({
     setSettingsMessage(null)
 
     try {
-      // Save settings key-value pairs
       const results = await Promise.all([
         saveSystemSettingsAction('school_name', schoolName),
         saveSystemSettingsAction('school_motto', schoolMotto),
@@ -390,14 +247,12 @@ export default function SettingsClient({
 
       setYearMessage({
         type: 'success',
-        text: `Academic Year "${yearName}" and Term dates saved & synchronized successfully!`,
+        text: `Academic Year "${yearName}" saved & synchronized successfully!`,
       })
 
-      // Update state local view
       const updatedYears = [...academicYears]
       const existingIdx = updatedYears.findIndex((y) => y.name === yearName)
 
-      // If active, deactivate others in the local list
       let finalYears = updatedYears
       if (isYearActive) {
         finalYears = updatedYears.map((y) => ({ ...y, is_active: false }))
@@ -425,283 +280,272 @@ export default function SettingsClient({
     }
   }
 
+  // Handle editing class
+  function handleEditClass(cls: any) {
+    setClassId(cls.id)
+    setClassName(cls.name || '')
+    setClassSection(cls.section || '')
+    setIsEarlyYears(cls.is_early_years || false)
+    setAgeGroup(cls.age_group || '')
+    setClassTeacherId(cls.class_teacher_id || '')
+    setClassMessage(null)
+  }
+
+  // Reset Class Form
+  function resetClassForm() {
+    setClassId(null)
+    setClassName('')
+    setClassSection('')
+    setIsEarlyYears(false)
+    setAgeGroup('')
+    setClassTeacherId('')
+  }
+
+  // Handle saving class
+  async function handleSaveClass(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingClass(true)
+    setClassMessage(null)
+
+    if (!className.trim()) {
+      setClassMessage({ type: 'error', text: 'Class name is required.' })
+      setSavingClass(false)
+      return
+    }
+
+    try {
+      const res = await saveClassAction({
+        id: classId || undefined,
+        name: className,
+        section: classSection,
+        is_early_years: isEarlyYears,
+        age_group: isEarlyYears ? ageGroup : undefined,
+        class_teacher_id: classTeacherId || null
+      })
+
+      if (res.error) {
+        throw new Error(res.error)
+      }
+
+      setClassMessage({
+        type: 'success',
+        text: `Class "${className}" saved successfully!`
+      })
+
+      const supabase = createClient()
+      const { data: freshClasses } = await supabase
+        .from('classes')
+        .select(`
+          *,
+          class_teacher:class_teacher_id(id, first_name, last_name)
+        `)
+        .order('name', { ascending: true })
+
+      if (freshClasses) {
+        setClassesList(freshClasses)
+      }
+
+      resetClassForm()
+    } catch (err: any) {
+      console.error(err)
+      setClassMessage({ type: 'error', text: err.message || 'Failed to save class' })
+    } finally {
+      setSavingClass(false)
+    }
+  }
+
+  // Handle deleting class
+  async function handleDeleteClass(id: string, name: string) {
+    if (!confirm(`Are you sure you want to delete class "${name}"? All associated data like timetables and assignments will be affected.`)) {
+      return
+    }
+
+    try {
+      const res = await deleteClassAction(id)
+      if (res.error) {
+        throw new Error(res.error)
+      }
+
+      setClassesList(classesList.filter(c => c.id !== id))
+    } catch (err: any) {
+      alert(`Delete failed: ${err.message}`)
+    }
+  }
+
+  const TABS = [
+    { id: 'general', label: 'General Info & Branding' },
+    { id: 'calendar', label: 'Academic Calendar' },
+    { id: 'grading', label: 'Grading Scale' },
+    { id: 'classes', label: 'Classes & Sections' }
+  ]
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div>
         <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>School & System Settings</h1>
-        <p style={{ color: 'var(--color-text-muted)' }}>Configure general school parameters, branding, and academic years schedule.</p>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>Configure branding, term schedules, classes, and grading scale parameters.</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
-        {/* General Info Panel */}
-        <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
-          <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', fontWeight: 600 }}>General Information & Branding</h2>
+      {/* Sub menu tabs */}
+      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.75rem', overflowX: 'auto' }}>
+        {TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => {
+              setActiveTab(tab.id as any)
+              setClassMessage(null)
+              setYearMessage(null)
+              setScaleMessage(null)
+              setSettingsMessage(null)
+            }}
+            style={{
+              padding: '0.6rem 1.25rem',
+              borderRadius: 'var(--radius-md)',
+              border: 'none',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              backgroundColor: activeTab === tab.id ? '#00264b' : 'transparent',
+              color: activeTab === tab.id ? '#ffffff' : 'var(--color-text-muted)',
+              transition: 'all 150ms ease-in-out'
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-          <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div className="form-group">
-              <label className="form-label">School Logo</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginTop: '0.5rem' }}>
-                <div style={{
-                  width: '80px',
-                  height: '80px',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px dashed var(--color-border)',
-                  backgroundColor: 'rgba(0,0,0,0.02)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                  position: 'relative'
-                }}>
-                  {schoolLogo ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={schoolLogo} alt="School Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                  ) : (
-                    <span style={{ fontSize: '1.5rem', color: 'var(--color-text-muted)' }}>🏫</span>
-                  )}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoUpload}
-                    disabled={uploadingLogo}
-                    style={{ fontSize: '0.85rem' }}
-                  />
-                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-                    {uploadingLogo ? 'Uploading logo to storage...' : 'Recommended square PNG or JPG.'}
+      {/* TAB CONTENT */}
+      {activeTab === 'general' && (
+        <div style={{ maxWidth: '650px' }}>
+          <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
+            <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', fontWeight: 600 }}>General Information & Branding</h2>
+
+            <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div className="form-group">
+                <label className="form-label">School Logo</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginTop: '0.5rem' }}>
+                  <div style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px dashed var(--color-border)',
+                    backgroundColor: 'rgba(0,0,0,0.02)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    position: 'relative'
+                  }}>
+                    {schoolLogo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={schoolLogo} alt="School Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    ) : (
+                      <span style={{ fontSize: '1.5rem', color: 'var(--color-text-muted)' }}>🏫</span>
+                    )}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      disabled={uploadingLogo}
+                      style={{ fontSize: '0.85rem' }}
+                    />
+                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+                      {uploadingLogo ? 'Uploading logo to storage...' : 'Recommended square PNG or JPG.'}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="form-group">
-              <label className="form-label">School Name</label>
-              <input
-                type="text"
-                className="input-field"
-                value={schoolName}
-                onChange={(e) => setSchoolName(e.target.value)}
-                placeholder="e.g. Leaders International School"
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">School Motto</label>
-              <input
-                type="text"
-                className="input-field"
-                value={schoolMotto}
-                onChange={(e) => setSchoolMotto(e.target.value)}
-                placeholder="e.g. Excellence in Education"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Physical Address</label>
-              <textarea
-                className="input-field"
-                rows={3}
-                value={schoolAddress}
-                onChange={(e) => setSchoolAddress(e.target.value)}
-                placeholder="e.g. 123 Education St, Dar es Salaam"
-                style={{ resize: 'vertical' }}
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="form-group">
-                <label className="form-label">Contact Email</label>
-                <input
-                  type="email"
-                  className="input-field"
-                  value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
-                  placeholder="info@leaders.ac.tz"
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Contact Phone</label>
+                <label className="form-label">School Name</label>
                 <input
                   type="text"
                   className="input-field"
-                  value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value)}
-                  placeholder="+255 123 456 789"
+                  value={schoolName}
+                  onChange={(e) => setSchoolName(e.target.value)}
+                  placeholder="e.g. Leaders International School"
+                  required
                 />
               </div>
-            </div>
 
-            {settingsMessage && (
-              <div style={{
-                padding: '0.75rem',
-                borderRadius: 'var(--radius-sm)',
-                backgroundColor: settingsMessage.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                color: settingsMessage.type === 'success' ? 'var(--color-success)' : 'var(--color-error)',
-                fontSize: '0.875rem',
-                borderLeft: `4px solid ${settingsMessage.type === 'success' ? 'var(--color-success)' : 'var(--color-error)'}`
-              }}>
-                {settingsMessage.text}
+              <div className="form-group">
+                <label className="form-label">School Motto</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={schoolMotto}
+                  onChange={(e) => setSchoolMotto(e.target.value)}
+                  placeholder="e.g. Excellence in Education"
+                />
               </div>
-            )}
 
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={savingSettings || uploadingLogo}
-              style={{ marginTop: '0.5rem', width: '100%', padding: '0.75rem' }}
-            >
-              {savingSettings ? 'Saving Settings...' : 'Save Settings'}
-            </button>
-          </form>
-        </div>
+              <div className="form-group">
+                <label className="form-label">Physical Address</label>
+                <textarea
+                  className="input-field"
+                  rows={3}
+                  value={schoolAddress}
+                  onChange={(e) => setSchoolAddress(e.target.value)}
+                  placeholder="e.g. 123 Education St, Dar es Salaam"
+                  style={{ resize: 'vertical' }}
+                />
+              </div>
 
-        {/* Exam Types Configurations */}
-        <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
-          <h2 style={{ fontSize: '1.25rem', marginBottom: '1.25rem', fontWeight: 600 }}>Report Card Exam Types & Weights</h2>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-            Define the exam types (columns) to appear on the student report cards and set their weights for computing the overall average.
-          </p>
-
-          <form onSubmit={handleSaveExamTypes} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {examTypes.map((type, index) => (
-                <div key={type.id} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 40px', gap: '0.75rem', alignItems: 'center' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Contact Email</label>
+                  <input
+                    type="email"
+                    className="input-field"
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    placeholder="info@leaders.ac.tz"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Contact Phone</label>
                   <input
                     type="text"
                     className="input-field"
-                    style={{ padding: '0.4rem 0.75rem' }}
-                    value={type.name}
-                    onChange={(e) => {
-                      const newTypes = [...examTypes]
-                      newTypes[index] = { ...type, name: e.target.value }
-                      setExamTypes(newTypes)
-                    }}
-                    required
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    placeholder="+255 123 456 789"
                   />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Weight:</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      className="input-field"
-                      style={{ padding: '0.4rem 0.5rem', width: '100%' }}
-                      value={type.weight}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value)
-                        const newTypes = [...examTypes]
-                        newTypes[index] = { ...type, weight: isNaN(val) ? 0 : val }
-                        setExamTypes(newTypes)
-                      }}
-                      required
-                    />
-                    <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>%</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveExamType(type.id)}
-                    style={{
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      color: 'var(--color-error)',
-                      cursor: 'pointer',
-                      fontSize: '1.1rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    🗑️
-                  </button>
                 </div>
-              ))}
+              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 40px', gap: '0.75rem', alignItems: 'center', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--color-border)' }}>
-                <input
-                  type="text"
-                  placeholder="New exam type (e.g. Midterm)"
-                  className="input-field"
-                  style={{ padding: '0.4rem 0.75rem' }}
-                  value={newTypeName}
-                  onChange={(e) => setNewTypeName(e.target.value)}
-                />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Weight:</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    className="input-field"
-                    style={{ padding: '0.4rem 0.5rem', width: '100%' }}
-                    value={newTypeWeight}
-                    onChange={(e) => setNewTypeWeight(Number(e.target.value))}
-                  />
-                  <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>%</span>
+              {settingsMessage && (
+                <div style={{
+                  padding: '0.75rem',
+                  borderRadius: 'var(--radius-sm)',
+                  backgroundColor: settingsMessage.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                  color: settingsMessage.type === 'success' ? 'var(--color-success)' : 'var(--color-error)',
+                  fontSize: '0.875rem',
+                  borderLeft: `4px solid ${settingsMessage.type === 'success' ? 'var(--color-success)' : 'var(--color-error)'}`
+                }}>
+                  {settingsMessage.text}
                 </div>
-                <button
-                  type="button"
-                  onClick={handleAddExamType}
-                  className="btn"
-                  style={{
-                    backgroundColor: 'rgba(59, 179, 195, 0.1)',
-                    color: 'var(--color-secondary)',
-                    padding: '0.4rem',
-                    borderRadius: 'var(--radius-sm)',
-                    border: 'none',
-                    fontWeight: 600
-                  }}
-                >
-                  ➕
-                </button>
-              </div>
-            </div>
+              )}
 
-            <div style={{
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              display: 'flex',
-              justifyContent: 'space-between',
-              padding: '0.5rem',
-              borderRadius: 'var(--radius-sm)',
-              backgroundColor: 'rgba(0,0,0,0.02)',
-              border: '1px solid var(--color-border)'
-            }}>
-              <span>Total Combined Weight:</span>
-              <span style={{
-                color: examTypes.reduce((sum, t) => sum + Number(t.weight), 0) === 100 ? 'var(--color-success)' : 'var(--color-error)'
-              }}>
-                {examTypes.reduce((sum, t) => sum + Number(t.weight), 0)}%
-              </span>
-            </div>
-
-            {examTypesMessage && (
-              <div style={{
-                padding: '0.75rem',
-                borderRadius: 'var(--radius-sm)',
-                backgroundColor: examTypesMessage.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                color: examTypesMessage.type === 'success' ? 'var(--color-success)' : 'var(--color-error)',
-                fontSize: '0.875rem',
-                borderLeft: `4px solid ${examTypesMessage.type === 'success' ? 'var(--color-success)' : 'var(--color-error)'}`
-              }}>
-                {examTypesMessage.text}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={savingExamTypes}
-              style={{ width: '100%', padding: '0.75rem' }}
-            >
-              {savingExamTypes ? 'Saving scale...' : 'Save Exam Types & Weights'}
-            </button>
-          </form>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={savingSettings || uploadingLogo}
+                style={{ marginTop: '0.5rem', width: '100%', padding: '0.75rem' }}
+              >
+                {savingSettings ? 'Saving Settings...' : 'Save Settings'}
+              </button>
+            </form>
+          </div>
         </div>
+      )}
 
-        {/* Academic Calendar Panel */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      {activeTab === 'calendar' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem', alignItems: 'start' }}>
           {/* Year Form */}
           <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
             <h2 style={{ fontSize: '1.25rem', marginBottom: '1.25rem', fontWeight: 600 }}>
@@ -717,16 +561,14 @@ export default function SettingsClient({
                   value={yearName}
                   onChange={(e) => setYearName(e.target.value)}
                   placeholder="e.g. 2026 or 2026/2027"
-                  disabled={!!editingYearName} // disable editing name directly to prevent conflict key change
+                  disabled={!!editingYearName}
                   required
                 />
               </div>
 
-              {/* Term Periods */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <h3 style={{ fontSize: '0.95rem', fontWeight: 600, borderBottom: '1px solid var(--color-border)', paddingBottom: '0.25rem' }}>Term Schedule</h3>
 
-                {/* Term 1 */}
                 <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr', gap: '0.75rem', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Term 1</span>
                   <input
@@ -745,7 +587,6 @@ export default function SettingsClient({
                   />
                 </div>
 
-                {/* Term 2 */}
                 <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr', gap: '0.75rem', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Term 2</span>
                   <input
@@ -764,7 +605,6 @@ export default function SettingsClient({
                   />
                 </div>
 
-                {/* Term 3 */}
                 <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr', gap: '0.75rem', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Term 3</span>
                   <input
@@ -811,25 +651,6 @@ export default function SettingsClient({
                 </label>
               </div>
 
-              <div style={{
-                fontSize: '0.78rem',
-                color: 'var(--color-text-muted)',
-                backgroundColor: 'rgba(59, 130, 246, 0.05)',
-                border: '1px solid rgba(59, 130, 246, 0.2)',
-                padding: '0.75rem',
-                borderRadius: 'var(--radius-sm)',
-                lineHeight: '1.4'
-              }}>
-                <strong style={{ color: '#2563eb', display: 'block', marginBottom: '0.2rem' }}>Operational Impact:</strong>
-                Saving term start/end dates and marking the active term updates:
-                <ul style={{ margin: '0.25rem 0 0 1.2rem', padding: 0 }}>
-                  <li><strong>Marks Entry</strong> & assessment submission periods</li>
-                  <li><strong>EYFS Progress Observations</strong> active logging period</li>
-                  <li><strong>Fee Payment & Billing</strong> structure calculations</li>
-                  <li><strong>Report Card Generations</strong> official header dates</li>
-                </ul>
-              </div>
-
               {yearMessage && (
                 <div style={{
                   padding: '0.75rem',
@@ -866,6 +687,116 @@ export default function SettingsClient({
             </form>
           </div>
 
+          {/* Academic Years List */}
+          <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
+            <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', fontWeight: 600 }}>Academic Year Schedule List</h2>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: 'rgba(0,0,0,0.02)' }}>
+                    <th style={{ padding: '1rem' }}>Academic Year</th>
+                    <th style={{ padding: '1rem' }}>Status</th>
+                    <th style={{ padding: '1rem' }}>Term 1 Period</th>
+                    <th style={{ padding: '1rem' }}>Term 2 Period</th>
+                    <th style={{ padding: '1rem' }}>Term 3 Period</th>
+                    <th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {academicYears.map((year) => {
+                    const terms = year.term_details || []
+                    const t1 = terms.find((t: any) => t.term_name === 'Term 1') || {}
+                    const t2 = terms.find((t: any) => t.term_name === 'Term 2') || {}
+                    const t3 = terms.find((t: any) => t.term_name === 'Term 3') || {}
+
+                    return (
+                      <tr key={year.name} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 150ms' }}>
+                        <td style={{ padding: '1rem', fontWeight: 600 }}>{year.name}</td>
+                        <td style={{ padding: '1rem' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
+                            {year.is_active ? (
+                              <span style={{
+                                padding: '0.25rem 0.75rem',
+                                borderRadius: '999px',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                color: 'var(--color-success)'
+                              }}>
+                                Active Year
+                              </span>
+                            ) : (
+                              <span style={{
+                                padding: '0.25rem 0.75rem',
+                                borderRadius: '999px',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                backgroundColor: 'rgba(0,0,0,0.05)',
+                                color: 'var(--color-text-muted)'
+                              }}>
+                                Inactive
+                              </span>
+                            )}
+                            {year.is_active && (
+                              <span style={{
+                                padding: '0.2rem 0.65rem',
+                                borderRadius: '12px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                                color: '#2563eb'
+                              }}>
+                                Current: {terms.find((t: any) => t.is_current)?.term_name || 'Term 3'}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.85rem' }}>
+                          {t1.start_date ? `${formatDate(t1.start_date)} to ${formatDate(t1.end_date)}` : 'N/A'}
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.85rem' }}>
+                          {t2.start_date ? `${formatDate(t2.start_date)} to ${formatDate(t2.end_date)}` : 'N/A'}
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.85rem' }}>
+                          {t3.start_date ? `${formatDate(t3.start_date)} to ${formatDate(t3.end_date)}` : 'N/A'}
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'right' }}>
+                          <button
+                            onClick={() => handleEditYear(year)}
+                            className="btn"
+                            style={{
+                              padding: '0.35rem 0.75rem',
+                              fontSize: '0.8rem',
+                              backgroundColor: 'rgba(59, 179, 195, 0.1)',
+                              color: 'var(--color-secondary)',
+                              border: 'none',
+                              borderRadius: 'var(--radius-sm)'
+                            }}
+                          >
+                            Edit / Set Active
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+
+                  {academicYears.length === 0 && (
+                    <tr>
+                      <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                        No academic years configured yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'grading' && (
+        <div style={{ maxWidth: '650px' }}>
           {/* Grading Scale Form */}
           <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
             <h2 style={{ fontSize: '1.25rem', marginBottom: '1.25rem', fontWeight: 600 }}>Grading Scale Configurations</h2>
@@ -963,326 +894,224 @@ export default function SettingsClient({
             </form>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Academic Years List */}
-      <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
-        <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', fontWeight: 600 }}>Academic Year Schedule List</h2>
+      {activeTab === 'classes' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          {/* Class Management Section */}
+          <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
+            <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', fontWeight: 600, color: 'var(--color-primary)' }}>School Classes & Sections</h2>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem', marginBottom: '2rem' }}>
+              Manage available classrooms, assign class teachers, and set up early years specifications.
+            </p>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: 'rgba(0,0,0,0.02)' }}>
-                <th style={{ padding: '1rem' }}>Academic Year</th>
-                <th style={{ padding: '1rem' }}>Status</th>
-                <th style={{ padding: '1rem' }}>Term 1 Period</th>
-                <th style={{ padding: '1rem' }}>Term 2 Period</th>
-                <th style={{ padding: '1rem' }}>Term 3 Period</th>
-                <th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {academicYears.map((year) => {
-                const terms = year.term_details || []
-                const t1 = terms.find((t: any) => t.term_name === 'Term 1') || {}
-                const t2 = terms.find((t: any) => t.term_name === 'Term 2') || {}
-                const t3 = terms.find((t: any) => t.term_name === 'Term 3') || {}
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 2fr', gap: '2rem', alignItems: 'start' }}>
+              
+              {/* Class Form */}
+              <div style={{ backgroundColor: 'rgba(0,0,0,0.01)', border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: 'var(--radius-md)' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1.25rem' }}>
+                  {classId ? `Edit Class: ${className}` : 'Create New Class'}
+                </h3>
 
-                return (
-                  <tr key={year.name} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 150ms' }}>
-                    <td style={{ padding: '1rem', fontWeight: 600 }}>{year.name}</td>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
-                        {year.is_active ? (
-                          <span style={{
-                            padding: '0.25rem 0.75rem',
-                            borderRadius: '999px',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                            color: 'var(--color-success)'
-                          }}>
-                            Active Year
-                          </span>
-                        ) : (
-                          <span style={{
-                            padding: '0.25rem 0.75rem',
-                            borderRadius: '999px',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            backgroundColor: 'rgba(0,0,0,0.05)',
-                            color: 'var(--color-text-muted)'
-                          }}>
-                            Inactive
-                          </span>
-                        )}
-                        {year.is_active && (
-                          <span style={{
-                            padding: '0.2rem 0.65rem',
-                            borderRadius: '12px',
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                            color: '#2563eb'
-                          }}>
-                            Current: {terms.find((t: any) => t.is_current)?.term_name || 'Term 3'}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem', fontSize: '0.85rem' }}>
-                      {t1.start_date ? `${formatDate(t1.start_date)} to ${formatDate(t1.end_date)}` : 'N/A'}
-                    </td>
-                    <td style={{ padding: '1rem', fontSize: '0.85rem' }}>
-                      {t2.start_date ? `${formatDate(t2.start_date)} to ${formatDate(t2.end_date)}` : 'N/A'}
-                    </td>
-                    <td style={{ padding: '1rem', fontSize: '0.85rem' }}>
-                      {t3.start_date ? `${formatDate(t3.start_date)} to ${formatDate(t3.end_date)}` : 'N/A'}
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'right' }}>
-                      <button
-                        onClick={() => handleEditYear(year)}
-                        className="btn"
-                        style={{
-                          padding: '0.35rem 0.75rem',
-                          fontSize: '0.8rem',
-                          backgroundColor: 'rgba(59, 179, 195, 0.1)',
-                          color: 'var(--color-secondary)',
-                          border: 'none',
-                          borderRadius: 'var(--radius-sm)'
-                        }}
-                      >
-                        Edit / Set Active
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-
-              {academicYears.length === 0 && (
-                <tr>
-                  <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                    No academic years configured yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Class Management Section */}
-      <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
-        <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', fontWeight: 600, color: 'var(--color-primary)' }}>School Classes & Sections</h2>
-        <p style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem', marginBottom: '2rem' }}>
-          Manage available classrooms, assign class teachers, and set up early years specifications.
-        </p>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 2fr', gap: '2rem', alignItems: 'start' }}>
-          
-          {/* Class Form */}
-          <div style={{ backgroundColor: 'rgba(0,0,0,0.01)', border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: 'var(--radius-md)' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1.25rem' }}>
-              {classId ? `Edit Class: ${className}` : 'Create New Class'}
-            </h3>
-
-            <form onSubmit={handleSaveClass} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div className="form-group">
-                <label className="form-label">Class Name *</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  value={className}
-                  onChange={(e) => setClassName(e.target.value)}
-                  placeholder="e.g. Grade 1 or Baby Class"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Section / Stream (Optional)</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  value={classSection}
-                  onChange={(e) => setClassSection(e.target.value)}
-                  placeholder="e.g. A, B, North or South"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Class Teacher</label>
-                <select
-                  className="input-field"
-                  value={classTeacherId}
-                  onChange={(e) => setClassTeacherId(e.target.value)}
-                >
-                  <option value="">-- No class teacher assigned --</option>
-                  {teachers.map(t => (
-                    <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.75rem', backgroundColor: 'rgba(0,0,0,0.02)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <input
-                    type="checkbox"
-                    id="is_ey_check"
-                    checked={isEarlyYears}
-                    onChange={(e) => setIsEarlyYears(e.target.checked)}
-                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                  />
-                  <label htmlFor="is_ey_check" style={{ fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>
-                    Is Early Years (EYFS)
-                  </label>
-                </div>
-
-                {isEarlyYears && (
-                  <div className="form-group" style={{ marginTop: '0.25rem' }}>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>Age Group</label>
+                <form onSubmit={handleSaveClass} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Class Name *</label>
                     <input
                       type="text"
                       className="input-field"
-                      style={{ padding: '0.4rem 0.6rem' }}
-                      value={ageGroup}
-                      onChange={(e) => setAgeGroup(e.target.value)}
-                      placeholder="e.g. 1-2y or 3-5y"
-                      required={isEarlyYears}
+                      value={className}
+                      onChange={(e) => setClassName(e.target.value)}
+                      placeholder="e.g. Grade 1 or Baby Class"
+                      required
                     />
                   </div>
-                )}
-              </div>
 
-              {classMessage && (
-                <div style={{
-                  padding: '0.75rem',
-                  borderRadius: 'var(--radius-sm)',
-                  backgroundColor: classMessage.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                  color: classMessage.type === 'success' ? 'var(--color-success)' : 'var(--color-error)',
-                  fontSize: '0.875rem',
-                  borderLeft: `4px solid ${classMessage.type === 'success' ? 'var(--color-success)' : 'var(--color-error)'}`
-                }}>
-                  {classMessage.text}
-                </div>
-              )}
+                  <div className="form-group">
+                    <label className="form-label">Section / Stream (Optional)</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={classSection}
+                      onChange={(e) => setClassSection(e.target.value)}
+                      placeholder="e.g. A, B, North or South"
+                    />
+                  </div>
 
-              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-                {classId && (
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={resetClassForm}
-                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.05)', color: 'var(--color-text)' }}
-                  >
-                    Cancel
-                  </button>
-                )}
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={savingClass}
-                  style={{ flex: 2, padding: '0.6rem' }}
-                >
-                  {savingClass ? 'Saving...' : 'Save Class'}
-                </button>
-              </div>
-            </form>
-          </div>
+                  <div className="form-group">
+                    <label className="form-label">Class Teacher</label>
+                    <select
+                      className="input-field"
+                      value={classTeacherId}
+                      onChange={(e) => setClassTeacherId(e.target.value)}
+                    >
+                      <option value="">-- No class teacher assigned --</option>
+                      {teachers.map(t => (
+                        <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>
+                      ))}
+                    </select>
+                  </div>
 
-          {/* Classes Table List */}
-          <div style={{ overflowX: 'auto', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ backgroundColor: 'rgba(0,0,0,0.03)', borderBottom: '1px solid var(--color-border)' }}>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>Class Name</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>Section</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>Type</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>Age Group</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>Class Teacher</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {classesList.map((cls) => (
-                  <tr key={cls.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 150ms' }}>
-                    <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{cls.name}</td>
-                    <td style={{ padding: '0.75rem 1rem' }}>{cls.section || <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>-</span>}</td>
-                    <td style={{ padding: '0.75rem 1rem' }}>
-                      {cls.is_early_years ? (
-                        <span style={{
-                          padding: '0.2rem 0.5rem', borderRadius: '4px',
-                          backgroundColor: 'rgba(59, 179, 195, 0.1)', color: 'var(--color-secondary)',
-                          fontSize: '0.75rem', fontWeight: 700
-                        }}>
-                          Early Years
-                        </span>
-                      ) : (
-                        <span style={{
-                          padding: '0.2rem 0.5rem', borderRadius: '4px',
-                          backgroundColor: 'rgba(0,0,0,0.05)', color: 'var(--color-text-muted)',
-                          fontSize: '0.75rem', fontWeight: 600
-                        }}>
-                          Primary / Regular
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ padding: '0.75rem 1rem' }}>{cls.age_group || <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>-</span>}</td>
-                    <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>
-                      {cls.class_teacher ? (
-                        `${cls.class_teacher.first_name} ${cls.class_teacher.last_name}`
-                      ) : (
-                        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>Unassigned</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                        <button
-                          onClick={() => handleEditClass(cls)}
-                          className="btn"
-                          style={{
-                            padding: '0.25rem 0.55rem',
-                            fontSize: '0.75rem',
-                            backgroundColor: 'rgba(59, 179, 195, 0.1)',
-                            color: 'var(--color-secondary)',
-                            border: 'none',
-                            borderRadius: 'var(--radius-sm)'
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClass(cls.id, `${cls.name} ${cls.section || ''}`.trim())}
-                          className="btn"
-                          style={{
-                            padding: '0.25rem 0.55rem',
-                            fontSize: '0.75rem',
-                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                            color: 'var(--color-error)',
-                            border: 'none',
-                            borderRadius: 'var(--radius-sm)'
-                          }}
-                        >
-                          Delete
-                        </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.75rem', backgroundColor: 'rgba(0,0,0,0.02)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="checkbox"
+                        id="is_ey_check"
+                        checked={isEarlyYears}
+                        onChange={(e) => setIsEarlyYears(e.target.checked)}
+                        style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                      />
+                      <label htmlFor="is_ey_check" style={{ fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>
+                        Is Early Years (EYFS)
+                      </label>
+                    </div>
+
+                    {isEarlyYears && (
+                      <div className="form-group" style={{ marginTop: '0.25rem' }}>
+                        <label className="form-label" style={{ fontSize: '0.75rem' }}>Age Group</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          style={{ padding: '0.4rem 0.6rem' }}
+                          value={ageGroup}
+                          onChange={(e) => setAgeGroup(e.target.value)}
+                          placeholder="e.g. 1-2y or 3-5y"
+                          required={isEarlyYears}
+                        />
                       </div>
-                    </td>
-                  </tr>
-                ))}
+                    )}
+                  </div>
 
-                {classesList.length === 0 && (
-                  <tr>
-                    <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                      No classes configured in the system yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  {classMessage && (
+                    <div style={{
+                      padding: '0.75rem',
+                      borderRadius: 'var(--radius-sm)',
+                      backgroundColor: classMessage.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                      color: classMessage.type === 'success' ? 'var(--color-success)' : 'var(--color-error)',
+                      fontSize: '0.875rem',
+                      borderLeft: `4px solid ${classMessage.type === 'success' ? 'var(--color-success)' : 'var(--color-error)'}`
+                    }}>
+                      {classMessage.text}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                    {classId && (
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={resetClassForm}
+                        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.05)', color: 'var(--color-text)' }}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      disabled={savingClass}
+                      style={{ flex: 2, padding: '0.6rem' }}
+                    >
+                      {savingClass ? 'Saving...' : 'Save Class'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Classes Table List */}
+              <div style={{ overflowX: 'auto', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: 'rgba(0,0,0,0.03)', borderBottom: '1px solid var(--color-border)' }}>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>Class Name</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>Section</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>Type</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>Age Group</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>Class Teacher</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {classesList.map((cls) => (
+                      <tr key={cls.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 150ms' }}>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{cls.name}</td>
+                        <td style={{ padding: '0.75rem 1rem' }}>{cls.section || <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>-</span>}</td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          {cls.is_early_years ? (
+                            <span style={{
+                              padding: '0.2rem 0.5rem', borderRadius: '4px',
+                              backgroundColor: 'rgba(59, 179, 195, 0.1)', color: 'var(--color-secondary)',
+                              fontSize: '0.75rem', fontWeight: 700
+                            }}>
+                              Early Years
+                            </span>
+                          ) : (
+                            <span style={{
+                              padding: '0.2rem 0.5rem', borderRadius: '4px',
+                              backgroundColor: 'rgba(0,0,0,0.05)', color: 'var(--color-text-muted)',
+                              fontSize: '0.75rem', fontWeight: 600
+                            }}>
+                              Primary / Regular
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem' }}>{cls.age_group || <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>-</span>}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>
+                          {cls.class_teacher ? (
+                            `${cls.class_teacher.first_name} ${cls.class_teacher.last_name}`
+                          ) : (
+                            <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>Unassigned</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                            <button
+                              onClick={() => handleEditClass(cls)}
+                              className="btn"
+                              style={{
+                                padding: '0.25rem 0.55rem',
+                                fontSize: '0.75rem',
+                                backgroundColor: 'rgba(59, 179, 195, 0.1)',
+                                color: 'var(--color-secondary)',
+                                border: 'none',
+                                borderRadius: 'var(--radius-sm)'
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteClass(cls.id, `${cls.name} ${cls.section || ''}`.trim())}
+                              className="btn"
+                              style={{
+                                padding: '0.25rem 0.55rem',
+                                fontSize: '0.75rem',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                color: 'var(--color-error)',
+                                border: 'none',
+                                borderRadius: 'var(--radius-sm)'
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+
+                    {classesList.length === 0 && (
+                      <tr>
+                        <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                          No classes configured in the system yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
           </div>
-
         </div>
-      </div>
+      )}
     </div>
   )
 }
