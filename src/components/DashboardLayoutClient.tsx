@@ -322,6 +322,9 @@ export default function DashboardLayoutClient({
           <NavLink href="/dashboard/teacher/report-cards" icon={FileSpreadsheet}>
             Report Cards (Teacher)
           </NavLink>
+          <NavLink href="/dashboard/teacher/timetable" icon={CalendarDays}>
+            My Timetable
+          </NavLink>
         </>
       )}
 

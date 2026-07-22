@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
         day_of_week,
         slot_id,
         room,
+        is_current,
         class_subjects (
           id,
           teacher_id,
@@ -23,6 +24,7 @@ export async function GET(request: NextRequest) {
         ),
         classes (name, section)
       `)
+      .eq('is_current', true)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
@@ -100,15 +102,21 @@ export async function POST(request: NextRequest) {
           class_id,
           day_of_week,
           slot_id,
+          is_current,
           class_subjects (
             teacher_id
           )
         `)
+        .eq('is_current', true)
 
       if (entriesErr) return NextResponse.json({ error: entriesErr.message }, { status: 500 })
 
-      // Clear previous timetable entries for this class
-      await supabase.from('timetable_entries').delete().eq('class_id', class_id)
+      // Archive previous timetable entries instead of deleting them!
+      await supabase
+        .from('timetable_entries')
+        .update({ is_current: false })
+        .eq('class_id', class_id)
+        .eq('is_current', true)
 
       const activeOtherEntries = (allEntries || []).filter(e => e.class_id !== class_id)
 
@@ -179,7 +187,8 @@ export async function POST(request: NextRequest) {
               class_id,
               class_subject_id: scheduledLesson.id,
               day_of_week: day,
-              slot_id: slot.id
+              slot_id: slot.id,
+              is_current: true
             })
 
             dailyAllocationCounts[day][scheduledLesson.id] = (dailyAllocationCounts[day][scheduledLesson.id] || 0) + 1
@@ -195,6 +204,22 @@ export async function POST(request: NextRequest) {
         if (bulkInsertErr) {
           return NextResponse.json({ error: bulkInsertErr.message }, { status: 500 })
         }
+      }
+
+      // Trigger In-App Notifications for Teachers linked to this class!
+      const { data: cls } = await supabase.from('classes').select('name, section').eq('id', class_id).single()
+      const className = cls ? `${cls.name} ${cls.section || ''}`.trim() : 'Class'
+      const teacherIds = Array.from(new Set(allocations.map(a => a.teacher_id).filter(Boolean)))
+
+      if (teacherIds.length > 0) {
+        const notifs = teacherIds.map(tId => ({
+          user_id: tId,
+          title: 'New Timetable Generated',
+          message: `A new timetable has been generated for ${className}. Please review your schedule.`,
+          type: 'system',
+          is_read: false
+        }))
+        await supabase.from('notifications').insert(notifs)
       }
 
       const unscheduledCount = lessonPool.length
@@ -250,6 +275,7 @@ export async function POST(request: NextRequest) {
       .eq('class_id', class_id)
       .eq('day_of_week', day_of_week)
       .eq('slot_id', slot_id)
+      .eq('is_current', true)
       .maybeSingle()
 
     if (classConflict && !force) {
@@ -275,6 +301,7 @@ export async function POST(request: NextRequest) {
       `)
       .eq('day_of_week', day_of_week)
       .eq('slot_id', slot_id)
+      .eq('is_current', true)
 
     const teacherConflict = (teacherConflicts || []).find(tc => {
       const tcCs = Array.isArray(tc.class_subjects) ? tc.class_subjects[0] : tc.class_subjects
@@ -310,7 +337,8 @@ export async function POST(request: NextRequest) {
         class_subject_id,
         day_of_week,
         slot_id,
-        room: room || null
+        room: room || null,
+        is_current: true
       })
       .select()
       .single()
@@ -414,6 +442,7 @@ export async function PATCH(request: NextRequest) {
       .eq('class_id', classId)
       .eq('day_of_week', day_of_week)
       .eq('slot_id', slot_id)
+      .eq('is_current', true)
       .neq('id', id)
       .maybeSingle()
 
@@ -433,6 +462,7 @@ export async function PATCH(request: NextRequest) {
       .select('id, classes(name, section), class_subjects(teacher_id, subjects(name))')
       .eq('day_of_week', day_of_week)
       .eq('slot_id', slot_id)
+      .eq('is_current', true)
       .neq('id', id)
 
     const teacherConflict = (teacherConflicts || []).find(tc => {

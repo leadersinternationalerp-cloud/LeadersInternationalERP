@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
         day_of_week,
         slot_id,
         room,
+        is_current,
         class_subjects (
           id,
           teacher_id,
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
         ),
         classes (name, section)
       `)
+      .eq('is_current', true)
 
     if (entryErr) return NextResponse.json({ error: entryErr.message }, { status: 500 })
 
