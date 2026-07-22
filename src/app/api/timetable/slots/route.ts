@@ -24,19 +24,33 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // If specific class requested but empty, fallback to global slots
-    if (class_id && (!slots || slots.length === 0)) {
-      const { data: globalSlots } = await supabase
-        .from('timetable_slots')
-        .select('*')
-        .is('class_id', null)
-        .order('period_number', { ascending: true })
-        .order('start_time', { ascending: true })
-      
-      return NextResponse.json({ slots: globalSlots || [] })
+    let finalSlots = slots || []
+    if (finalSlots.length === 0) {
+      if (class_id) {
+        const { data: globalSlots } = await supabase
+          .from('timetable_slots')
+          .select('*')
+          .is('class_id', null)
+          .order('period_number', { ascending: true })
+          .order('start_time', { ascending: true })
+        finalSlots = globalSlots || []
+      }
+
+      if (finalSlots.length === 0) {
+        const { data: anySlots } = await supabase
+          .from('timetable_slots')
+          .select('*')
+          .order('period_number', { ascending: true })
+          .order('start_time', { ascending: true })
+        
+        if (anySlots && anySlots.length > 0) {
+          const firstClassId = anySlots[0].class_id
+          finalSlots = anySlots.filter(s => s.class_id === firstClassId)
+        }
+      }
     }
 
-    return NextResponse.json({ slots: slots || [] })
+    return NextResponse.json({ slots: finalSlots })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }
