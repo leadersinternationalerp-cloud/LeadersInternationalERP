@@ -42,10 +42,28 @@ export default async function SettingsPage() {
     .select('*')
     .order('name', { ascending: false })
 
+  // 4. Fetch classes
+  const { data: classes } = await supabase
+    .from('classes')
+    .select(`
+      *,
+      class_teacher:class_teacher_id(id, first_name, last_name)
+    `)
+    .order('name', { ascending: true })
+
+  // 5. Fetch teachers
+  const { data: teachers } = await supabase
+    .from('profiles')
+    .select('id, first_name, last_name')
+    .eq('role', 'Teacher')
+    .order('first_name', { ascending: true })
+
   return (
     <SettingsClient
       initialSettings={settings}
       initialAcademicYears={academicYears || []}
+      initialClasses={classes || []}
+      teachers={teachers || []}
     />
   )
 }

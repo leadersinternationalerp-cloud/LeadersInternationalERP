@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { saveSystemSettingsAction, saveAcademicYearAction } from './actions'
+import { saveSystemSettingsAction, saveAcademicYearAction, saveClassAction, deleteClassAction } from './actions'
 import { formatDate } from '@/utils/date'
 import {
   parseGradingLevels,
@@ -27,11 +27,15 @@ interface AcademicYear {
 interface SettingsClientProps {
   initialSettings: Record<string, any>
   initialAcademicYears: any[]
+  initialClasses: any[]
+  teachers: any[]
 }
 
 export default function SettingsClient({
   initialSettings,
   initialAcademicYears,
+  initialClasses,
+  teachers
 }: SettingsClientProps) {
   // General settings state
   const [schoolName, setSchoolName] = useState(initialSettings.school_name || '')
@@ -48,6 +52,111 @@ export default function SettingsClient({
 
   const [savingScale, setSavingScale] = useState(false)
   const [scaleMessage, setScaleMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Class management state
+  const [classesList, setClassesList] = useState<any[]>(initialClasses)
+  const [classId, setClassId] = useState<string | null>(null)
+  const [className, setClassName] = useState('')
+  const [classSection, setClassSection] = useState('')
+  const [isEarlyYears, setIsEarlyYears] = useState(false)
+  const [ageGroup, setAgeGroup] = useState('')
+  const [classTeacherId, setClassTeacherId] = useState('')
+
+  const [savingClass, setSavingClass] = useState(false)
+  const [classMessage, setClassMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Handle editing class
+  function handleEditClass(cls: any) {
+    setClassId(cls.id)
+    setClassName(cls.name || '')
+    setClassSection(cls.section || '')
+    setIsEarlyYears(cls.is_early_years || false)
+    setAgeGroup(cls.age_group || '')
+    setClassTeacherId(cls.class_teacher_id || '')
+    setClassMessage(null)
+  }
+
+  // Reset Class Form
+  function resetClassForm() {
+    setClassId(null)
+    setClassName('')
+    setClassSection('')
+    setIsEarlyYears(false)
+    setAgeGroup('')
+    setClassTeacherId('')
+  }
+
+  // Handle saving class
+  async function handleSaveClass(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingClass(true)
+    setClassMessage(null)
+
+    if (!className.trim()) {
+      setClassMessage({ type: 'error', text: 'Class name is required.' })
+      setSavingClass(false)
+      return
+    }
+
+    try {
+      const res = await saveClassAction({
+        id: classId || undefined,
+        name: className,
+        section: classSection,
+        is_early_years: isEarlyYears,
+        age_group: isEarlyYears ? ageGroup : undefined,
+        class_teacher_id: classTeacherId || null
+      })
+
+      if (res.error) {
+        throw new Error(res.error)
+      }
+
+      setClassMessage({
+        type: 'success',
+        text: `Class "${className}" saved successfully!`
+      })
+
+      // Fetch fresh list of classes from client query to update UI cleanly
+      const supabase = createClient()
+      const { data: freshClasses } = await supabase
+        .from('classes')
+        .select(`
+          *,
+          class_teacher:class_teacher_id(id, first_name, last_name)
+        `)
+        .order('name', { ascending: true })
+
+      if (freshClasses) {
+        setClassesList(freshClasses)
+      }
+
+      resetClassForm()
+    } catch (err: any) {
+      console.error(err)
+      setClassMessage({ type: 'error', text: err.message || 'Failed to save class' })
+    } finally {
+      setSavingClass(false)
+    }
+  }
+
+  // Handle deleting class
+  async function handleDeleteClass(id: string, name: string) {
+    if (!confirm(`Are you sure you want to delete class "${name}"? All associated data like timetables and assignments will be affected.`)) {
+      return
+    }
+
+    try {
+      const res = await deleteClassAction(id)
+      if (res.error) {
+        throw new Error(res.error)
+      }
+
+      setClassesList(classesList.filter(c => c.id !== id))
+    } catch (err: any) {
+      alert(`Delete failed: ${err.message}`)
+    }
+  }
 
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsMessage, setSettingsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -959,6 +1068,219 @@ export default function SettingsClient({
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Class Management Section */}
+      <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
+        <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', fontWeight: 600, color: 'var(--color-primary)' }}>School Classes & Sections</h2>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem', marginBottom: '2rem' }}>
+          Manage available classrooms, assign class teachers, and set up early years specifications.
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 2fr', gap: '2rem', alignItems: 'start' }}>
+          
+          {/* Class Form */}
+          <div style={{ backgroundColor: 'rgba(0,0,0,0.01)', border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: 'var(--radius-md)' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1.25rem' }}>
+              {classId ? `Edit Class: ${className}` : 'Create New Class'}
+            </h3>
+
+            <form onSubmit={handleSaveClass} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div className="form-group">
+                <label className="form-label">Class Name *</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={className}
+                  onChange={(e) => setClassName(e.target.value)}
+                  placeholder="e.g. Grade 1 or Baby Class"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Section / Stream (Optional)</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={classSection}
+                  onChange={(e) => setClassSection(e.target.value)}
+                  placeholder="e.g. A, B, North or South"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Class Teacher</label>
+                <select
+                  className="input-field"
+                  value={classTeacherId}
+                  onChange={(e) => setClassTeacherId(e.target.value)}
+                >
+                  <option value="">-- No class teacher assigned --</option>
+                  {teachers.map(t => (
+                    <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.75rem', backgroundColor: 'rgba(0,0,0,0.02)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    id="is_ey_check"
+                    checked={isEarlyYears}
+                    onChange={(e) => setIsEarlyYears(e.target.checked)}
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="is_ey_check" style={{ fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>
+                    Is Early Years (EYFS)
+                  </label>
+                </div>
+
+                {isEarlyYears && (
+                  <div className="form-group" style={{ marginTop: '0.25rem' }}>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>Age Group</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      style={{ padding: '0.4rem 0.6rem' }}
+                      value={ageGroup}
+                      onChange={(e) => setAgeGroup(e.target.value)}
+                      placeholder="e.g. 1-2y or 3-5y"
+                      required={isEarlyYears}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {classMessage && (
+                <div style={{
+                  padding: '0.75rem',
+                  borderRadius: 'var(--radius-sm)',
+                  backgroundColor: classMessage.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                  color: classMessage.type === 'success' ? 'var(--color-success)' : 'var(--color-error)',
+                  fontSize: '0.875rem',
+                  borderLeft: `4px solid ${classMessage.type === 'success' ? 'var(--color-success)' : 'var(--color-error)'}`
+                }}>
+                  {classMessage.text}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                {classId && (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={resetClassForm}
+                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.05)', color: 'var(--color-text)' }}
+                  >
+                    Cancel
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingClass}
+                  style={{ flex: 2, padding: '0.6rem' }}
+                >
+                  {savingClass ? 'Saving...' : 'Save Class'}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Classes Table List */}
+          <div style={{ overflowX: 'auto', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ backgroundColor: 'rgba(0,0,0,0.03)', borderBottom: '1px solid var(--color-border)' }}>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>Class Name</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>Section</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>Type</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>Age Group</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>Class Teacher</th>
+                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {classesList.map((cls) => (
+                  <tr key={cls.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 150ms' }}>
+                    <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{cls.name}</td>
+                    <td style={{ padding: '0.75rem 1rem' }}>{cls.section || <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>-</span>}</td>
+                    <td style={{ padding: '0.75rem 1rem' }}>
+                      {cls.is_early_years ? (
+                        <span style={{
+                          padding: '0.2rem 0.5rem', borderRadius: '4px',
+                          backgroundColor: 'rgba(59, 179, 195, 0.1)', color: 'var(--color-secondary)',
+                          fontSize: '0.75rem', fontWeight: 700
+                        }}>
+                          Early Years
+                        </span>
+                      ) : (
+                        <span style={{
+                          padding: '0.2rem 0.5rem', borderRadius: '4px',
+                          backgroundColor: 'rgba(0,0,0,0.05)', color: 'var(--color-text-muted)',
+                          fontSize: '0.75rem', fontWeight: 600
+                        }}>
+                          Primary / Regular
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '0.75rem 1rem' }}>{cls.age_group || <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>-</span>}</td>
+                    <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>
+                      {cls.class_teacher ? (
+                        `${cls.class_teacher.first_name} ${cls.class_teacher.last_name}`
+                      ) : (
+                        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>Unassigned</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                        <button
+                          onClick={() => handleEditClass(cls)}
+                          className="btn"
+                          style={{
+                            padding: '0.25rem 0.55rem',
+                            fontSize: '0.75rem',
+                            backgroundColor: 'rgba(59, 179, 195, 0.1)',
+                            color: 'var(--color-secondary)',
+                            border: 'none',
+                            borderRadius: 'var(--radius-sm)'
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClass(cls.id, `${cls.name} ${cls.section || ''}`.trim())}
+                          className="btn"
+                          style={{
+                            padding: '0.25rem 0.55rem',
+                            fontSize: '0.75rem',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            color: 'var(--color-error)',
+                            border: 'none',
+                            borderRadius: 'var(--radius-sm)'
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+
+                {classesList.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                      No classes configured in the system yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
         </div>
       </div>
     </div>

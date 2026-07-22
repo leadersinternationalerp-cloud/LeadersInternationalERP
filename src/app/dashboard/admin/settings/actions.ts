@@ -165,3 +165,125 @@ export async function saveAcademicYearAction(
 
   return { success: true }
 }
+
+export async function saveClassAction(classData: {
+  id?: string
+  name: string
+  section?: string
+  is_early_years?: boolean
+  age_group?: string
+  class_teacher_id?: string | null
+}) {
+  const supabase = await createClient()
+
+  // 1. Get user and verify role
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, roles')
+    .eq('id', user.id)
+    .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+
+  const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
+  if (!isAdmin) {
+    return { error: 'Forbidden: You do not have permission to manage classes.' }
+  }
+
+  // 2. Perform save/upsert
+  const payload = {
+    name: classData.name,
+    section: classData.section || null,
+    is_early_years: classData.is_early_years || false,
+    age_group: classData.age_group || null,
+    class_teacher_id: classData.class_teacher_id || null,
+    updated_at: new Date().toISOString()
+  }
+
+  let error
+  if (classData.id) {
+    const res = await supabase
+      .from('classes')
+      .update(payload)
+      .eq('id', classData.id)
+    error = res.error
+  } else {
+    const res = await supabase
+      .from('classes')
+      .insert({
+        ...payload,
+        created_at: new Date().toISOString()
+      })
+    error = res.error
+  }
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  // 3. Log audit action
+  await logAuditAction(
+    classData.id ? `Update Class: ${classData.name}` : `Create Class: ${classData.name}`,
+    'classes',
+    classData
+  )
+
+  revalidatePath('/dashboard/admin/settings')
+  revalidatePath('/dashboard/admin/timetable')
+  revalidatePath('/dashboard/admin/teacher-assignments')
+  revalidatePath('/dashboard/accountant/fee-structures')
+  revalidatePath('/dashboard/students')
+
+  return { success: true }
+}
+
+export async function deleteClassAction(id: string) {
+  const supabase = await createClient()
+
+  // 1. Get user and verify role
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, roles')
+    .eq('id', user.id)
+    .single()
+  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+
+  const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
+  if (!isAdmin) {
+    return { error: 'Forbidden: You do not have permission to delete classes.' }
+  }
+
+  // 2. Perform delete
+  const { error } = await supabase
+    .from('classes')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  // 3. Log audit action
+  await logAuditAction(`Delete Class: ${id}`, 'classes', { id })
+
+  revalidatePath('/dashboard/admin/settings')
+  revalidatePath('/dashboard/admin/timetable')
+  revalidatePath('/dashboard/admin/teacher-assignments')
+  revalidatePath('/dashboard/accountant/fee-structures')
+  revalidatePath('/dashboard/students')
+
+  return { success: true }
+}

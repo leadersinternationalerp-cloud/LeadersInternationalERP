@@ -37,6 +37,16 @@ export default async function FeeStructuresPage() {
     .select('*')
     .order('created_at', { ascending: false })
 
+  // Fetch classes matching system database classes
+  const { data: dbClasses } = await supabase
+    .from('classes')
+    .select('name')
+
+  const defaultGrades = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8']
+  const systemGrades = dbClasses && dbClasses.length > 0
+    ? Array.from(new Set(dbClasses.map(c => c.name))).filter(Boolean).sort()
+    : defaultGrades
+
   // Format currency helper
   function formatTZS(amount: number) {
     return new Intl.NumberFormat('en-TZ', {
@@ -99,14 +109,9 @@ export default async function FeeStructuresPage() {
               <div className="form-group">
                 <label className="form-label">Grade / Class Level</label>
                 <select name="grade_level" className="input-field" required>
-                  <option value="Grade 1">Grade 1</option>
-                  <option value="Grade 2">Grade 2</option>
-                  <option value="Grade 3">Grade 3</option>
-                  <option value="Grade 4">Grade 4</option>
-                  <option value="Grade 5">Grade 5</option>
-                  <option value="Grade 6">Grade 6</option>
-                  <option value="Grade 7">Grade 7</option>
-                  <option value="Grade 8">Grade 8</option>
+                  {systemGrades.map(grade => (
+                    <option key={grade} value={grade}>{grade}</option>
+                  ))}
                 </select>
               </div>
 
