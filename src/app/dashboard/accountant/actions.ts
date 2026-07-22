@@ -15,6 +15,9 @@ export async function saveFeeStructureAction(formData: FormData) {
   const amount = parseFloat(formData.get('amount') as string)
   const description = formData.get('description') as string
 
+  const payable_once = formData.get('payable_once') === 'on'
+  const payable_annually = formData.get('payable_annually') === 'on'
+
   if (!academic_year || !term || !grade_level || !fee_type || isNaN(amount)) {
     return { error: 'All fields are required.' }
   }
@@ -40,6 +43,8 @@ export async function saveFeeStructureAction(formData: FormData) {
     fee_type,
     amount,
     description,
+    payable_once,
+    payable_annually,
     created_by: user?.id
   })
 
