@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { WhatsAppService } from '@/lib/whatsapp/WhatsAppService'
+import { generateDetailedReceiptPdfBuffer } from '@/lib/pdf/ReceiptPdfGenerator'
 
 export async function POST(request: Request) {
   try {
@@ -61,13 +62,8 @@ export async function POST(request: Request) {
 
     // 4. Generate PDF
     console.log(`[WHATSAPP API] Generating receipt PDF for payment ${paymentId}`)
-    const pdfBytes = await WhatsAppService.generateReceiptPDF(
-      paymentId,
-      receiptNumber,
-      amount,
-      studentName,
-      dateStr
-    )
+    const pdfBuffer = await generateDetailedReceiptPdfBuffer(paymentId)
+    const pdfBytes = new Uint8Array(pdfBuffer)
 
     // 5. Upload to Supabase Storage
     console.log(`[WHATSAPP API] Uploading receipt PDF to storage`)

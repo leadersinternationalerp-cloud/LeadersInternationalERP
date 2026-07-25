@@ -286,11 +286,13 @@ export async function recordPaymentAction(formData: FormData) {
 
     // Generate WhatsApp PDF Receipt
     const { WhatsAppService } = await import('@/lib/whatsapp/WhatsAppService')
+    const { generateDetailedReceiptPdfBuffer } = await import('@/lib/pdf/ReceiptPdfGenerator')
     const { data: student } = await supabase.from('profiles').select('first_name, last_name, phone').eq('id', student_id).single()
     const studentName = student ? `${student.first_name} ${student.last_name}` : 'Student'
     const parentPhone = student?.phone || '+255000000000'
 
-    const pdfBytes = await WhatsAppService.generateReceiptPDF(newPayment.id, receipt_number, amount, studentName, new Date().toLocaleString())
+    const pdfBuffer = await generateDetailedReceiptPdfBuffer(newPayment.id)
+    const pdfBytes = new Uint8Array(pdfBuffer)
     const pdfUrl = await WhatsAppService.uploadReceipt(receipt_number, pdfBytes)
     await WhatsAppService.sendReceipt(parentPhone, receipt_number, pdfUrl)
 
