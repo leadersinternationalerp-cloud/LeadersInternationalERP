@@ -47,7 +47,6 @@ export default function SettingsClient({
   const [schoolAddress, setSchoolAddress] = useState(initialSettings.school_address || '')
   const [contactEmail, setContactEmail] = useState(initialSettings.contact_email || '')
   const [contactPhone, setContactPhone] = useState(initialSettings.contact_phone || '')
-  const [schoolLogo, setSchoolLogo] = useState(initialSettings.school_logo || '')
   const [schoolStamp, setSchoolStamp] = useState(initialSettings.school_stamp || '')
   const [uploadingStamp, setUploadingStamp] = useState(false)
 
@@ -61,7 +60,6 @@ export default function SettingsClient({
 
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsMessage, setSettingsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [uploadingLogo, setUploadingLogo] = useState(false)
 
   // Academic Year State
   const [academicYears, setAcademicYears] = useState<any[]>(initialAcademicYears)
@@ -90,43 +88,6 @@ export default function SettingsClient({
 
   const [savingClass, setSavingClass] = useState(false)
   const [classMessage, setClassMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-
-  // Handle Logo upload
-  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setUploadingLogo(true)
-    setSettingsMessage(null)
-
-    try {
-      const supabase = createClient()
-      const fileExt = file.name.split('.').pop()
-      const fileName = `logo-${Date.now()}.${fileExt}`
-
-      let uploadResult = await supabase.storage.from('logos').upload(fileName, file)
-      if (uploadResult.error && uploadResult.error.message.includes('not found')) {
-        await supabase.storage.createBucket('logos', { public: true })
-        uploadResult = await supabase.storage.from('logos').upload(fileName, file)
-      }
-
-      if (uploadResult.error) {
-        throw uploadResult.error
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('logos')
-        .getPublicUrl(fileName)
-
-      setSchoolLogo(publicUrl)
-      setSettingsMessage({ type: 'success', text: 'School logo uploaded successfully! Click save settings to persist.' })
-    } catch (err: any) {
-      console.error(err)
-      setSettingsMessage({ type: 'error', text: `Logo upload failed: ${err.message}` })
-    } finally {
-      setUploadingLogo(false)
-    }
-  }
 
   // Handle Stamp upload
   async function handleStampUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -178,7 +139,6 @@ export default function SettingsClient({
         saveSystemSettingsAction('school_address', schoolAddress),
         saveSystemSettingsAction('contact_email', contactEmail),
         saveSystemSettingsAction('contact_phone', contactPhone),
-        saveSystemSettingsAction('school_logo', schoolLogo),
         saveSystemSettingsAction('school_stamp', schoolStamp),
       ])
 
@@ -464,43 +424,6 @@ export default function SettingsClient({
 
             <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <div className="form-group">
-                <label className="form-label">School Logo</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginTop: '0.5rem' }}>
-                  <div style={{
-                    width: '80px',
-                    height: '80px',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px dashed var(--color-border)',
-                    backgroundColor: 'rgba(0,0,0,0.02)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                    position: 'relative'
-                  }}>
-                    {schoolLogo ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={schoolLogo} alt="School Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                    ) : (
-                      <span style={{ fontSize: '1.5rem', color: 'var(--color-text-muted)' }}>🏫</span>
-                    )}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      disabled={uploadingLogo}
-                      style={{ fontSize: '0.85rem' }}
-                    />
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-                      {uploadingLogo ? 'Uploading logo to storage...' : 'Recommended square PNG or JPG.'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="form-group">
                 <label className="form-label">School Stamp / Seal</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginTop: '0.5rem' }}>
                   <div style={{
@@ -611,7 +534,7 @@ export default function SettingsClient({
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={savingSettings || uploadingLogo}
+                disabled={savingSettings || uploadingStamp}
                 style={{ marginTop: '0.5rem', width: '100%', padding: '0.75rem' }}
               >
                 {savingSettings ? 'Saving Settings...' : 'Save Settings'}

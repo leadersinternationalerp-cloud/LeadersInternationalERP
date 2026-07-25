@@ -1,17 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import PDFDocument from 'pdfkit'
-import fs from 'fs'
-import path from 'path'
-
-// Logo loader helper
-function loadLogoBuffer() {
-  const logoPath = path.join(process.cwd(), 'public', 'logo.png')
-  if (fs.existsSync(logoPath)) {
-    return fs.readFileSync(logoPath)
-  }
-  return null
-}
+import { drawLetterhead } from '@/lib/pdfLetterhead'
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,7 +18,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: prof } = await supabase.from('profiles').select('email, first_name, last_name, role, roles').eq('id', user.id).single()
+    const { data: prof } = await supabase.from('profiles').select('email, role, roles').eq('id', user.id).single()
     const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
       ? prof.roles
       : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
@@ -37,19 +27,6 @@ export async function GET(request: NextRequest) {
     if (!canRead) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
-
-    // Query system settings for header branding
-    const { data: settingsData } = await supabase.from('system_settings').select('*')
-    const settings: Record<string, string> = {}
-    settingsData?.forEach(item => {
-      settings[item.key] = typeof item.value === 'string' ? item.value : JSON.stringify(item.value)
-    })
-
-    const schoolName = settings['school_name'] || 'LEADERS INTERNATIONAL SCHOOL'
-    const schoolMotto = settings['school_motto'] || 'LEARNING TODAY, LEADING TOMORROW'
-    const schoolEmail = settings['contact_email'] || 'info@leaders.ac.tz'
-    const schoolPhone = settings['contact_phone'] || '+255 123 456 789'
-    const schoolAddress = settings['school_address'] || 'P.O. Box 123, Dar es Salaam'
 
     // Query fee structures
     let query = supabase
@@ -130,57 +107,13 @@ export async function GET(request: NextRequest) {
 
     const sortedClasses = Object.keys(classGroups).sort()
 
-    // Create PDF Document
-    const doc = new PDFDocument({ margin: 40, size: 'A4' })
+    // Create PDF Document with bufferPages: true
+    const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true })
     const chunks: Buffer[] = []
     doc.on('data', chunk => chunks.push(chunk))
 
-    const logoBuffer = loadLogoBuffer()
-
-    // Header Drawer Helper
-    const drawHeader = (pageNum: number) => {
-      if (logoBuffer) {
-        doc.image(logoBuffer, 40, 25, { width: 55, height: 55 })
-      }
-
-      // Title header texts
-      doc.fillColor('#00264b').fontSize(16).font('Helvetica-Bold')
-      doc.text(schoolName.toUpperCase(), 40, 28, { align: 'center' })
-      
-      doc.fillColor('#3bb3c3').fontSize(9).font('Helvetica')
-      doc.text(schoolMotto.toUpperCase(), 40, 46, { align: 'center' })
-
-      doc.fillColor('#475569').fontSize(8)
-      doc.text(`${schoolPhone} | ${schoolEmail.toUpperCase()}`, 40, 58, { align: 'center' })
-      doc.text(schoolAddress.toUpperCase(), 40, 68, { align: 'center' })
-
-      doc.fillColor('#0f172a').fontSize(10).font('Helvetica-Bold')
-      const termTitle = term && term !== 'all' ? term : 'All Terms'
-      doc.text(`Fee Structure - ${termTitle}`, 40, 82, { align: 'center' })
-      
-      const classTitle = grade_level && grade_level !== 'all' ? grade_level : 'All Classes'
-      doc.fontSize(9).font('Helvetica')
-      doc.text(`Class: ${classTitle}`, 40, 95, { align: 'center' })
-
-      // Double line separator
-      doc.strokeColor('#e2e8f0').lineWidth(1.5).moveTo(40, 112).lineTo(555, 112).stroke()
-    }
-
-    drawHeader(1)
-
-    // Footer Drawer Helper
-    const drawFooter = (preparedBy: string) => {
-      const dateStr = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
-      doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(40, 805).lineTo(555, 805).stroke()
-      
-      doc.fillColor('#64748b').fontSize(8).font('Helvetica')
-      doc.text(`Generated: ${dateStr}`, 40, 812)
-      doc.text(`Prepared by: ${preparedBy}`, 40, 812, { align: 'right' })
-    }
-
-    drawFooter(prof?.email || user.email)
-
-    let currentY = 125
+    // Starting Y Coordinate after letterhead and subtitles
+    let currentY = 135
 
     // SECTION 1: Summary Table by Term
     doc.fillColor('#00264b').fontSize(11).font('Helvetica-Bold').text('Termly Summary View', 40, currentY)
@@ -212,9 +145,7 @@ export async function GET(request: NextRequest) {
     summaryGroups.forEach((row) => {
       if (currentY > 740) {
         doc.addPage()
-        drawHeader(2)
-        drawFooter(prof?.email || user.email)
-        currentY = 125
+        currentY = 135 // Skip header space
         drawTable1Headers(currentY)
         currentY += 20
       }
@@ -253,9 +184,7 @@ export async function GET(request: NextRequest) {
     // Page break before Section 2 if low room
     if (currentY > 600) {
       doc.addPage()
-      drawHeader(2)
-      drawFooter(prof?.email || user.email)
-      currentY = 125
+      currentY = 135
     }
 
     // SECTION 2: Detailed Breakdown Table by Class, then Term
@@ -292,12 +221,6 @@ export async function GET(request: NextRequest) {
 
       let classTotal = 0
 
-      // Calculate total rows needed for Class to draw vertical span borders cleanly
-      let classRowsCount = 0
-      sortedTerms.forEach(t => {
-        classRowsCount += termsObj[t].length + 1 // items + subtotal row
-      })
-
       // Store class top Y position
       const classStartY = currentY
 
@@ -305,25 +228,18 @@ export async function GET(request: NextRequest) {
         const items = termsObj[t]
         let termTotal = 0
 
-        // Calculate term rows count for vertical Term borders
-        const termRowsCount = items.length + 1 // items + subtotal row
         const termStartY = currentY
 
         items.forEach((item, itemIdx) => {
           if (currentY > 740) {
-            // Draw borders before breaking page
+            // Draw boundaries before breaking page
             doc.strokeColor('#e2e8f0').lineWidth(0.5)
-            // Left boundary of Class col
             doc.moveTo(40, classStartY).lineTo(40, currentY).stroke()
-            // Right boundary of Class col / Left of Term
             doc.moveTo(130, classStartY).lineTo(130, currentY).stroke()
-            // Right boundary of Term / Left of Vote Head
             doc.moveTo(210, classStartY).lineTo(210, currentY).stroke()
 
             doc.addPage()
-            drawHeader(2)
-            drawFooter(prof?.email || user.email)
-            currentY = 125
+            currentY = 135
             drawTable2Headers(currentY)
             currentY += 20
           }
@@ -334,13 +250,12 @@ export async function GET(request: NextRequest) {
           doc.strokeColor('#e2e8f0').lineWidth(0.5)
           doc.rect(40, currentY, 515, rowHeight).stroke()
           
-          // Dividers inside columns (excluding Class & Term spans)
+          // Dividers inside columns
           doc.moveTo(210, currentY).lineTo(210, currentY + rowHeight).stroke()
           doc.moveTo(455, currentY).lineTo(455, currentY + rowHeight).stroke()
 
           doc.fillColor('#334155').fontSize(8.5).font('Helvetica')
           
-          // Draw Class and Term label ONLY on the first item row of this term
           if (itemIdx === 0) {
             // Write class (only at start)
             doc.fillColor('#0f172a').font('Helvetica-Bold')
@@ -367,9 +282,7 @@ export async function GET(request: NextRequest) {
         // Draw Term Subtotal Row
         if (currentY > 740) {
           doc.addPage()
-          drawHeader(2)
-          drawFooter(prof?.email || user.email)
-          currentY = 125
+          currentY = 135
           drawTable2Headers(currentY)
           currentY += 20
         }
@@ -378,7 +291,7 @@ export async function GET(request: NextRequest) {
         doc.strokeColor('#e2e8f0').lineWidth(0.5)
         doc.rect(40, currentY, 515, subtotalHeight).stroke()
         
-        // Background for total row (only for vote head and amount columns)
+        // Background for total row
         doc.rect(210, currentY, 345, subtotalHeight).fill('#f8fafc')
         doc.strokeColor('#e2e8f0').rect(210, currentY, 345, subtotalHeight).stroke()
         doc.moveTo(455, currentY).lineTo(455, currentY + subtotalHeight).stroke()
@@ -392,7 +305,7 @@ export async function GET(request: NextRequest) {
         }).format(termTotal)
         doc.text(termTotalStr, 460, currentY + 5, { width: 90, align: 'right' })
 
-        // Draw vertical column grid border lines for Class and Term spans
+        // Draw vertical columns borders
         doc.strokeColor('#cbd5e1').lineWidth(0.5)
         doc.moveTo(130, termStartY).lineTo(130, currentY + subtotalHeight).stroke()
         doc.moveTo(210, termStartY).lineTo(210, currentY + subtotalHeight).stroke()
@@ -403,9 +316,7 @@ export async function GET(request: NextRequest) {
       // Draw Class Total Row
       if (currentY > 740) {
         doc.addPage()
-        drawHeader(2)
-        drawFooter(prof?.email || user.email)
-        currentY = 125
+        currentY = 135
         drawTable2Headers(currentY)
         currentY += 20
       }
@@ -428,7 +339,7 @@ export async function GET(request: NextRequest) {
       }).format(classTotal)
       doc.text(classTotalStr, 460, currentY + 6, { width: 90, align: 'right' })
 
-      // Draw vertical outer boundaries for Class column span
+      // Draw vertical outer boundaries
       doc.strokeColor('#cbd5e1').lineWidth(0.5)
       doc.moveTo(40, classStartY).lineTo(40, currentY).stroke()
       doc.moveTo(130, classStartY).lineTo(130, currentY).stroke()
@@ -436,10 +347,35 @@ export async function GET(request: NextRequest) {
       currentY += classTotalHeight
     })
 
-    // End stream
+    // Draw header and footers in final pass
+    const range = doc.bufferedPageRange()
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i)
+      
+      // Draw uniform constant letterhead
+      await drawLetterhead(doc, 40, 515, false)
+
+      // Centered details below letterhead
+      doc.fillColor('#0f172a').fontSize(10).font('Helvetica-Bold')
+      const termTitle = term && term !== 'all' ? term : 'All Terms'
+      doc.text(`Fee Structure - ${termTitle}`, 40, 95, { align: 'center' })
+      
+      const classTitle = grade_level && grade_level !== 'all' ? grade_level : 'All Classes'
+      doc.fontSize(9).font('Helvetica')
+      doc.text(`Class: ${classTitle}`, 40, 107, { align: 'center' })
+
+      // Footer
+      const dateStr = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
+      doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(40, 802).lineTo(555, 802).stroke()
+      
+      doc.fillColor('#64748b').fontSize(8).font('Helvetica')
+      doc.text(`Generated: ${dateStr}`, 40, 808)
+      doc.text(`Prepared by: ${prof?.email || user.email} | Page ${i + 1} of ${range.count}`, 40, 808, { align: 'right' })
+    }
+
     doc.end()
 
-    // Wait for pdf construction
+    // Wait for buffer completion
     await new Promise((resolve) => doc.on('end', resolve))
     const pdfBuffer = Buffer.concat(chunks)
 

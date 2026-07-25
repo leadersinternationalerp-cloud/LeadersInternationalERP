@@ -9,6 +9,12 @@ WHERE NOT EXISTS (
 );
 
 INSERT INTO public.integration_config (provider_type, provider_name, is_active)
+SELECT 'WHATSAPP', 'Twilio WhatsApp', false
+WHERE NOT EXISTS (
+    SELECT 1 FROM public.integration_config WHERE provider_name = 'Twilio WhatsApp'
+);
+
+INSERT INTO public.integration_config (provider_type, provider_name, is_active)
 SELECT 'SMS', 'Twilio SMS', false
 WHERE NOT EXISTS (
     SELECT 1 FROM public.integration_config WHERE provider_name = 'Twilio SMS'

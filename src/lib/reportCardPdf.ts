@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit'
 import fs from 'fs'
 import path from 'path'
 import { GradeLevel } from '@/utils/grading'
+import { drawLetterhead } from './pdfLetterhead'
 
 export interface ReportSubjectMark {
   subject_name: string
@@ -182,45 +183,8 @@ export function getDefaultRemark(grade: string): string {
 }
 
 // Draw Header
-function drawHeader(doc: PDFKit.PDFDocument, opts: ReportCardOptions, logos: { logoBuffer: Buffer | null; cambridgeBuffer: Buffer | null }) {
-  const schoolName = opts.schoolName || 'LEADERS INTERNATIONAL SCHOOL'
-  const schoolMotto = opts.schoolMotto || 'Nurturing Leaders of Tomorrow'
-  const schoolAddress = opts.schoolAddress || 'Zanzibar, Tanzania | Tel +255 777 123 456 | www.leaders.ac.tz'
-
-  const contentWidth = 525.28
-  const startX = 35
-
-  // Draw school logo (top-left)
-  if (logos.logoBuffer) {
-    try {
-      doc.image(logos.logoBuffer, startX, 25, { width: 55, height: 55 })
-    } catch (e) {
-      console.error('Error drawing school logo:', e)
-    }
-  }
-
-  // Draw Cambridge logo (top-right)
-  if (logos.cambridgeBuffer) {
-    try {
-      doc.image(logos.cambridgeBuffer, startX + contentWidth - 95, 30, { width: 95, height: 45 })
-    } catch (e) {
-      console.error('Error drawing Cambridge logo:', e)
-    }
-  }
-
-  // Center header details
-  doc.fontSize(16).font('Helvetica-Bold').fillColor('#00264b')
-  doc.text(schoolName, startX + 60, 30, { width: contentWidth - 165, align: 'center' })
-
-  doc.fontSize(8.5).font('Helvetica').fillColor('#475569')
-  doc.text(schoolAddress, startX + 60, 52, { width: contentWidth - 165, align: 'center' })
-
-  doc.fontSize(8).font('Helvetica-Oblique').fillColor('#0f172a')
-  doc.text(schoolMotto, startX + 60, 65, { width: contentWidth - 165, align: 'center' })
-
-  // Double separator line
-  doc.lineWidth(1).strokeColor('#00264b').moveTo(startX, 82).lineTo(startX + contentWidth, 82).stroke()
-  doc.lineWidth(0.5).strokeColor('#00264b').moveTo(startX, 85).lineTo(startX + contentWidth, 85).stroke()
+async function drawHeader(doc: PDFKit.PDFDocument, opts: ReportCardOptions) {
+  await drawLetterhead(doc, 35, 525.28, true)
 }
 
 // Draw Student Info
@@ -731,7 +695,7 @@ export async function generateSmartkidzReportPdf(optsOrArray: ReportCardOptions 
     }
 
     // Draw Page Content (must fit strictly in 1 A4 page)
-    drawHeader(doc, opts, logos)
+    await drawHeader(doc, opts)
     await drawStudentInfoSection(doc, opts, photoBuffer)
     const finalTableY = drawAcademicTable(doc, opts)
     

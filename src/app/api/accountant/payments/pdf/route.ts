@@ -1,17 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import PDFDocument from 'pdfkit'
-import fs from 'fs'
-import path from 'path'
-
-// Helper to load logo from local public folder
-function loadLogoBuffer() {
-  const logoPath = path.join(process.cwd(), 'public', 'logo.png')
-  if (fs.existsSync(logoPath)) {
-    return fs.readFileSync(logoPath)
-  }
-  return null
-}
+import { drawLetterhead } from '@/lib/pdfLetterhead'
 
 export async function GET(request: NextRequest) {
   try {
@@ -58,11 +48,6 @@ export async function GET(request: NextRequest) {
       settings[item.key] = typeof item.value === 'string' ? item.value : JSON.stringify(item.value)
     })
 
-    const schoolName = settings['school_name'] || 'LEADERS INTERNATIONAL SCHOOL'
-    const schoolMotto = settings['school_motto'] || 'LEARNING TODAY, LEADING TOMORROW'
-    const schoolEmail = settings['contact_email'] || 'info@leaders.ac.tz'
-    const schoolPhone = settings['contact_phone'] || '+255 123 456 789'
-    const schoolAddress = settings['school_address'] || 'P.O. Box 123, Dar es Salaam'
     const schoolStampUrl = settings['school_stamp']
 
     // Fetch invoice items to render the breakdown table (pro-rated to payment.amount)
@@ -82,7 +67,6 @@ export async function GET(request: NextRequest) {
     }))
 
     // Calculate Balances
-    // Fetch all payments for this invoice sorted by created_at
     const { data: allInvoicePayments } = await supabase
       .from('payments')
       .select('id, amount')
@@ -115,41 +99,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Generate PDF via pdfkit
-    const doc = new PDFDocument({ margin: 40, size: 'A4' })
+    // Generate PDF via pdfkit with bufferPages: true
+    const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true })
     const chunks: Buffer[] = []
-    
     doc.on('data', chunk => chunks.push(chunk))
 
-    const logoBuffer = loadLogoBuffer()
-
-    // 1. Render Header Layout
-    if (logoBuffer) {
-      doc.image(logoBuffer, 40, 25, { width: 55, height: 55 })
-    }
-
-    doc.fillColor('#00264b').fontSize(16).font('Helvetica-Bold')
-    doc.text(schoolName.toUpperCase(), 40, 28, { align: 'center' })
-    
-    doc.fillColor('#3bb3c3').fontSize(9).font('Helvetica')
-    doc.text(schoolMotto.toUpperCase(), 40, 46, { align: 'center' })
-
-    doc.fillColor('#475569').fontSize(8)
-    doc.text(`${schoolPhone} | ${schoolEmail.toUpperCase()}`, 40, 58, { align: 'center' })
-    doc.text(schoolAddress.toUpperCase(), 40, 68, { align: 'center' })
-
-    // Receipt details on the right
-    doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold')
-    doc.text(`Receipt No: ${payment.receipt_number.split('-').pop() || payment.receipt_number}`, 420, 28, { align: 'right' })
-    
-    doc.fontSize(9).font('Helvetica')
-    const payDate = new Date(payment.payment_date).toLocaleDateString('en-US', { dateStyle: 'medium' })
-    doc.text(`Date: ${payDate}`, 420, 42, { align: 'right' })
-
-    // Separation line
-    doc.strokeColor('#00264b').lineWidth(1.5).moveTo(40, 92).lineTo(555, 92).stroke()
-
-    // 2. Info Boxes (Student vs Payment Details)
+    // Start drawing receipt body contents below the letterhead (Y=105)
     let boxY = 105
     doc.strokeColor('#e2e8f0').lineWidth(0.5)
     
@@ -187,7 +142,6 @@ export async function GET(request: NextRequest) {
     doc.rect(40, tableY, 515, 20).fill('#f8fafc')
     doc.strokeColor('#e2e8f0').rect(40, tableY, 515, 20).stroke()
     
-    // Header text
     doc.fillColor('#475569').fontSize(8.5).font('Helvetica-Bold')
     doc.text('Year', 45, tableY + 6, { width: 50 })
     doc.text('Term', 105, tableY + 6, { width: 80 })
@@ -245,6 +199,34 @@ export async function GET(request: NextRequest) {
     // Draw school stamp if buffer loaded
     if (stampBuffer) {
       doc.image(stampBuffer, 465, currentY + 10, { width: 55, height: 55 })
+    }
+
+    // Final pass for Header and Footer
+    const range = doc.bufferedPageRange()
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i)
+      
+      // Draw constant header
+      await drawLetterhead(doc, 40, 515, false)
+
+      // Receipt details on top right below header Y range
+      doc.fillColor('#0f172a').fontSize(10).font('Helvetica-Bold')
+      doc.text(`Receipt No: REC-${payment.receipt_number.split('-').pop() || payment.receipt_number}`, 300, 25, { align: 'right', width: 250 })
+      
+      doc.fontSize(8.5).font('Helvetica')
+      const payDate = new Date(payment.payment_date).toLocaleDateString('en-US', { dateStyle: 'medium' })
+      doc.text(`Date: ${payDate}`, 300, 38, { align: 'right', width: 250 })
+      
+      doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#00264b')
+      doc.text('PAYMENT RECEIPT VOUCHER', 300, 51, { align: 'right', width: 250 })
+
+      // Footer
+      const dateStr = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
+      doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(40, 802).lineTo(555, 802).stroke()
+      
+      doc.fillColor('#64748b').fontSize(8).font('Helvetica')
+      doc.text(`Generated: ${dateStr}`, 40, 808)
+      doc.text(`Page ${i + 1} of ${range.count}`, 40, 808, { align: 'right' })
     }
 
     doc.end()

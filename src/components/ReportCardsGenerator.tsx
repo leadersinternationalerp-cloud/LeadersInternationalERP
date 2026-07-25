@@ -52,6 +52,7 @@ export default function ReportCardsGenerator({
   const [generatingId, setGeneratingId] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [showRank, setShowRank] = useState(false)
+  const [sendingWhatsapp, setSendingWhatsapp] = useState(false)
 
   // Fetch students for class when selection changes
   const fetchStudentsForClass = async (classId: string) => {
@@ -74,6 +75,57 @@ export default function ReportCardsGenerator({
     const classId = e.target.value
     setSelectedClassId(classId)
     fetchStudentsForClass(classId)
+  }
+
+  const handleSendWhatsapp = async () => {
+    if (!previewUrl) return
+    
+    // Parse URL parameters
+    const urlObj = new URL(previewUrl, window.location.origin)
+    const studentId = urlObj.searchParams.get('student_id')
+    const termId = urlObj.searchParams.get('term_id')
+    const urlShowRank = urlObj.searchParams.get('show_rank') || 'true'
+
+    if (!studentId || !termId) {
+      alert('Invalid preview URL parameters.')
+      return
+    }
+
+    setSendingWhatsapp(true)
+    try {
+      const res = await fetch('/api/whatsapp/send-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId,
+          termId,
+          showRank: urlShowRank === 'true',
+          type: 'PRIMARY'
+        })
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send report card WhatsApp')
+      }
+
+      if (data.failed > 0 && data.success === 0) {
+        throw new Error(data.errors.join('\n'))
+      }
+
+      let msg = `Report card PDF successfully sent to the parent contact via WhatsApp!`
+      if (data.total > 1) {
+        msg = `Bulk report card delivery results:\n- Sent: ${data.success}\n- Failed: ${data.failed}\n- Skipped: ${data.skipped}`
+        if (data.errors.length > 0) {
+          msg += `\n\nErrors:\n${data.errors.join('\n')}`
+        }
+      }
+      alert(msg)
+    } catch (err: any) {
+      alert(err.message || 'An error occurred while sending the report card.')
+    } finally {
+      setSendingWhatsapp(false)
+    }
   }
 
   // Get selected class details
@@ -336,7 +388,8 @@ export default function ReportCardsGenerator({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 {/* Send WhatsApp Placeholder */}
                 <button
-                  onClick={() => alert('WhatsApp Integration Placeholder: Report Card sent successfully to the parent contact.')}
+                  onClick={handleSendWhatsapp}
+                  disabled={sendingWhatsapp}
                   style={{
                     backgroundColor: '#25D366',
                     color: '#ffffff',
@@ -349,13 +402,14 @@ export default function ReportCardsGenerator({
                     alignItems: 'center',
                     gap: '0.5rem',
                     cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(37, 211, 102, 0.2)'
+                    boxShadow: '0 2px 4px rgba(37, 211, 102, 0.2)',
+                    opacity: sendingWhatsapp ? 0.7 : 1
                   }}
                 >
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                     <path d="M12.012 2c-5.506 0-9.989 4.478-9.99 9.984a9.96 9.96 0 0 0 1.333 4.993L2 22l5.233-1.371a9.936 9.936 0 0 0 4.777 1.218h.004c5.505 0 9.989-4.478 9.99-9.983A9.996 9.996 0 0 0 12.012 2zm5.82 14.156c-.252.712-1.461 1.294-2.014 1.347-.503.048-1.155.076-3.435-.866-2.915-1.205-4.786-4.185-4.931-4.378-.146-.193-1.176-1.571-1.176-2.996 0-1.425.728-2.126 1.01-2.408.28-.282.613-.353.818-.353.204 0 .408.002.585.01.183.008.428-.072.67.51.252.608.86 2.1.934 2.25.075.15.125.326.025.524-.1.198-.15.322-.3.494-.15.172-.315.385-.45.517-.15.148-.308.309-.133.61.176.3.78 1.282 1.67 2.075.146.13.275.243.385.342.756.68 1.438.89 1.89 1.037.45.147.88.106 1.213-.242.333-.348 1.46-1.696 1.85-2.28.39-.583.78-.49 1.32-.292.54.198 3.436 1.622 3.636 1.722.202.1.337.15.387.235.05.085.05.495-.202 1.208z"/>
                   </svg>
-                  Send WhatsApp
+                  {sendingWhatsapp ? 'Sending...' : 'Send WhatsApp'}
                 </button>
                 
                 {/* Download Button */}

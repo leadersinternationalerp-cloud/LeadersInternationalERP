@@ -21,6 +21,7 @@ export default function PaymentsClient({
   const [isWhatsappModalOpen, setIsWhatsappModalOpen] = useState(false)
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null)
   const [whatsappNumber, setWhatsappNumber] = useState('')
+  const [sendingWhatsapp, setSendingWhatsapp] = useState(false)
 
   // Format currency helper
   function formatTZS(amount: number) {
@@ -65,35 +66,38 @@ export default function PaymentsClient({
     setIsWhatsappModalOpen(true)
   }
 
-  // Send Receipt to WhatsApp
-  function handleSendWhatsapp() {
+  // Send Receipt to WhatsApp programmatically
+  async function handleSendWhatsapp() {
     if (!selectedPayment) return
     if (!whatsappNumber.trim()) {
       alert('Please enter a WhatsApp phone number')
       return
     }
 
-    // Clean phone number (remove +, spaces, leading zeros if with country code)
-    let cleanPhone = whatsappNumber.replace(/[+\s-]/g, '')
-    if (cleanPhone.startsWith('0')) {
-      cleanPhone = '255' + cleanPhone.substring(1)
+    setSendingWhatsapp(true)
+    try {
+      const res = await fetch('/api/whatsapp/send-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paymentId: selectedPayment.id,
+          phone: whatsappNumber.trim()
+        })
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send receipt')
+      }
+
+      alert('Receipt PDF successfully sent via WhatsApp!')
+      setIsWhatsappModalOpen(false)
+      setSelectedPayment(null)
+    } catch (err: any) {
+      alert(err.message || 'An error occurred while sending the receipt.')
+    } finally {
+      setSendingWhatsapp(false)
     }
-
-    const pay = selectedPayment
-    const studentName = `${pay.students?.profiles?.first_name} ${pay.students?.profiles?.last_name}`
-    const recNo = pay.receipt_number.split('-').pop() || pay.receipt_number
-
-    // Compose receipt WhatsApp text
-    const headerStr = `*LEADERS INTERNATIONAL SCHOOL*\n*OFFICIAL PAYMENT RECEIPT*\n\n`
-    const bodyStr = `*Receipt No:* REC-${recNo}\n*Date:* ${new Date(pay.payment_date).toLocaleDateString()}\n*Student Name:* ${studentName}\n*Admission No:* ${pay.students?.student_id || pay.students?.admission_number}\n*Payment Method:* ${pay.payment_method}\n*Total Paid:* ${formatTZS(pay.amount).replace('TZS', 'TZS ')}\n`
-    
-    const pdfUrl = `${window.location.origin}/api/accountant/payments/pdf?payment_id=${pay.id}`
-    const downloadStr = `\nDownload your official Receipt PDF here:\n${pdfUrl}`
-
-    const finalMessage = encodeURIComponent(headerStr + bodyStr + downloadStr)
-    window.open(`https://wa.me/${cleanPhone}?text=${finalMessage}`, '_blank')
-    setIsWhatsappModalOpen(false)
-    setSelectedPayment(null)
   }
 
   return (
@@ -271,9 +275,10 @@ export default function PaymentsClient({
               <button
                 onClick={handleSendWhatsapp}
                 className="btn btn-primary"
-                style={{ backgroundColor: '#25D366', color: '#ffffff', borderColor: '#25D366' }}
+                style={{ backgroundColor: '#25D366', color: '#ffffff', borderColor: '#25D366', opacity: sendingWhatsapp ? 0.7 : 1 }}
+                disabled={sendingWhatsapp}
               >
-                Send Receipt
+                {sendingWhatsapp ? 'Sending...' : 'Send Receipt'}
               </button>
             </div>
           </div>

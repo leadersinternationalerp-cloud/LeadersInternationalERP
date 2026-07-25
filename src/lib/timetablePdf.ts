@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit'
 import fs from 'fs'
 import path from 'path'
+import { drawLetterhead } from './pdfLetterhead'
 
 export interface TimetablePDFOptions {
   title: string;
@@ -47,36 +48,18 @@ export async function generateTimetablePdf(opts: TimetablePDFOptions): Promise<B
     doc.on('error', reject)
   })
 
-  const logoBuffer = loadLogoBuffer()
   const startX = 40
-  const startY = 35
   const contentWidth = 762 // A4 landscape width = 842 - 80 margins
 
   // 1. Header Area
-  if (logoBuffer) {
-    try {
-      doc.image(logoBuffer, startX, startY, { width: 45, height: 45 })
-    } catch (e) {
-      console.error(e)
-    }
-  }
+  await drawLetterhead(doc, startX, contentWidth, false)
 
-  const textStartX = logoBuffer ? startX + 55 : startX
-
-  doc.fontSize(14).font('Helvetica-Bold').fillColor('#00264b')
-     .text('LEADERS INTERNATIONAL SCHOOL', textStartX, startY)
-  
-  doc.fontSize(9.5).font('Helvetica-Bold').fillColor('#475569')
-     .text(`${opts.title.toUpperCase()} - ${opts.entityName.toUpperCase()}`, textStartX, startY + 18)
-
-  doc.fontSize(7.5).font('Helvetica').fillColor('#64748b')
-     .text('Kisakasaka, Zanzibar | info@leaders.ac.tz | +255 777 123 456', textStartX, startY + 32)
-
-  // Separator Line
-  doc.lineWidth(1).strokeColor('#00264b').moveTo(startX, startY + 48).lineTo(startX + contentWidth, startY + 48).stroke()
+  // Subtitle below letterhead Y range
+  doc.fontSize(10).font('Helvetica-Bold').fillColor('#00264b')
+     .text(`${opts.title.toUpperCase()} - ${opts.entityName.toUpperCase()}`, startX, 96, { width: contentWidth, align: 'center' })
 
   // 2. Timetable Grid Layout (Days as Rows, Periods as Columns)
-  const gridStartY = startY + 62
+  const gridStartY = 114
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
   const slotsCount = opts.slots.length
 

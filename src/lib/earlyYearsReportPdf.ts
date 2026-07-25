@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit'
 import fs from 'fs'
 import path from 'path'
+import { drawLetterhead } from './pdfLetterhead'
 
 export interface EYObservation {
   learning_area: string
@@ -81,49 +82,8 @@ export function loadLogoBuffers() {
 }
 
 // 1. Primary School Header (Matching Primary layout and colors)
-function drawHeader(doc: PDFKit.PDFDocument, opts: EYReportOptions, logos: { logoBuffer: Buffer | null; cambridgeBuffer: Buffer | null }) {
-  const contentWidth = 525
-  const startX = 35
-  const startY = 24
-
-  // Draw school logo (top-left)
-  if (logos.logoBuffer) {
-    try {
-      doc.image(logos.logoBuffer, startX, startY, { width: 50, height: 50 })
-    } catch (e) {
-      console.error('Error drawing school logo:', e)
-    }
-  }
-
-  // Draw Cambridge logo (top-right)
-  if (logos.cambridgeBuffer) {
-    try {
-      doc.image(logos.cambridgeBuffer, startX + contentWidth - 85, startY + 2, { width: 85, height: 42 })
-    } catch (e) {
-      console.error('Error drawing Cambridge logo:', e)
-    }
-  }
-
-  // Center Header Texts (Matching exact user wording & replaces)
-  const schoolName = opts.schoolName || 'LEADERS INTERNATIONAL SCHOOL'
-  const schoolAddress = 'Kisakasaka, Zanzibar | info@leaders.ac.tz | +255 777 123 456'
-  const schoolMotto = '"Learning Today, Leading Tomorrow"'
-
-  doc.fontSize(14).font('Helvetica-Bold').fillColor('#00264b')
-     .text(schoolName, startX + 55, startY, { width: contentWidth - 145, align: 'center' })
-  
-  doc.fontSize(8).font('Helvetica-Bold').fillColor('#00264b')
-     .text('CAMBRIDGE SCHOOL – EARLY YEARS FOUNDATION STAGE', startX + 55, startY + 16, { width: contentWidth - 145, align: 'center' })
-
-  doc.fontSize(7.5).font('Helvetica').fillColor('#475569')
-     .text(schoolAddress, startX + 55, startY + 28, { width: contentWidth - 145, align: 'center' })
-
-  doc.fontSize(7.5).font('Helvetica-Oblique').fillColor('#0f172a')
-     .text(schoolMotto, startX + 55, startY + 39, { width: contentWidth - 145, align: 'center' })
-
-  // Double Primary Blue Line Separator
-  doc.lineWidth(1).strokeColor('#00264b').moveTo(startX, startY + 52).lineTo(startX + contentWidth, startY + 52).stroke()
-  doc.lineWidth(0.5).strokeColor('#00264b').moveTo(startX, startY + 54).lineTo(startX + contentWidth, startY + 54).stroke()
+async function drawHeader(doc: PDFKit.PDFDocument, opts: EYReportOptions) {
+  await drawLetterhead(doc, 35, 525, true)
 }
 
 // 2. Compact Child Information Section (Reduced Height, Removed Language at Home & Admission Date)
@@ -466,7 +426,7 @@ export async function generateEarlyYearsReportPdf(optsOrArray: EYReportOptions |
     }
 
     // Render EXACT 1-PAGE EYFS Report Card
-    drawHeader(doc, opts, logos)
+    await drawHeader(doc, opts)
     const infoEndY = await drawStudentInfoSection(doc, opts, photoBuffer)
     const tableEndY = drawLearningAreasTable(doc, opts, infoEndY + 6)
     drawCharacteristicsAndComments(doc, opts, tableEndY + 6)

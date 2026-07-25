@@ -124,6 +124,30 @@ export default async function AccountantFeeRemindersPage() {
               `
               await sendEmail(parentProfile.email, 'Outstanding Fee Payment Reminder', emailHtml)
             }
+
+            // D. Dispatch Twilio WhatsApp statement PDF
+            if (parentProfile.phone) {
+              try {
+                const { WhatsAppService } = await import('@/lib/whatsapp/WhatsAppService')
+                const invNo = inv.invoice_number || `INV-${inv.id.substring(0, 8)}`
+                const pdfBytes = await WhatsAppService.generateInvoicePDF(
+                  invNo,
+                  studentName,
+                  (inv.student as any)?.grade_level || '-',
+                  inv.term,
+                  Number(inv.net_amount),
+                  Number(inv.paid_amount),
+                  new Date().toLocaleDateString()
+                )
+                const pdfUrl = await WhatsAppService.uploadInvoice(invNo, pdfBytes)
+                
+                const parentName = `${parentProfile.first_name} ${parentProfile.last_name}`
+                const waMsg = `Dear ${parentName}, please find the outstanding fee statement for ${studentName} (${inv.term}) attached here: ${pdfUrl}`
+                await WhatsAppService.sendWhatsAppPDF(parentProfile.phone, `Statement-${invNo}.pdf`, pdfUrl, waMsg)
+              } catch (waErr) {
+                console.error('[WHATSAPP REMINDER ERROR] Failed to send PDF statement via WhatsApp:', waErr)
+              }
+            }
           }
         }
       }

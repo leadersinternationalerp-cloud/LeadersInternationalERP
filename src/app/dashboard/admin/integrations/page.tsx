@@ -120,13 +120,20 @@ export default async function IntegrationsPage() {
                         </span>
                       </td>
                       <td style={{ padding: '1rem', textAlign: 'right' }}>
-                        {!conf.is_active && (
-                          <form action={toggleActiveAction}>
-                            <input type="hidden" name="id" value={conf.id} />
-                            <input type="hidden" name="provider_type" value={conf.provider_type} />
-                            <button type="submit" className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>Make Active</button>
-                          </form>
-                        )}
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          {conf.provider_type === 'WHATSAPP' && conf.provider_name.toLowerCase().includes('twilio') && (
+                            <a href="/dashboard/admin/integrations/twilio" className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
+                              Manage Senders
+                            </a>
+                          )}
+                          {!conf.is_active && (
+                            <form action={toggleActiveAction}>
+                              <input type="hidden" name="id" value={conf.id} />
+                              <input type="hidden" name="provider_type" value={conf.provider_type} />
+                              <button type="submit" className="btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>Make Active</button>
+                            </form>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

@@ -67,6 +67,7 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [sendingWhatsapp, setSendingWhatsapp] = useState(false)
 
   // Form Fields
   const [learningArea, setLearningArea] = useState(LEARNING_AREAS[0])
@@ -76,6 +77,44 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
   const [nextSteps, setNextSteps] = useState('')
   const [isFinal, setIsFinal] = useState(true)
   const [expandingAi, setExpandingAi] = useState(false)
+
+  const handleSendWhatsapp = async () => {
+    if (!previewUrl) return
+    
+    // Parse URL parameters
+    const urlObj = new URL(previewUrl, window.location.origin)
+    const studentId = urlObj.searchParams.get('student_id')
+    const termId = urlObj.searchParams.get('term_id')
+
+    if (!studentId || !termId) {
+      alert('Invalid preview URL parameters.')
+      return
+    }
+
+    setSendingWhatsapp(true)
+    try {
+      const res = await fetch('/api/whatsapp/send-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId,
+          termId,
+          type: 'EARLY_YEARS'
+        })
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send report card WhatsApp')
+      }
+
+      alert('EYFS Progress Report PDF successfully sent to the parent contact via WhatsApp!')
+    } catch (err: any) {
+      alert(err.message || 'An error occurred while sending the report card.')
+    } finally {
+      setSendingWhatsapp(false)
+    }
+  }
 
   // Handle AI Expansion of Observation Notes
   const handleAiExpand = async () => {
@@ -792,7 +831,8 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
                 {/* Send WhatsApp Button */}
                 <button
                   type="button"
-                  onClick={() => alert('WhatsApp Integration: EYFS Progress Report sent successfully to the parent contact.')}
+                  onClick={handleSendWhatsapp}
+                  disabled={sendingWhatsapp}
                   style={{
                     backgroundColor: '#25D366',
                     color: '#ffffff',
@@ -805,13 +845,14 @@ export default function EarlyYearsClient({ classes, terms, initialStudents }: Ea
                     alignItems: 'center',
                     gap: '0.5rem',
                     cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(37, 211, 102, 0.2)'
+                    boxShadow: '0 2px 4px rgba(37, 211, 102, 0.2)',
+                    opacity: sendingWhatsapp ? 0.7 : 1
                   }}
                 >
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                     <path d="M12.012 2c-5.506 0-9.989 4.478-9.99 9.984a9.96 9.96 0 0 0 1.333 4.993L2 22l5.233-1.371a9.936 9.936 0 0 0 4.777 1.218h.004c5.505 0 9.989-4.478 9.99-9.983A9.996 9.996 0 0 0 12.012 2zm5.82 14.156c-.252.712-1.461 1.294-2.014 1.347-.503.048-1.155.076-3.435-.866-2.915-1.205-4.786-4.185-4.931-4.378-.146-.193-1.176-1.571-1.176-2.996 0-1.425.728-2.126 1.01-2.408.28-.282.613-.353.818-.353.204 0 .408.002.585.01.183.008.428-.072.67.51.252.608.86 2.1.934 2.25.075.15.125.326.025.524-.1.198-.15.322-.3.494-.15.172-.315.385-.45.517-.15.148-.308.309-.133.61.176.3.78 1.282 1.67 2.075.146.13.275.243.385.342.756.68 1.438.89 1.89 1.037.45.147.88.106 1.213-.242.333-.348 1.46-1.696 1.85-2.28.39-.583.78-.49 1.32-.292.54.198 3.436 1.622 3.636 1.722.202.1.337.15.387.235.05.085.05.495-.202 1.208z"/>
                   </svg>
-                  Send WhatsApp
+                  {sendingWhatsapp ? 'Sending...' : 'Send WhatsApp'}
                 </button>
                 
                 {/* Download PDF Button */}
