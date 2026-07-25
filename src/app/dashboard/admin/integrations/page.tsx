@@ -28,6 +28,7 @@ export default async function IntegrationsPage() {
     const api_key = formData.get('api_key') as string
     const api_secret = formData.get('api_secret') as string
     const api_url = formData.get('api_url') as string
+    const webhook_secret = formData.get('webhook_secret') as string
     const is_active = formData.get('is_active') === 'on'
 
     if (!provider_type || !provider_name) return
@@ -45,6 +46,7 @@ export default async function IntegrationsPage() {
       api_key,
       api_secret,
       api_url,
+      webhook_secret,
       is_active,
       updated_by: user?.id
     })
@@ -166,15 +168,19 @@ export default async function IntegrationsPage() {
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Provider Name</label>
-              <input type="text" name="provider_name" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} placeholder="e.g. AfricasTalking, Selcom" />
+              <input type="text" name="provider_name" required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} placeholder="e.g. Twilio Sandbox, AfricasTalking" />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>API Key / Token</label>
+              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>API Key (Your Twilio Account SID)</label>
               <input type="password" name="api_key" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>API Secret (Optional)</label>
+              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>API Secret (Your Twilio Auth Token)</label>
               <input type="password" name="api_secret" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Webhook Secret (Sender ID)</label>
+              <input type="text" name="webhook_secret" style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} placeholder="Enter your Sandbox number exactly like this: +14155238886" />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Base URL (Optional)</label>
@@ -182,7 +188,7 @@ export default async function IntegrationsPage() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
               <input type="checkbox" name="is_active" id="is_active" defaultChecked />
-              <label htmlFor="is_active" style={{ fontSize: '0.9rem' }}>Set as Active Provider</label>
+              <label htmlFor="is_active" style={{ fontSize: '0.9rem' }}>Activate: Make sure you toggle it to Active!</label>
             </div>
             
             <button type="submit" className="btn-primary" style={{ marginTop: '0.5rem' }}>Save Configuration</button>
