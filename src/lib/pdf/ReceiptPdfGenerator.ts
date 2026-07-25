@@ -206,11 +206,11 @@ export async function generateDetailedReceiptPdfBuffer(paymentId: string): Promi
 
     // Footer
     const dateStr = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
-    doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(40, 802).lineTo(555, 802).stroke()
+    doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(40, 390).lineTo(555, 390).stroke()
     
     doc.fillColor('#64748b').fontSize(8).font('Helvetica')
-    doc.text(`Generated: ${dateStr}`, 40, 808)
-    doc.text(`Page ${i + 1} of ${range.count}`, 40, 808, { align: 'right' })
+    doc.text(`Generated: ${dateStr}`, 40, 396)
+    doc.text(`Page ${i + 1} of ${range.count}`, 40, 396, { align: 'right' })
   }
 
   doc.end()
