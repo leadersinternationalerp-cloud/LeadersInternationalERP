@@ -1,17 +1,35 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { autoGenerateMissingInvoices, getCurrentTermAndYear } from '../actions'
+import { isCurrentOrPast } from '@/utils/billing'
 
 export default async function FeeBalancesPage() {
   const supabase = await createClient()
 
-  // Fetch student invoices with balances
+  // 1. Trigger auto-generation of missing invoices for current & past terms
+  await autoGenerateMissingInvoices()
+
+  // 2. Fetch current active term and year
+  const { termName: currentTerm, academicYearName: currentYear } = await getCurrentTermAndYear()
+
+  // 3. Fetch all invoices with students, profiles, and payments
   const { data: invoices } = await supabase
     .from('invoices')
     .select(`
       *,
-      student:student_id(first_name, last_name, admission_number)
+      student:student_id (
+        id,
+        student_id,
+        admission_number,
+        profiles (
+          first_name,
+          last_name
+        )
+      ),
+      payments (
+        amount
+      )
     `)
-    .gt('amount_due', 0)
     .order('due_date', { ascending: true })
 
   // Calculate aging
@@ -23,18 +41,43 @@ export default async function FeeBalancesPage() {
     overdue_90_plus: 0
   }
 
-  const enhancedInvoices = (invoices || []).map(inv => {
-    const dueDate = new Date(inv.due_date)
-    const daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 3600 * 24))
-    
-    let bucket = 'Current'
-    if (daysOverdue > 90) { bucket = '90+ Days'; aging.overdue_90_plus += inv.amount_due }
-    else if (daysOverdue > 60) { bucket = '61-90 Days'; aging.overdue_60 += inv.amount_due }
-    else if (daysOverdue > 0) { bucket = '1-60 Days'; aging.overdue_30 += inv.amount_due }
-    else { aging.current += inv.amount_due }
+  // 4. Filter to keep only current or past invoices, calculate amount_due on the client side, and categorize by overdue age
+  const enhancedInvoices = (invoices || [])
+    .filter(inv => isCurrentOrPast(inv.academic_year, inv.term, currentYear, currentTerm))
+    .map(inv => {
+      const studentInfo: any = inv.student
+      const profile: any = Array.isArray(studentInfo?.profiles) ? studentInfo.profiles[0] : studentInfo?.profiles
+      const firstName = profile?.first_name || ''
+      const lastName = profile?.last_name || ''
+      const studentName = `${firstName} ${lastName}`.trim()
+      const admissionNo = studentInfo?.student_id || studentInfo?.admission_number || ''
 
-    return { ...inv, daysOverdue, bucket }
-  })
+      // Calculate actual unpaid amount due
+      const netAmount = Number(inv.net_amount || inv.total_amount)
+      const paid = (inv.payments as any[] || []).reduce((sum, p) => sum + Number(p.amount), 0)
+      const amountDue = netAmount - paid
+
+      const dueDate = new Date(inv.due_date)
+      const daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 3600 * 24))
+      
+      let bucket = 'Current'
+      if (amountDue > 0) {
+        if (daysOverdue > 90) { bucket = '90+ Days'; aging.overdue_90_plus += amountDue }
+        else if (daysOverdue > 60) { bucket = '61-90 Days'; aging.overdue_60 += amountDue }
+        else if (daysOverdue > 0) { bucket = '1-60 Days'; aging.overdue_30 += amountDue }
+        else { aging.current += amountDue }
+      }
+
+      return { 
+        ...inv, 
+        studentName,
+        admissionNo,
+        amount_due: amountDue,
+        daysOverdue, 
+        bucket 
+      }
+    })
+    .filter(inv => inv.amount_due > 0) // Only display invoices that have a pending unpaid balance
 
   return (
     <div>
@@ -82,7 +125,10 @@ export default async function FeeBalancesPage() {
           <tbody>
             {enhancedInvoices.map((inv) => (
               <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                <td style={{ padding: '1rem', fontWeight: 600 }}>{inv.student?.first_name} {inv.student?.last_name}</td>
+                <td style={{ padding: '1rem', fontWeight: 600 }}>
+                  <div>{inv.studentName}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>ID: {inv.admissionNo}</div>
+                </td>
                 <td style={{ padding: '1rem', fontFamily: 'monospace' }}>{inv.id.substring(0, 8).toUpperCase()}</td>
                 <td style={{ padding: '1rem' }}>{new Date(inv.due_date).toLocaleDateString()}</td>
                 <td style={{ padding: '1rem' }}>
@@ -105,7 +151,7 @@ export default async function FeeBalancesPage() {
             {enhancedInvoices.length === 0 && (
               <tr>
                 <td colSpan={6} style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-success)', fontWeight: 600 }}>
-                  All invoices are paid in full. No outstanding balances.
+                  All current and past invoices are paid in full. No outstanding balances.
                 </td>
               </tr>
             )}

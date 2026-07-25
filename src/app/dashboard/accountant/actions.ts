@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { logAuditAction } from '@/utils/audit'
 import { AccountingService } from '@/lib/accounting/AccountingService'
+import { isCurrentOrPast } from '@/utils/billing'
 
 // Save Fee Structure
 export async function saveFeeStructureAction(formData: FormData) {
@@ -346,5 +347,203 @@ export async function saveExpenseAction(formData: FormData) {
   await logAuditAction('Expense Recorded', 'expenses', { category, amount, date })
 
   revalidatePath('/dashboard/accountant/expenses')
+  return { success: true }
+}
+
+// Get the current active term and academic year
+export async function getCurrentTermAndYear() {
+  const supabase = await createClient()
+  const { data: activeTerm } = await supabase
+    .from('terms')
+    .select('name, academic_year_id, academic_years(name)')
+    .eq('is_current', true)
+    .maybeSingle()
+
+  let termName = activeTerm?.name || 'Term 3'
+  let academicYearName = '2025-2026'
+
+  const joinedYear: any = activeTerm?.academic_years
+  const resolvedYear = Array.isArray(joinedYear) ? joinedYear[0]?.name : joinedYear?.name
+
+  if (resolvedYear) {
+    academicYearName = resolvedYear
+  } else if (activeTerm?.academic_year_id) {
+    const { data: activeYear } = await supabase
+      .from('academic_years')
+      .select('name')
+      .eq('id', activeTerm.academic_year_id)
+      .maybeSingle()
+    if (activeYear) {
+      academicYearName = activeYear.name
+    }
+  }
+
+  return { termName, academicYearName }
+}
+
+
+// Automatically scan and generate invoices for any missing past or current term fee structures
+export async function autoGenerateMissingInvoices() {
+  const supabase = await createClient()
+
+  // 1. Resolve current active term and academic year
+  const { termName: currentTerm, academicYearName: currentYear } = await getCurrentTermAndYear()
+
+  // 2. Fetch all fee structures
+  const { data: feeStructures, error: feeErr } = await supabase
+    .from('fee_structures')
+    .select('*')
+  
+  if (feeErr || !feeStructures || feeStructures.length === 0) {
+    return { success: true, message: 'No fee structures found.' }
+  }
+
+  // 3. Fetch all students
+  const { data: students, error: studentErr } = await supabase
+    .from('students')
+    .select('id, grade_level')
+  
+  if (studentErr || !students || students.length === 0) {
+    return { success: true, message: 'No students found.' }
+  }
+
+  // 4. Fetch all existing invoices to check mapping
+  const { data: existingInvoices } = await supabase
+    .from('invoices')
+    .select('id, student_id, academic_year, term')
+  
+  const existingInvoicesSet = new Set(
+    (existingInvoices || []).map(inv => `${inv.student_id}_${inv.academic_year}_${inv.term}`)
+  )
+
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // 5. For each student, check which current/past fee structures exist and generate invoices if missing
+  for (const student of students) {
+    if (!student.grade_level) continue
+
+    // Filter structures matching their grade level and are current or past
+    const studentFees = feeStructures.filter(
+      fs => fs.grade_level === student.grade_level && isCurrentOrPast(fs.academic_year, fs.term, currentYear, currentTerm)
+    )
+
+    if (studentFees.length === 0) continue
+
+    // Group fees by (academic_year, term)
+    const groupedFees: Record<string, { year: string; term: string; fees: any[] }> = {}
+    for (const fee of studentFees) {
+      const key = `${fee.academic_year}_${fee.term}`
+      if (!groupedFees[key]) {
+        groupedFees[key] = { year: fee.academic_year, term: fee.term, fees: [] }
+      }
+      groupedFees[key].fees.push(fee)
+    }
+
+    // Sort combos chronologically to correctly compute carryover balances
+    const combinations = Object.values(groupedFees).sort((a, b) => {
+      const aYr = parseInt(a.year.split('-')[0])
+      const bYr = parseInt(b.year.split('-')[0])
+      if (aYr !== bYr) return aYr - bYr
+      const getTermNum = (t: string) => {
+        const m = t.match(/\d+/)
+        return m ? parseInt(m[0]) : 0
+      }
+      return getTermNum(a.term) - getTermNum(b.term)
+    })
+
+    for (const combo of combinations) {
+      const cacheKey = `${student.id}_${combo.year}_${combo.term}`
+      if (existingInvoicesSet.has(cacheKey)) continue
+
+      // Generate missing invoice for this student!
+      try {
+        // Calculate outstanding carryover balance from all prior invoices
+        const { data: prevInvoices } = await supabase
+          .from('invoices')
+          .select('id, total_amount, discount_amount, academic_year, term, payments(amount)')
+          .eq('student_id', student.id)
+
+        let carriedOverBalance = 0
+        if (prevInvoices) {
+          const priorInvoices = prevInvoices.filter(inv => {
+            const invYr = parseInt(inv.academic_year.split('-')[0])
+            const comboYr = parseInt(combo.year.split('-')[0])
+            if (invYr < comboYr) return true
+            if (invYr > comboYr) return false
+            const getTermNum = (t: string) => {
+              const m = t.match(/\d+/)
+              return m ? parseInt(m[0]) : 0
+            }
+            return getTermNum(inv.term) < getTermNum(combo.term)
+          })
+
+          for (const inv of priorInvoices) {
+            const netAmount = Number(inv.total_amount) - Number(inv.discount_amount || 0)
+            const paid = (inv.payments as any[] || []).reduce((sum, p) => sum + Number(p.amount), 0)
+            const outstanding = netAmount - paid
+            if (outstanding > 0) {
+              carriedOverBalance += outstanding
+            }
+          }
+        }
+
+        const feesTotal = combo.fees.reduce((sum, f) => sum + Number(f.amount), 0)
+        const totalAmount = feesTotal + carriedOverBalance
+
+        // Set default due date to 14 days from today
+        const dueDate = new Date()
+        dueDate.setDate(dueDate.getDate() + 14)
+        const dueDateStr = dueDate.toISOString().split('T')[0]
+
+        // Create invoice
+        const { data: newInvoice, error: invError } = await supabase
+          .from('invoices')
+          .insert({
+            student_id: student.id,
+            academic_year: combo.year,
+            term: combo.term,
+            total_amount: totalAmount,
+            discount_amount: 0.00,
+            status: 'Pending',
+            due_date: dueDateStr,
+            generated_by: user?.id
+          })
+          .select('id')
+          .single()
+
+        if (invError) throw invError
+
+        // Add invoice line items
+        const itemsToInsert = combo.fees.map(f => ({
+          invoice_id: newInvoice.id,
+          fee_structure_id: f.id,
+          amount: f.amount,
+          description: f.fee_type
+        }))
+
+        if (carriedOverBalance > 0) {
+          itemsToInsert.push({
+            invoice_id: newInvoice.id,
+            fee_structure_id: null as any,
+            amount: carriedOverBalance,
+            description: 'Previous Balance Carryover'
+          })
+        }
+
+        const { error: itemsError } = await supabase
+          .from('invoice_items')
+          .insert(itemsToInsert)
+
+        if (itemsError) throw itemsError
+
+        // Add to set to avoid reprocessing in current run
+        existingInvoicesSet.add(cacheKey)
+
+      } catch (e: any) {
+        console.error(`Auto invoice gen failed for student ${student.id} for ${combo.term}:`, e.message)
+      }
+    }
+  }
+
   return { success: true }
 }

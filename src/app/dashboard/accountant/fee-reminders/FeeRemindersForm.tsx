@@ -9,12 +9,12 @@ interface Invoice {
   net_amount: number
   paid_amount: number
   status: string
+  studentName?: string
+  admissionNo?: string
+  amount_due?: number
   student: {
     student_id: string
-    profiles: {
-      first_name: string
-      last_name: string
-    }
+    profiles?: any
   }
 }
 
@@ -123,7 +123,17 @@ export default function FeeRemindersForm({
           </thead>
           <tbody>
             {invoices.map((inv) => {
-              const balance = Number(inv.net_amount) - Number(inv.paid_amount)
+              // Safe resolve student profile
+              const rawProf = inv.student?.profiles
+              const prof = Array.isArray(rawProf) ? rawProf[0] : rawProf
+              const derivedName = prof ? `${prof.first_name || ''} ${prof.last_name || ''}`.trim() : 'Student'
+              
+              const studentName = inv.studentName || derivedName
+              const admissionNo = inv.admissionNo || inv.student?.student_id
+              
+              const paidAmount = inv.paid_amount || 0
+              const balance = inv.amount_due !== undefined ? inv.amount_due : (Number(inv.net_amount) - paidAmount)
+
               const isChecked = !!selectedIds[inv.id]
               return (
                 <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: isChecked ? 'rgba(59, 179, 195, 0.02)' : 'transparent' }}>
@@ -137,10 +147,10 @@ export default function FeeRemindersForm({
                   </td>
                   <td style={{ padding: '1rem' }}>
                     <div style={{ fontWeight: 600 }}>
-                      {inv.student?.profiles?.first_name} {inv.student?.profiles?.last_name}
+                      {studentName}
                     </div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                      ID: {inv.student?.student_id}
+                      ID: {admissionNo}
                     </div>
                   </td>
                   <td style={{ padding: '1rem' }}>
@@ -148,15 +158,15 @@ export default function FeeRemindersForm({
                     <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{inv.term}</div>
                   </td>
                   <td style={{ padding: '1rem' }}>{formatTZS(inv.net_amount)}</td>
-                  <td style={{ padding: '1rem', color: 'var(--color-success)' }}>{formatTZS(inv.paid_amount)}</td>
+                  <td style={{ padding: '1rem', color: 'var(--color-success)' }}>{formatTZS(paidAmount)}</td>
                   <td style={{ padding: '1rem', fontWeight: 700, color: 'var(--color-error)' }}>
                     {formatTZS(balance)}
                   </td>
                   <td style={{ padding: '1rem' }}>
                     <span style={{
                       padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600,
-                      backgroundColor: inv.status === 'Partial' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                      color: inv.status === 'Partial' ? 'var(--color-warning)' : 'var(--color-error)'
+                      backgroundColor: inv.status === 'Partial' || inv.status === 'Partially Paid' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                      color: inv.status === 'Partial' || inv.status === 'Partially Paid' ? 'var(--color-warning)' : 'var(--color-error)'
                     }}>
                       {inv.status}
                     </span>

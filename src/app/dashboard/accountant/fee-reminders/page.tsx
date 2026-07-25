@@ -3,6 +3,8 @@ import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import FeeRemindersForm from './FeeRemindersForm'
 import { sendSMS, sendEmail } from '@/utils/notifications'
+import { autoGenerateMissingInvoices, getCurrentTermAndYear } from '../actions'
+import { isCurrentOrPast } from '@/utils/billing'
 
 export default async function AccountantFeeRemindersPage() {
   const supabase = await createClient()
@@ -26,7 +28,13 @@ export default async function AccountantFeeRemindersPage() {
     )
   }
 
-  // Fetch all unpaid or partially paid invoices with student profile details
+  // 1. Trigger auto-generation of missing invoices for current & past terms
+  await autoGenerateMissingInvoices()
+
+  // 2. Fetch current active term and year
+  const { termName: currentTerm, academicYearName: currentYear } = await getCurrentTermAndYear()
+
+  // 3. Fetch all unpaid or partially paid invoices joining students, profiles, and payments
   const { data: invoices } = await supabase
     .from('invoices')
     .select(`
@@ -34,13 +42,42 @@ export default async function AccountantFeeRemindersPage() {
       student:student_id (
         id,
         student_id,
-        profiles:id (first_name, last_name)
+        admission_number,
+        profiles (
+          first_name,
+          last_name
+        )
+      ),
+      payments (
+        amount
       )
     `)
     .neq('status', 'Paid')
     .order('created_at', { ascending: false })
 
-  const outstandingInvoices = invoices || []
+  // 4. Filter to keep only current or past invoices, calculate actual amount due on client
+  const outstandingInvoices = (invoices || [])
+    .filter(inv => isCurrentOrPast(inv.academic_year, inv.term, currentYear, currentTerm))
+    .map(inv => {
+      const studentInfo: any = inv.student
+      const prof: any = Array.isArray(studentInfo?.profiles) ? studentInfo.profiles[0] : studentInfo?.profiles
+      const firstName = prof?.first_name || ''
+      const lastName = prof?.last_name || ''
+      const studentName = `${firstName} ${lastName}`.trim()
+      const admissionNo = studentInfo?.student_id || studentInfo?.admission_number || ''
+
+      const paid = (inv.payments as any[] || []).reduce((sum, p) => sum + Number(p.amount), 0)
+      const netAmount = Number(inv.net_amount || inv.total_amount)
+      const outstanding = netAmount - paid
+
+      return {
+        ...inv,
+        studentName,
+        admissionNo,
+        amount_due: outstanding
+      }
+    })
+    .filter(inv => inv.amount_due > 0)
 
   // Server Action to trigger fee reminders to parents
   async function handleSendFeeRemindersAction(formData: FormData) {
@@ -57,22 +94,37 @@ export default async function AccountantFeeRemindersPage() {
 
     if (selectedInvoiceIds.length === 0) return
 
-    // Fetch the invoice details for selected IDs
+    // Fetch invoice details with payments and correct student profile join
     const { data: selectInvs } = await supabase
       .from('invoices')
       .select(`
         *,
         student:student_id (
           id,
-          profiles:id (first_name, last_name)
+          student_id,
+          admission_number,
+          profiles (
+            first_name,
+            last_name
+          )
+        ),
+        payments (
+          amount
         )
       `)
       .in('id', selectedInvoiceIds)
 
     if (selectInvs) {
       for (const inv of selectInvs) {
-        const studentName = `${(inv.student as any)?.profiles?.first_name} ${(inv.student as any)?.profiles?.last_name}`
-        const outstanding = Number(inv.net_amount) - Number(inv.paid_amount)
+        const studentInfo: any = inv.student
+        const prof: any = Array.isArray(studentInfo?.profiles) ? studentInfo.profiles[0] : studentInfo?.profiles
+        const studentName = prof ? `${prof.first_name} ${prof.last_name}`.trim() : 'Student'
+        
+        // Calculate outstanding balance due
+        const paid = (inv.payments as any[] || []).reduce((sum, p) => sum + Number(p.amount), 0)
+        const netAmount = Number(inv.net_amount || inv.total_amount)
+        const outstanding = netAmount - paid
+
         const formattedAmt = new Intl.NumberFormat('en-TZ', {
           style: 'currency',
           currency: 'TZS',
@@ -93,7 +145,7 @@ export default async function AccountantFeeRemindersPage() {
 
         if (parents) {
           for (const link of parents) {
-            const parentProfile: any = link.profiles
+            const parentProfile: any = Array.isArray(link.profiles) ? link.profiles[0] : link.profiles
             if (!parentProfile) continue
 
             // A. Create In-App Notification
@@ -133,10 +185,10 @@ export default async function AccountantFeeRemindersPage() {
                 const pdfBytes = await WhatsAppService.generateInvoicePDF(
                   invNo,
                   studentName,
-                  (inv.student as any)?.grade_level || '-',
+                  studentInfo?.grade_level || '-',
                   inv.term,
-                  Number(inv.net_amount),
-                  Number(inv.paid_amount),
+                  netAmount,
+                  paid,
                   new Date().toLocaleDateString()
                 )
                 const pdfUrl = await WhatsAppService.uploadInvoice(invNo, pdfBytes)
