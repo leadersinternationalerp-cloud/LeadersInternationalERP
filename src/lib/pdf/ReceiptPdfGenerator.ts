@@ -83,8 +83,8 @@ export async function generateDetailedReceiptPdfBuffer(paymentId: string): Promi
     }
   }
 
-  // Generate PDF via pdfkit with bufferPages: true
-  const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true })
+  // Generate PDF via pdfkit with bufferPages: true (A5 Landscape provides same width as A4 but half height)
+  const doc = new PDFDocument({ margin: 40, size: 'A5', layout: 'landscape', bufferPages: true })
   const chunks: Buffer[] = []
   doc.on('data', chunk => chunks.push(chunk))
 

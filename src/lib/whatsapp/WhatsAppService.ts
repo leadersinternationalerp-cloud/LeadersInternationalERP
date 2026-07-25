@@ -9,7 +9,7 @@ export class WhatsAppService {
    */
   static async uploadReceipt(receiptNumber: string, pdfBytes: Uint8Array): Promise<string> {
     const supabase = createServiceClient()
-    const fileName = `${receiptNumber}.pdf`
+    const fileName = `${receiptNumber}_${Date.now()}.pdf`
     
     const { error } = await supabase.storage.from('receipts').upload(fileName, pdfBytes, {
       contentType: 'application/pdf',

@@ -44,6 +44,7 @@ export default function PaymentsClient({
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null)
   const [whatsappNumber, setWhatsappNumber] = useState('')
   const [sendingWhatsapp, setSendingWhatsapp] = useState(false)
+  const [previewPdfUrl, setPreviewPdfUrl] = useState('')
 
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -164,7 +165,7 @@ export default function PaymentsClient({
 
   // Open PDF for viewing/printing
   function handleViewPDF(payId: string) {
-    window.open(`/api/accountant/payments/pdf?payment_id=${payId}`, '_blank')
+    setPreviewPdfUrl(`/api/accountant/payments/pdf?payment_id=${payId}`)
   }
 
   async function handleSendWhatsappDirect(paymentId: string, phone: string) {
@@ -757,6 +758,32 @@ export default function PaymentsClient({
                 {sendingWhatsapp ? 'Sending...' : 'Send Receipt'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Viewer Modal */}
+      {previewPdfUrl && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div className="glass-panel" style={{ width: '90%', maxWidth: '800px', height: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+            <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--color-surface)' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 600 }}>Receipt Preview</h3>
+              <button onClick={() => setPreviewPdfUrl('')} className="btn btn-secondary" style={{ padding: '0.5rem' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <iframe src={previewPdfUrl} style={{ width: '100%', flex: 1, border: 'none' }} title="PDF Preview" />
           </div>
         </div>
       )}
