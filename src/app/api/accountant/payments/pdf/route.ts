@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     const pdfBuffer = await generateDetailedReceiptPdfBuffer(paymentId)
 
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(pdfBuffer as any, {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': 'inline; filename="receipt.pdf"',
