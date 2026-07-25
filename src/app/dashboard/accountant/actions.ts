@@ -253,6 +253,18 @@ export async function recordPaymentAction(formData: FormData) {
     return { error: error.message }
   }
 
+  // Update bank deposit status to ALLOCATED if linked
+  const bank_deposit_id = formData.get('bank_deposit_id') as string
+  if (bank_deposit_id && bank_deposit_id.trim() !== '') {
+    const { error: depErr } = await supabase
+      .from('bank_deposits')
+      .update({ status: 'ALLOCATED' })
+      .eq('id', bank_deposit_id)
+    if (depErr) {
+      console.error('Failed to update bank deposit status:', depErr)
+    }
+  }
+
   // Record Accounting Journal
   try {
     await AccountingService.recordFeePayment(

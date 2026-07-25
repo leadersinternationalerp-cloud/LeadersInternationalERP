@@ -66,6 +66,13 @@ export default async function PaymentsPage() {
     `)
     .order('payment_date', { ascending: false })
 
+  // Fetch pending bank deposits
+  const { data: bankDeposits } = await supabase
+    .from('bank_deposits')
+    .select('*')
+    .eq('status', 'PENDING')
+    .order('deposit_date', { ascending: false })
+
   return (
     <div>
       <h1 style={{ fontSize: '1.75rem', marginBottom: '1.5rem', color: 'var(--color-primary)' }}>
@@ -75,6 +82,7 @@ export default async function PaymentsPage() {
       <PaymentsClient
         initialPayments={payments || []}
         pendingInvoices={pendingInvoices || []}
+        initialBankDeposits={bankDeposits || []}
       />
     </div>
   )

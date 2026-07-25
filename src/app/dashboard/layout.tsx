@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import InactivityTimeout from '@/components/InactivityTimeout'
 import DashboardLayoutClient from '@/components/DashboardLayoutClient'
 
+// Cache-busting trigger comment to force Next.js to compile layout updates: 2026-07-25T09:59:44
 export default async function DashboardLayout({
   children,
 }: {
