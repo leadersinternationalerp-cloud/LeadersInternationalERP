@@ -190,8 +190,15 @@ export class WhatsAppService {
 
           const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
           const params = new URLSearchParams()
-          params.append('To', phone.startsWith('whatsapp:') ? phone : `whatsapp:${phone}`)
-          params.append('From', fromNumber)
+          
+          let twilioTo = phone
+          if (twilioTo.startsWith('whatsapp:')) twilioTo = twilioTo.replace('whatsapp:', '')
+          if (!twilioTo.startsWith('+')) twilioTo = '+' + twilioTo
+
+          const twilioFrom = fromNumber.startsWith('whatsapp:') ? fromNumber : `whatsapp:${fromNumber}`
+
+          params.append('To', `whatsapp:${twilioTo}`)
+          params.append('From', twilioFrom)
           params.append('Body', messageText)
           params.append('MediaUrl', pdfUrl)
 

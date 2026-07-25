@@ -39,7 +39,6 @@ export async function GET(request: Request) {
       .select(`
         id,
         student_id,
-        admission_number,
         profiles (first_name, last_name, phone)
       `)
       .eq('id', studentId)
@@ -51,7 +50,7 @@ export async function GET(request: Request) {
 
     const studentProfile: any = Array.isArray(student.profiles) ? student.profiles[0] : student.profiles
     const studentName = studentProfile ? `${studentProfile.first_name} ${studentProfile.last_name}`.trim() : ''
-    const studentAdmNo = student.student_id || student.admission_number || ''
+    const studentAdmNo = student.student_id || ''
 
     // B. Fetch parent details
     const { data: parentLinks } = await supabase
@@ -84,7 +83,6 @@ export async function GET(request: Request) {
           students:student_id (
             id,
             student_id,
-            admission_number,
             profiles (first_name, last_name)
           )
         `)
@@ -101,7 +99,7 @@ export async function GET(request: Request) {
         return {
           id: s.id,
           name: sProf ? `${sProf.first_name} ${sProf.last_name}`.trim() : '',
-          admission_number: s.student_id || s.admission_number || ''
+          admission_number: s.student_id || ''
         }
       }).filter(Boolean)
     }
