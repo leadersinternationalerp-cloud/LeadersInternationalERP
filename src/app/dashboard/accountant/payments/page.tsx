@@ -44,7 +44,6 @@ export default async function PaymentsPage() {
       student_id,
       students (
         student_id,
-        admission_number,
         profiles (
           first_name,
           last_name
@@ -64,7 +63,6 @@ export default async function PaymentsPage() {
       invoices (term, academic_year),
       students (
         student_id,
-        admission_number,
         profiles (
           first_name,
           last_name

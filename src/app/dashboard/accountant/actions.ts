@@ -407,14 +407,27 @@ export async function autoGenerateMissingInvoices() {
     return { success: true, message: 'No students found.' }
   }
 
-  // 4. Fetch all existing invoices to check mapping
-  const { data: existingInvoices } = await supabase
+  // 4. Fetch all existing invoices with payments in ONE query to avoid database calls inside loop
+  const { data: allInvoices, error: invFetchErr } = await supabase
     .from('invoices')
-    .select('id, student_id, academic_year, term')
+    .select('id, student_id, total_amount, discount_amount, academic_year, term, payments(amount)')
   
-  const existingInvoicesSet = new Set(
-    (existingInvoices || []).map(inv => `${inv.student_id}_${inv.academic_year}_${inv.term}`)
-  )
+  if (invFetchErr) {
+    console.error('Failed to fetch existing invoices for auto-gen check:', invFetchErr)
+    return { error: invFetchErr.message }
+  }
+
+  // Build lookups in memory
+  const existingInvoicesSet = new Set<string>()
+  const invoicesByStudent: Record<string, any[]> = {}
+  
+  for (const inv of allInvoices || []) {
+    existingInvoicesSet.add(`${inv.student_id}_${inv.academic_year}_${inv.term}`)
+    if (!invoicesByStudent[inv.student_id]) {
+      invoicesByStudent[inv.student_id] = []
+    }
+    invoicesByStudent[inv.student_id].push(inv)
+  }
 
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -457,33 +470,28 @@ export async function autoGenerateMissingInvoices() {
 
       // Generate missing invoice for this student!
       try {
-        // Calculate outstanding carryover balance from all prior invoices
-        const { data: prevInvoices } = await supabase
-          .from('invoices')
-          .select('id, total_amount, discount_amount, academic_year, term, payments(amount)')
-          .eq('student_id', student.id)
-
+        // Calculate outstanding carryover balance from in-memory cache
+        const prevInvoices = invoicesByStudent[student.id] || []
         let carriedOverBalance = 0
-        if (prevInvoices) {
-          const priorInvoices = prevInvoices.filter(inv => {
-            const invYr = parseInt(inv.academic_year.split('-')[0])
-            const comboYr = parseInt(combo.year.split('-')[0])
-            if (invYr < comboYr) return true
-            if (invYr > comboYr) return false
-            const getTermNum = (t: string) => {
-              const m = t.match(/\d+/)
-              return m ? parseInt(m[0]) : 0
-            }
-            return getTermNum(inv.term) < getTermNum(combo.term)
-          })
 
-          for (const inv of priorInvoices) {
-            const netAmount = Number(inv.total_amount) - Number(inv.discount_amount || 0)
-            const paid = (inv.payments as any[] || []).reduce((sum, p) => sum + Number(p.amount), 0)
-            const outstanding = netAmount - paid
-            if (outstanding > 0) {
-              carriedOverBalance += outstanding
-            }
+        const priorInvoices = prevInvoices.filter(inv => {
+          const invYr = parseInt(inv.academic_year.split('-')[0])
+          const comboYr = parseInt(combo.year.split('-')[0])
+          if (invYr < comboYr) return true
+          if (invYr > comboYr) return false
+          const getTermNum = (t: string) => {
+            const m = t.match(/\d+/)
+            return m ? parseInt(m[0]) : 0
+          }
+          return getTermNum(inv.term) < getTermNum(combo.term)
+        })
+
+        for (const inv of priorInvoices) {
+          const netAmount = Number(inv.total_amount) - Number(inv.discount_amount || 0)
+          const paid = (inv.payments as any[] || []).reduce((sum, p) => sum + Number(p.amount), 0)
+          const outstanding = netAmount - paid
+          if (outstanding > 0) {
+            carriedOverBalance += outstanding
           }
         }
 
@@ -536,8 +544,21 @@ export async function autoGenerateMissingInvoices() {
 
         if (itemsError) throw itemsError
 
-        // Add to set to avoid reprocessing in current run
+        // Update in-memory set and lookup cache for subsequent terms carryover
         existingInvoicesSet.add(cacheKey)
+        const newInvoiceCached = {
+          id: newInvoice.id,
+          student_id: student.id,
+          academic_year: combo.year,
+          term: combo.term,
+          total_amount: totalAmount,
+          discount_amount: 0.00,
+          payments: []
+        }
+        if (!invoicesByStudent[student.id]) {
+          invoicesByStudent[student.id] = []
+        }
+        invoicesByStudent[student.id].push(newInvoiceCached)
 
       } catch (e: any) {
         console.error(`Auto invoice gen failed for student ${student.id} for ${combo.term}:`, e.message)
