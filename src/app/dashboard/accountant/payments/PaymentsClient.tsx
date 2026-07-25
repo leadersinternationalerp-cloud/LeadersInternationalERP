@@ -265,27 +265,30 @@ export default function PaymentsClient({
                       marginTop: '0.25rem',
                       boxShadow: '0 10px 25px rgba(0,0,0,0.15)'
                     }}>
-                      {filteredInvoices.map((inv: any) => (
-                        <div
-                          key={inv.id}
-                          onClick={() => selectInvoice(inv)}
-                          style={{
-                            padding: '0.75rem 1rem',
-                            cursor: 'pointer',
-                            borderBottom: '1px solid var(--color-border)',
-                            transition: 'background-color 0.2s',
-                          }}
-                          className="hover-bg"
-                        >
-                          <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
-                            {inv.students?.profiles?.first_name} {inv.students?.profiles?.last_name}
+                      {filteredInvoices.map((inv: any) => {
+                        const bal = Number(inv.net_amount) - (inv.payments || []).reduce((sum: number, p: any) => sum + Number(p.amount), 0)
+                        return (
+                          <div
+                            key={inv.id}
+                            onClick={() => selectInvoice(inv)}
+                            style={{
+                              padding: '0.75rem 1rem',
+                              cursor: 'pointer',
+                              borderBottom: '1px solid var(--color-border)',
+                              transition: 'background-color 0.2s',
+                            }}
+                            className="hover-bg"
+                          >
+                            <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                              {inv.students?.profiles?.first_name} {inv.students?.profiles?.last_name}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', justifyContent: 'space-between', marginTop: '0.15rem' }}>
+                              <span>Adm: {inv.students?.student_id || inv.students?.admission_number}</span>
+                              <span style={{ fontWeight: 600, color: 'var(--color-secondary)' }}>{inv.term} (Bal: {formatTZS(bal)})</span>
+                            </div>
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', justifyContent: 'space-between', marginTop: '0.15rem' }}>
-                            <span>Adm: {inv.students?.student_id || inv.students?.admission_number}</span>
-                            <span style={{ fontWeight: 600, color: 'var(--color-secondary)' }}>{inv.term} ({formatTZS(inv.net_amount)})</span>
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                       {filteredInvoices.length === 0 && (
                         <div style={{ padding: '1rem', color: 'var(--color-text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>
                           No pending invoices found matching "{searchQuery}"
@@ -310,6 +313,9 @@ export default function PaymentsClient({
                   </div>
                   <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-secondary)', marginTop: '0.2rem' }}>
                     Invoice Term: {selectedInvoice.term} [{formatTZS(selectedInvoice.net_amount)}]
+                  </div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-error)', marginTop: '0.2rem' }}>
+                    Outstanding Balance: {formatTZS(Number(selectedInvoice.net_amount) - (selectedInvoice.payments || []).reduce((sum: number, p: any) => sum + Number(p.amount), 0))}
                   </div>
                   
                   <button

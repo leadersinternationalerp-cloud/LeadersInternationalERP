@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import PaymentsClient from './PaymentsClient'
+import { autoGenerateMissingInvoices } from '../actions'
 
 export default async function PaymentsPage() {
   const supabase = await createClient()
@@ -28,6 +29,9 @@ export default async function PaymentsPage() {
     )
   }
 
+  // Trigger auto-generation check for missing invoices (current & past terms)
+  await autoGenerateMissingInvoices()
+
   // Fetch pending/partially paid invoices for selection
   const { data: pendingInvoices } = await supabase
     .from('invoices')
@@ -45,6 +49,9 @@ export default async function PaymentsPage() {
           first_name,
           last_name
         )
+      ),
+      payments (
+        amount
       )
     `)
     .neq('status', 'Paid')
