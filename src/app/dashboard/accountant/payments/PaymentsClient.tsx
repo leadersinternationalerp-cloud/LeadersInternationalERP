@@ -168,9 +168,25 @@ export default function PaymentsClient({
   }
 
   // Trigger Send WhatsApp modal
-  function triggerWhatsappShare(pay: any) {
+  async function triggerWhatsappShare(pay: any) {
     setSelectedPayment(pay)
     setIsWhatsappModalOpen(true)
+    setWhatsappNumber('')
+
+    try {
+      const res = await fetch(`/api/accountant/payments/student-details?student_id=${pay.student_id}`)
+      if (res.ok) {
+        const details = await res.json()
+        if (details.parents && details.parents.length > 0) {
+          const parentWithPhone = details.parents.find((p: any) => p.phone)
+          if (parentWithPhone) {
+            setWhatsappNumber(parentWithPhone.phone)
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to pre-fill parent phone number:', err)
+    }
   }
 
   // Send Receipt to WhatsApp programmatically

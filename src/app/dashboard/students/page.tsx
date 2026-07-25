@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import StudentsListClient from './StudentsListClient'
+import { cleanupOldInactiveStudents } from './enroll/actions'
 
 export default async function StudentsPage() {
   const supabase = await createClient()
@@ -25,6 +26,9 @@ export default async function StudentsPage() {
   if (!isAuthorized) {
     return <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}><h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2></div>
   }
+
+  // Run background clean-up for students deactivated for more than a year
+  await cleanupOldInactiveStudents()
 
   // 2. Fetch terms and classes for generators
   const { data: terms } = await supabase.from('terms').select('*').order('created_at', { ascending: false })
@@ -83,7 +87,8 @@ export default async function StudentsPage() {
       profiles: singleProfile ? {
         first_name: singleProfile.first_name,
         last_name: singleProfile.last_name,
-        email: singleProfile.email
+        email: singleProfile.email,
+        phone: singleProfile.phone
       } : undefined
     }
   })

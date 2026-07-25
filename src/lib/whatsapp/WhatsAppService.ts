@@ -1,4 +1,4 @@
-import { createClient } from '@/utils/supabase/server'
+import { createServiceClient } from '@/utils/supabase/service'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
 export class WhatsAppService {
@@ -43,7 +43,7 @@ export class WhatsAppService {
    * Uploads PDF to Supabase Storage and returns the public URL.
    */
   static async uploadReceipt(receiptNumber: string, pdfBytes: Uint8Array): Promise<string> {
-    const supabase = await createClient()
+    const supabase = createServiceClient()
     const fileName = `${receiptNumber}.pdf`
     
     const { error } = await supabase.storage.from('receipts').upload(fileName, pdfBytes, {
@@ -126,7 +126,7 @@ export class WhatsAppService {
    * Uploads Invoice Statement PDF to Supabase Storage and returns public URL.
    */
   static async uploadInvoice(invoiceNumber: string, pdfBytes: Uint8Array): Promise<string> {
-    const supabase = await createClient()
+    const supabase = createServiceClient()
     const fileName = `Statement-${invoiceNumber}.pdf`
     
     const { error } = await supabase.storage.from('receipts').upload(fileName, pdfBytes, {
@@ -155,7 +155,7 @@ export class WhatsAppService {
    * Generic method to dispatch a PDF document link via WhatsApp.
    */
   static async sendWhatsAppPDF(phone: string, fileName: string, pdfUrl: string, messageText: string): Promise<boolean> {
-    const supabase = await createClient()
+    const supabase = createServiceClient()
 
     // Fetch active WhatsApp config
     const { data: config } = await supabase
