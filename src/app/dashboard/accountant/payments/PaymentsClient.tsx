@@ -167,45 +167,13 @@ export default function PaymentsClient({
     window.open(`/api/accountant/payments/pdf?payment_id=${payId}`, '_blank')
   }
 
-  // Trigger Send WhatsApp modal
-  async function triggerWhatsappShare(pay: any) {
-    setSelectedPayment(pay)
-    setIsWhatsappModalOpen(true)
-    setWhatsappNumber('')
-
-    try {
-      const res = await fetch(`/api/accountant/payments/student-details?student_id=${pay.student_id}`)
-      if (res.ok) {
-        const details = await res.json()
-        if (details.parents && details.parents.length > 0) {
-          const parentWithPhone = details.parents.find((p: any) => p.phone)
-          if (parentWithPhone) {
-            setWhatsappNumber(parentWithPhone.phone)
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Failed to pre-fill parent phone number:', err)
-    }
-  }
-
-  // Send Receipt to WhatsApp programmatically
-  async function handleSendWhatsapp() {
-    if (!selectedPayment) return
-    if (!whatsappNumber.trim()) {
-      alert('Please enter a WhatsApp phone number')
-      return
-    }
-
+  async function handleSendWhatsappDirect(paymentId: string, phone: string) {
     setSendingWhatsapp(true)
     try {
       const res = await fetch('/api/whatsapp/send-receipt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paymentId: selectedPayment.id,
-          phone: whatsappNumber.trim()
-        })
+        body: JSON.stringify({ paymentId, phone })
       })
 
       const data = await res.json()
@@ -222,6 +190,45 @@ export default function PaymentsClient({
     } finally {
       setSendingWhatsapp(false)
     }
+  }
+
+  // Trigger Send WhatsApp modal or auto-send
+  async function triggerWhatsappShare(pay: any) {
+    setSelectedPayment(pay)
+    setSendingWhatsapp(true) // Show loading indicator somewhere if needed
+
+    try {
+      const res = await fetch(`/api/accountant/payments/student-details?student_id=${pay.student_id}`)
+      if (res.ok) {
+        const details = await res.json()
+        if (details.parents && details.parents.length > 0) {
+          const parentWithPhone = details.parents.find((p: any) => p.phone)
+          if (parentWithPhone && parentWithPhone.phone) {
+            // Auto-send since phone is available
+            await handleSendWhatsappDirect(pay.id, parentWithPhone.phone)
+            return // Skip opening modal
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to pre-fill parent phone number:', err)
+    } finally {
+      setSendingWhatsapp(false)
+    }
+
+    // Fallback if no phone number was found: open modal
+    setIsWhatsappModalOpen(true)
+    setWhatsappNumber('')
+  }
+
+  // Send Receipt to WhatsApp programmatically (from Modal)
+  async function handleSendWhatsapp() {
+    if (!selectedPayment) return
+    if (!whatsappNumber.trim()) {
+      alert('Please enter a WhatsApp phone number')
+      return
+    }
+    await handleSendWhatsappDirect(selectedPayment.id, whatsappNumber.trim())
   }
 
   // Filter invoices based on search query
