@@ -176,13 +176,17 @@ export default function DashboardLayoutClient({
       )}
 
       {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
-        <NavLink href="/dashboard/users" icon={UsersRound}>
-          User Management
-        </NavLink>
+        <>
+          <SectionHeader>User Administration</SectionHeader>
+          <NavLink href="/dashboard/users" icon={UsersRound}>
+            User Management
+          </NavLink>
+        </>
       )}
 
       {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal') || userRoles.includes('Accountant')) && (
         <>
+          <SectionHeader>Finance Management</SectionHeader>
           <NavLink href="/dashboard/accountant/fee-balances" icon={Scale}>
             Fee Balances
           </NavLink>
