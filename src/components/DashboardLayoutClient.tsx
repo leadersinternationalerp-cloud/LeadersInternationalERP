@@ -40,10 +40,25 @@ export default function DashboardLayoutClient({
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    system: true,
+    management: true,
+    finance: true,
+    academics: true,
+    hr: true,
+    integration: true,
+  })
 
   const toggleMobile = () => setMobileOpen(!mobileOpen)
   const toggleCollapsed = () => setCollapsed(!collapsed)
   const toggleNotifications = () => setNotificationsOpen(!notificationsOpen)
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }))
+  }
 
   // Close mobile sidebar on route change
   useEffect(() => {
@@ -104,336 +119,536 @@ export default function DashboardLayoutClient({
     )
   }
 
-  const SectionHeader = ({ children: label }: { children: React.ReactNode }) => (
-    <div
-      className="nav-section"
-      title={collapsed ? String(label) : undefined}
-      style={{
-        opacity: collapsed ? 0.6 : 1,
-        height: 'auto',
-        overflow: 'hidden',
-        padding: collapsed ? '0.35rem 0' : '0.35rem 0.85rem',
-        marginTop: collapsed ? '0.5rem' : '0.85rem',
-        textAlign: collapsed ? 'center' : 'left',
-        fontSize: collapsed ? '0.55rem' : '0.68rem',
-        transition: 'all 0.2s ease',
-        borderBottom: collapsed ? '1px solid rgba(100, 116, 139, 0.2)' : 'none',
-        paddingBottom: collapsed ? '0.35rem' : '0',
-        letterSpacing: collapsed ? '0.1em' : '0.05em',
-      }}
-    >
-      {collapsed ? String(label).substring(0, 3).toUpperCase() : label}
-    </div>
-  )
+  const SectionHeader = ({ 
+    sectionKey, 
+    label 
+  }: { 
+    sectionKey: string
+    label: string 
+  }) => {
+    const isExpanded = expandedSections[sectionKey]
+    return (
+      <button
+        onClick={() => toggleSection(sectionKey)}
+        className="nav-section"
+        type="button"
+        title={collapsed ? label : undefined}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: collapsed ? 'center' : 'space-between',
+          width: '100%',
+          background: 'none',
+          border: 'none',
+          color: 'var(--color-text-muted)',
+          cursor: 'pointer',
+          outline: 'none',
+          opacity: collapsed ? 0.6 : 0.8,
+          padding: collapsed ? '0.35rem 0' : '0.35rem 0.85rem',
+          marginTop: collapsed ? '0.5rem' : '0.85rem',
+          fontSize: collapsed ? '0.55rem' : '0.68rem',
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          transition: 'all 0.2s ease',
+          borderBottom: collapsed ? '1px solid rgba(100, 116, 139, 0.2)' : 'none',
+          paddingBottom: collapsed ? '0.35rem' : '0.25rem',
+          textAlign: 'left'
+        }}
+      >
+        <span>
+          {collapsed ? label.substring(0, 3).toUpperCase() : label}
+        </span>
+        {!collapsed && (
+          <span style={{ 
+            display: 'inline-flex',
+            transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', 
+            transition: 'transform 0.2s ease',
+            fontSize: '0.6rem',
+            opacity: 0.7
+          }}>
+            ▼
+          </span>
+        )}
+      </button>
+    )
+  }
 
   // Sidebar content (shared between mobile overlay and desktop sidebar)
   const sidebarContent = (
     <>
-      <SectionHeader>Main Menu</SectionHeader>
-
-      {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal') || userRoles.includes('Dean') || userRoles.includes('HOS') || userRoles.includes('Accountant')) && (
-        <NavLink href="/dashboard" icon={LayoutDashboard}>
-          Dashboard Overview
-        </NavLink>
-      )}
-
-      <NavLink href="/dashboard/calendar" icon={CalendarDays}>
-        School Calendar
-      </NavLink>
-
-      {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal') || userRoles.includes('Teacher')) && (
-        <NavLink href="/dashboard/students" icon={Users}>
-          Students
-        </NavLink>
-      )}
-
-      {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal')) && (
-        <NavLink href="/dashboard/staff" icon={UserCog}>
-          Staff & Teachers
-        </NavLink>
-      )}
-
-      {(userRoles.includes('System Admin') || userRoles.includes('Principal') || userRoles.includes('Dean') || userRoles.includes('HOS')) && (
+      {/* 1. MANAGEMENT CLUSTER */}
+      {(userRoles.includes('System Admin') || 
+        userRoles.includes('Director') || 
+        userRoles.includes('Principal') || 
+        userRoles.includes('Dean') || 
+        userRoles.includes('HOS') || 
+        userRoles.includes('Accountant') || 
+        userRoles.includes('Teacher')) && (
         <>
-          <SectionHeader>Academic Leadership</SectionHeader>
+          <SectionHeader sectionKey="management" label="Management" />
+          {expandedSections.management && (
+            <div style={{ paddingLeft: collapsed ? '0' : '0.5rem' }}>
+              {(userRoles.includes('System Admin') || 
+                userRoles.includes('Director') || 
+                userRoles.includes('Principal') || 
+                userRoles.includes('Dean') || 
+                userRoles.includes('HOS') || 
+                userRoles.includes('Accountant')) && (
+                <NavLink href="/dashboard" icon={LayoutDashboard}>
+                  Dashboard Overview
+                </NavLink>
+              )}
 
-          {(userRoles.includes('System Admin') || userRoles.includes('Principal') || userRoles.includes('Director')) && (
-            <NavLink href="/dashboard/principal/lesson-plans" icon={BookOpen}>
-              Lesson Plan Reports
-            </NavLink>
+              {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
+                <NavLink href="/dashboard/users" icon={UsersRound}>
+                  User Management
+                </NavLink>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
+                <NavLink href="/dashboard/director" icon={LayoutDashboard}>
+                  Executive Dashboard
+                </NavLink>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
+                <NavLink href="/dashboard/director/applications" icon={BookOpen}>
+                  Self-Service Inbox
+                </NavLink>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
+                <NavLink href="/dashboard/director/inventory" icon={Package}>
+                  Inventory
+                </NavLink>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
+                <NavLink href="/dashboard/director/transport" icon={Bus}>
+                  Transport
+                </NavLink>
+              )}
+
+              {userRoles.includes('System Admin') && (
+                <NavLink href="/dashboard/admin/kitchen-content" icon={Settings}>
+                  Kitchen Content
+                </NavLink>
+              )}
+
+              {(userRoles.includes('System Admin') || 
+                userRoles.includes('Principal') || 
+                userRoles.includes('Dean') || 
+                userRoles.includes('HOS')) && (
+                <NavLink href="/dashboard/admin/timetable" icon={CalendarDays}>
+                  School Timetable
+                </NavLink>
+              )}
+            </div>
           )}
-
-          <NavLink href="/dashboard/principal/report-cards" icon={FileSpreadsheet}>
-            Report Cards (Principal)
-          </NavLink>
-          <NavLink href="/dashboard/principal/early-years" icon={Baby}>
-            Early Years Reports (Principal)
-          </NavLink>
-          <NavLink href="/dashboard/admin/timetable" icon={CalendarDays}>
-            School Timetable
-          </NavLink>
         </>
       )}
 
-      {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
+      {/* 2. FINANCE CLUSTER */}
+      {(userRoles.includes('System Admin') || 
+        userRoles.includes('Director') || 
+        userRoles.includes('Principal') || 
+        userRoles.includes('Accountant') || 
+        userRoles.includes('Student') || 
+        userRoles.includes('Parent')) && (
         <>
-          <SectionHeader>User Administration</SectionHeader>
-          <NavLink href="/dashboard/users" icon={UsersRound}>
-            User Management
-          </NavLink>
+          <SectionHeader sectionKey="finance" label="Finance" />
+          {expandedSections.finance && (
+            <div style={{ paddingLeft: collapsed ? '0' : '0.5rem' }}>
+              {(userRoles.includes('System Admin') || userRoles.includes('Accountant')) && (
+                <NavLink href="/dashboard/accountant" icon={Wallet}>
+                  Financial Dashboard
+                </NavLink>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
+                <NavLink href="/dashboard/director/finance" icon={Wallet}>
+                  Financial Overview
+                </NavLink>
+              )}
+
+              {(userRoles.includes('System Admin') || 
+                userRoles.includes('Director') || 
+                userRoles.includes('Principal') || 
+                userRoles.includes('Accountant')) && (
+                <>
+                  <NavLink href="/dashboard/accountant/fee-balances" icon={Scale}>
+                    Fee Balances
+                  </NavLink>
+                  <NavLink href="/dashboard/accountant/fee-structures" icon={FileSpreadsheet}>
+                    Fee Structures
+                  </NavLink>
+                </>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Accountant')) && (
+                <>
+                  <NavLink href="/dashboard/accountant/invoices" icon={Receipt}>
+                    Student Invoices
+                  </NavLink>
+                  <NavLink href="/dashboard/accountant/payments" icon={CreditCard}>
+                    Record Payments
+                  </NavLink>
+                  <NavLink href="/dashboard/accountant/expenses" icon={FileSpreadsheet}>
+                    Expenses & Bills
+                  </NavLink>
+                </>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Student')) && (
+                <NavLink href="/dashboard/student/fees" icon={Receipt}>
+                  Fee Statements
+                </NavLink>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Parent')) && (
+                <NavLink href="/dashboard/parent/fees" icon={Receipt}>
+                  Fee Invoices
+                </NavLink>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Accountant')) && (
+                <>
+                  <div
+                    style={{
+                      fontSize: '0.65rem',
+                      fontWeight: 'bold',
+                      color: 'rgba(255,255,255,0.4)',
+                      margin: '0.5rem 0 0.2rem 0.85rem',
+                      textTransform: 'uppercase',
+                      display: collapsed ? 'none' : 'block',
+                    }}
+                  >
+                    Accounting Suite
+                  </div>
+                  <NavLink href="/dashboard/accountant/accounting/statements" icon={FileSpreadsheet}>
+                    Financial Statements
+                  </NavLink>
+                  <NavLink href="/dashboard/accountant/accounting/coa" icon={ListTree}>
+                    Chart of Accounts
+                  </NavLink>
+                  <NavLink href="/dashboard/accountant/accounting/journals" icon={BookCopy}>
+                    Journals
+                  </NavLink>
+                  <NavLink href="/dashboard/accountant/accounting/reconciliation" icon={Scale}>
+                    Reconciliation
+                  </NavLink>
+                  <NavLink href="/dashboard/accountant/accounting/bills" icon={Receipt}>
+                    Bills & Payables
+                  </NavLink>
+                  <NavLink href="/dashboard/accountant/accounting/deposits" icon={Landmark}>
+                    Bank Deposits
+                  </NavLink>
+                  <NavLink href="/dashboard/accountant/accounting/assets" icon={Building2}>
+                    Fixed Assets
+                  </NavLink>
+                </>
+              )}
+            </div>
+          )}
         </>
       )}
 
-      {(userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal') || userRoles.includes('Accountant')) && (
+      {/* 3. ACADEMICS CLUSTER */}
+      {(userRoles.includes('System Admin') || 
+        userRoles.includes('Director') || 
+        userRoles.includes('Principal') || 
+        userRoles.includes('Dean') || 
+        userRoles.includes('HOS') || 
+        userRoles.includes('Teacher') || 
+        userRoles.includes('Student') || 
+        userRoles.includes('Parent')) && (
         <>
-          <SectionHeader>Finance Management</SectionHeader>
-          <NavLink href="/dashboard/accountant/fee-balances" icon={Scale}>
-            Fee Balances
-          </NavLink>
-          <NavLink href="/dashboard/accountant/fee-structures" icon={FileSpreadsheet}>
-            Fee Structures
-          </NavLink>
+          <SectionHeader sectionKey="academics" label="Academics" />
+          {expandedSections.academics && (
+            <div style={{ paddingLeft: collapsed ? '0' : '0.5rem' }}>
+              <NavLink href="/dashboard/calendar" icon={CalendarDays}>
+                School Calendar
+              </NavLink>
+
+              {(userRoles.includes('System Admin') || 
+                userRoles.includes('Director') || 
+                userRoles.includes('Principal') || 
+                userRoles.includes('Teacher')) && (
+                <NavLink href="/dashboard/students" icon={Users}>
+                  Students List
+                </NavLink>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Dean')) && (
+                <NavLink href="/dashboard/dean/students" icon={UsersRound}>
+                  Student Enrollment
+                </NavLink>
+              )}
+
+              {userRoles.includes('System Admin') && (
+                <>
+                  <NavLink href="/dashboard/admin/syllabus" icon={Settings}>
+                    Syllabus Setup
+                  </NavLink>
+                  <NavLink href="/dashboard/admin/subjects" icon={Settings}>
+                    Subjects Setup
+                  </NavLink>
+                  <NavLink href="/dashboard/admin/teacher-assignments" icon={Settings}>
+                    Teacher Assignments
+                  </NavLink>
+                </>
+              )}
+
+              {(userRoles.includes('System Admin') || 
+                userRoles.includes('Principal') || 
+                userRoles.includes('Director')) && (
+                <NavLink href="/dashboard/principal/lesson-plans" icon={BookOpen}>
+                  Lesson Plan Reports
+                </NavLink>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Dean')) && (
+                <>
+                  <NavLink href="/dashboard/dean/marks-overview" icon={PenLine}>
+                    Marks Overview
+                  </NavLink>
+                  <NavLink href="/dashboard/dean/submissions" icon={BookOpen}>
+                    Submissions Review
+                  </NavLink>
+                </>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('HOS')) && (
+                <>
+                  <NavLink href="/dashboard/hos/marks" icon={PenLine}>
+                    Section Marks Overview
+                  </NavLink>
+                  <NavLink href="/dashboard/hos/attendance" icon={ClipboardCheck}>
+                    Section Attendance
+                  </NavLink>
+                </>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Teacher')) && (
+                <>
+                  <NavLink href="/dashboard/teacher" icon={School}>
+                    Teacher Dashboard
+                  </NavLink>
+                  <NavLink href="/dashboard/teacher/attendance" icon={ClipboardCheck}>
+                    Daily Attendance
+                  </NavLink>
+                  <NavLink href="/dashboard/teacher/marks" icon={PenLine}>
+                    Academic Marks
+                  </NavLink>
+                  <NavLink href="/dashboard/teacher/lesson-plans/new" icon={BookOpen}>
+                    Lesson Plans
+                  </NavLink>
+                  <NavLink href="/dashboard/teacher/early-years" icon={Baby}>
+                    Early Years Observations
+                  </NavLink>
+                  <NavLink href="/dashboard/teacher/early-years/reports" icon={FileSpreadsheet}>
+                    Early Years Reports
+                  </NavLink>
+                  <NavLink href="/dashboard/teacher/class-activities" icon={Puzzle}>
+                    Class Activities
+                  </NavLink>
+                  <NavLink href="/dashboard/teacher/quizzes/bank" icon={Layers}>
+                    Quiz Bank
+                  </NavLink>
+                  <NavLink href="/dashboard/teacher/quizzes/jobs" icon={Sparkles}>
+                    Quiz Print Jobs
+                  </NavLink>
+                  <NavLink href="/dashboard/teacher/timetable" icon={CalendarDays}>
+                    My Timetable
+                  </NavLink>
+                </>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Principal')) && (
+                <NavLink href="/dashboard/principal/report-cards" icon={FileSpreadsheet}>
+                  Report Cards (Principal)
+                </NavLink>
+              )}
+
+              {(userRoles.includes('System Admin') || 
+                userRoles.includes('Principal') || 
+                userRoles.includes('Director')) && (
+                <NavLink href="/dashboard/principal/early-years" icon={Baby}>
+                  Early Years Reports (Principal)
+                </NavLink>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Dean')) && (
+                <>
+                  <NavLink href="/dashboard/dean/report-cards" icon={FileSpreadsheet}>
+                    Report Cards (Dean)
+                  </NavLink>
+                  <NavLink href="/dashboard/dean/early-years" icon={Baby}>
+                    Early Years (Dean)
+                  </NavLink>
+                </>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Teacher')) && (
+                <NavLink href="/dashboard/teacher/report-cards" icon={FileSpreadsheet}>
+                  Report Cards (Teacher)
+                </NavLink>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Student')) && (
+                <>
+                  <NavLink href="/dashboard/student" icon={School}>
+                    Student Dashboard
+                  </NavLink>
+                  <NavLink href="/dashboard/student/report-card" icon={FileSpreadsheet}>
+                    Report Card
+                  </NavLink>
+                </>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Parent')) && (
+                <>
+                  <NavLink href="/dashboard/parent/dashboard" icon={HeartHandshake}>
+                    Parent Dashboard
+                  </NavLink>
+                  <NavLink href="/dashboard/parent/students" icon={Users}>
+                    My Children
+                  </NavLink>
+                  <NavLink href="/dashboard/parent/report-card" icon={FileSpreadsheet}>
+                    Report Card
+                  </NavLink>
+                </>
+              )}
+            </div>
+          )}
         </>
       )}
 
+      {/* 4. HR CLUSTER */}
+      {(userRoles.includes('System Admin') || 
+        userRoles.includes('Director') || 
+        userRoles.includes('Principal') || 
+        userRoles.includes('Accountant') || 
+        userRoles.includes('Teacher') || 
+        userRoles.includes('HOS') || 
+        userRoles.includes('Dean')) && (
+        <>
+          <SectionHeader sectionKey="hr" label="HR" />
+          {expandedSections.hr && (
+            <div style={{ paddingLeft: collapsed ? '0' : '0.5rem' }}>
+              {(userRoles.includes('System Admin') || 
+                userRoles.includes('Director') || 
+                userRoles.includes('Principal')) && (
+                <NavLink href="/dashboard/staff" icon={UserCog}>
+                  Staff & Teachers
+                </NavLink>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
+                <>
+                  <NavLink href="/dashboard/director/attendance" icon={ClipboardCheck}>
+                    Staff Attendance
+                  </NavLink>
+                  <NavLink href="/dashboard/director/payrolls" icon={HandCoins}>
+                    Manage Payrolls
+                  </NavLink>
+                </>
+              )}
+
+              {(userRoles.includes('System Admin') || userRoles.includes('Accountant')) && (
+                <>
+                  <NavLink href="/dashboard/accountant/payroll" icon={HandCoins}>
+                    Manage Payroll
+                  </NavLink>
+                  <NavLink href="/dashboard/accountant/advances" icon={HandCoins}>
+                    Salary Advances
+                  </NavLink>
+                  <NavLink href="/dashboard/accountant/leave-config" icon={Settings}>
+                    Leave Configuration
+                  </NavLink>
+                </>
+              )}
+
+              {(userRoles.includes('Teacher') || 
+                userRoles.includes('Accountant') || 
+                userRoles.includes('HOS') || 
+                userRoles.includes('Dean') || 
+                userRoles.includes('Principal') || 
+                userRoles.includes('Director') || 
+                userRoles.includes('System Admin')) && (
+                <>
+                  <div
+                    style={{
+                      fontSize: '0.65rem',
+                      fontWeight: 'bold',
+                      color: 'rgba(255,255,255,0.4)',
+                      margin: '0.5rem 0 0.2rem 0.85rem',
+                      textTransform: 'uppercase',
+                      display: collapsed ? 'none' : 'block',
+                    }}
+                  >
+                    Self Service
+                  </div>
+                  <NavLink href="/dashboard/staff/self-service/leave" icon={Umbrella}>
+                    My HR Dashboard
+                  </NavLink>
+                  <NavLink href="/dashboard/staff/self-service/leave" icon={Umbrella}>
+                    My Leave
+                  </NavLink>
+                  <NavLink href="/dashboard/staff/self-service/advances" icon={HandCoins}>
+                    My Salary Advances
+                  </NavLink>
+                  <NavLink href="/dashboard/staff/self-service/payslips" icon={Banknote}>
+                    My Payslips
+                  </NavLink>
+                </>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* 5. SYSTEM SETTINGS CLUSTER */}
       {userRoles.includes('System Admin') && (
         <>
-          <SectionHeader>Administration</SectionHeader>
-          <NavLink href="/dashboard/admin/settings" icon={Settings}>
-            School Settings
-          </NavLink>
-          <NavLink href="/dashboard/admin/settings/assessment-weights" icon={FileSpreadsheet}>
-            Assessment Weights
-          </NavLink>
-          <NavLink href="/dashboard/admin/backups" icon={Settings}>
-            Database Backups
-          </NavLink>
-          <NavLink href="/dashboard/admin/audit-logs" icon={Settings}>
-            Security Audit Logs
-          </NavLink>
-          <NavLink href="/dashboard/admin/integrations" icon={Plug}>
-            Integrations
-          </NavLink>
-          <NavLink href="/dashboard/admin/syllabus" icon={Settings}>
-            Syllabus Setup
-          </NavLink>
-          <NavLink href="/dashboard/admin/subjects" icon={Settings}>
-            Subjects Setup
-          </NavLink>
-          <NavLink href="/dashboard/admin/teacher-assignments" icon={Settings}>
-            Teacher Assignments
-          </NavLink>
-          <NavLink href="/dashboard/admin/biometric/devices" icon={Fingerprint}>
-            Biometric Devices
-          </NavLink>
-          <NavLink href="/dashboard/admin/biometric/exceptions" icon={Fingerprint}>
-            Biometric Exceptions
-          </NavLink>
-          <NavLink href="/dashboard/admin/kitchen-content" icon={Settings}>
-            Kitchen Content
-          </NavLink>
+          <SectionHeader sectionKey="system" label="System" />
+          {expandedSections.system && (
+            <div style={{ paddingLeft: collapsed ? '0' : '0.5rem' }}>
+              <NavLink href="/dashboard/admin/settings" icon={Settings}>
+                School Settings
+              </NavLink>
+              <NavLink href="/dashboard/admin/settings/assessment-weights" icon={FileSpreadsheet}>
+                Assessment Weights
+              </NavLink>
+              <NavLink href="/dashboard/admin/backups" icon={Settings}>
+                Database Backups
+              </NavLink>
+              <NavLink href="/dashboard/admin/audit-logs" icon={Settings}>
+                Security Audit Logs
+              </NavLink>
+              <NavLink href="/dashboard/admin/biometric/devices" icon={Fingerprint}>
+                Biometric Devices
+              </NavLink>
+              <NavLink href="/dashboard/admin/biometric/exceptions" icon={Fingerprint}>
+                Biometric Exceptions
+              </NavLink>
+            </div>
+          )}
         </>
       )}
 
+      {/* 6. INTEGRATION CLUSTER */}
       {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
         <>
-          <SectionHeader>Director Operations</SectionHeader>
-          <NavLink href="/dashboard/director" icon={LayoutDashboard}>
-            Executive Dashboard
-          </NavLink>
-          <NavLink href="/dashboard/director/attendance" icon={ClipboardCheck}>
-            Staff Attendance
-          </NavLink>
-          <NavLink href="/dashboard/director/finance" icon={Wallet}>
-            Financial Overview
-          </NavLink>
-          <NavLink href="/dashboard/director/payrolls" icon={HandCoins}>
-            Manage Payrolls
-          </NavLink>
-          <NavLink href="/dashboard/director/applications" icon={BookOpen}>
-            Self-Service Inbox
-          </NavLink>
-          <NavLink href="/dashboard/director/inventory" icon={Package}>
-            Inventory
-          </NavLink>
-          <NavLink href="/dashboard/director/transport" icon={Bus}>
-            Transport
-          </NavLink>
-        </>
-      )}
-
-      {(userRoles.includes('System Admin') || userRoles.includes('Dean')) && (
-        <>
-          <SectionHeader>Dean Operations</SectionHeader>
-          <NavLink href="/dashboard/dean" icon={LayoutDashboard}>
-            Dashboard Overview
-          </NavLink>
-          <NavLink href="/dashboard/dean/students" icon={UsersRound}>
-            Student Enrollment
-          </NavLink>
-          <NavLink href="/dashboard/dean/marks-overview" icon={PenLine}>
-            Marks Overview
-          </NavLink>
-          <NavLink href="/dashboard/dean/submissions" icon={BookOpen}>
-            Submissions Review
-          </NavLink>
-          <NavLink href="/dashboard/dean/report-cards" icon={FileSpreadsheet}>
-            Report Cards (Dean)
-          </NavLink>
-          <NavLink href="/dashboard/dean/early-years" icon={Baby}>
-            Early Years (Dean)
-          </NavLink>
-        </>
-      )}
-
-      {(userRoles.includes('System Admin') || userRoles.includes('HOS')) && (
-        <>
-          <SectionHeader>Section Operations</SectionHeader>
-          <NavLink href="/dashboard/hos/marks" icon={PenLine}>
-            Section Marks Overview
-          </NavLink>
-          <NavLink href="/dashboard/hos/attendance" icon={ClipboardCheck}>
-            Section Attendance
-          </NavLink>
-        </>
-      )}
-
-      {(userRoles.includes('System Admin') || userRoles.includes('Teacher')) && (
-        <>
-          <SectionHeader>My Classes</SectionHeader>
-          <NavLink href="/dashboard/teacher" icon={School}>
-            Teacher Dashboard
-          </NavLink>
-          <NavLink href="/dashboard/teacher/attendance" icon={ClipboardCheck}>
-            Daily Attendance
-          </NavLink>
-          <NavLink href="/dashboard/teacher/marks" icon={PenLine}>
-            Academic Marks
-          </NavLink>
-          <NavLink href="/dashboard/teacher/lesson-plans/new" icon={BookOpen}>
-            Lesson Plans
-          </NavLink>
-          <NavLink href="/dashboard/teacher/early-years" icon={Baby}>
-            Early Years Observations
-          </NavLink>
-          <NavLink href="/dashboard/teacher/early-years/reports" icon={FileSpreadsheet}>
-            Early Years Reports
-          </NavLink>
-          <NavLink href="/dashboard/teacher/class-activities" icon={Puzzle}>
-            Class Activities
-          </NavLink>
-          <NavLink href="/dashboard/teacher/quizzes/bank" icon={Layers}>
-            Quiz Bank
-          </NavLink>
-          <NavLink href="/dashboard/teacher/quizzes/jobs" icon={Sparkles}>
-            Quiz Print Jobs
-          </NavLink>
-          <NavLink href="/dashboard/teacher/report-cards" icon={FileSpreadsheet}>
-            Report Cards (Teacher)
-          </NavLink>
-          <NavLink href="/dashboard/teacher/timetable" icon={CalendarDays}>
-            My Timetable
-          </NavLink>
-        </>
-      )}
-
-      {(userRoles.includes('System Admin') || userRoles.includes('Accountant')) && (
-        <>
-          <SectionHeader>Finance</SectionHeader>
-          <NavLink href="/dashboard/accountant" icon={Wallet}>
-            Financial Dashboard
-          </NavLink>
-          <NavLink href="/dashboard/accountant/invoices" icon={Receipt}>
-            Student Invoices
-          </NavLink>
-          <NavLink href="/dashboard/accountant/payments" icon={CreditCard}>
-            Record Payments
-          </NavLink>
-          <NavLink href="/dashboard/accountant/expenses" icon={FileSpreadsheet}>
-            Expenses & Bills
-          </NavLink>
-          <NavLink href="/dashboard/accountant/payroll" icon={HandCoins}>
-            Manage Payroll
-          </NavLink>
-          <NavLink href="/dashboard/accountant/advances" icon={HandCoins}>
-            Salary Advances
-          </NavLink>
-          <NavLink href="/dashboard/accountant/leave-config" icon={Settings}>
-            Leave Configuration
-          </NavLink>
-          <SectionHeader>Accounting Suite</SectionHeader>
-          <NavLink href="/dashboard/accountant/accounting/statements" icon={FileSpreadsheet}>
-            Financial Statements
-          </NavLink>
-          <NavLink href="/dashboard/accountant/accounting/coa" icon={ListTree}>
-            Chart of Accounts
-          </NavLink>
-          <NavLink href="/dashboard/accountant/accounting/journals" icon={BookCopy}>
-            Journals
-          </NavLink>
-          <NavLink href="/dashboard/accountant/accounting/reconciliation" icon={Scale}>
-            Reconciliation
-          </NavLink>
-          <NavLink href="/dashboard/accountant/accounting/bills" icon={Receipt}>
-            Bills & Payables
-          </NavLink>
-          <NavLink href="/dashboard/accountant/accounting/deposits" icon={Landmark}>
-            Bank Deposits
-          </NavLink>
-          <NavLink href="/dashboard/accountant/accounting/assets" icon={Building2}>
-            Fixed Assets
-          </NavLink>
-        </>
-      )}
-
-      {(userRoles.includes('System Admin') || userRoles.includes('Student')) && (
-        <>
-          <SectionHeader>My Academics</SectionHeader>
-          <NavLink href="/dashboard/student" icon={School}>
-            Student Dashboard
-          </NavLink>
-          <NavLink href="/dashboard/student/report-card" icon={FileSpreadsheet}>
-            Report Card
-          </NavLink>
-          <NavLink href="/dashboard/student/fees" icon={Receipt}>
-            Fee Statements
-          </NavLink>
-        </>
-      )}
-
-      {(userRoles.includes('System Admin') || userRoles.includes('Parent')) && (
-        <>
-          <SectionHeader>Parent Portal</SectionHeader>
-          <NavLink href="/dashboard/parent/dashboard" icon={HeartHandshake}>
-            Parent Dashboard
-          </NavLink>
-          <NavLink href="/dashboard/parent/students" icon={Users}>
-            My Children
-          </NavLink>
-          <NavLink href="/dashboard/parent/report-card" icon={FileSpreadsheet}>
-            Report Card
-          </NavLink>
-          <NavLink href="/dashboard/parent/fees" icon={Receipt}>
-            Fee Invoices
-          </NavLink>
-        </>
-      )}
-
-      {(userRoles.includes('Teacher') || userRoles.includes('Accountant') || userRoles.includes('HOS') || userRoles.includes('Dean') || userRoles.includes('Principal') || userRoles.includes('Director')) && (
-        <>
-          <SectionHeader>Self Service</SectionHeader>
-          <NavLink href="/dashboard/staff/self-service/leave" icon={Umbrella}>
-            My HR Dashboard
-          </NavLink>
-          <NavLink href="/dashboard/staff/self-service/leave" icon={Umbrella}>
-            My Leave
-          </NavLink>
-          <NavLink href="/dashboard/staff/self-service/advances" icon={HandCoins}>
-            My Salary Advances
-          </NavLink>
-          <NavLink href="/dashboard/staff/self-service/payslips" icon={Banknote}>
-            My Payslips
-          </NavLink>
+          <SectionHeader sectionKey="integration" label="Integration" />
+          {expandedSections.integration && (
+            <div style={{ paddingLeft: collapsed ? '0' : '0.5rem' }}>
+              <NavLink href="/dashboard/admin/integrations" icon={Plug}>
+                Integrations
+              </NavLink>
+            </div>
+          )}
         </>
       )}
     </>
