@@ -8,6 +8,7 @@ export default function InvoicesClient({ initialInvoices }: { initialInvoices: a
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [gradeFilter, setGradeFilter] = useState('All')
+  const [termFilter, setTermFilter] = useState('All')
 
   const filteredInvoices = useMemo(() => {
     return initialInvoices.filter(inv => {
@@ -15,10 +16,11 @@ export default function InvoicesClient({ initialInvoices }: { initialInvoices: a
       const matchesSearch = name.includes(search.toLowerCase()) || inv.students?.student_id?.toLowerCase().includes(search.toLowerCase())
       const matchesStatus = statusFilter === 'All' || inv.status === statusFilter
       const matchesGrade = gradeFilter === 'All' || inv.students?.grade_level === gradeFilter
+      const matchesTerm = termFilter === 'All' || inv.term === termFilter
       
-      return matchesSearch && matchesStatus && matchesGrade
+      return matchesSearch && matchesStatus && matchesGrade && matchesTerm
     })
-  }, [initialInvoices, search, statusFilter, gradeFilter])
+  }, [initialInvoices, search, statusFilter, gradeFilter, termFilter])
 
   return (
     <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
@@ -50,6 +52,12 @@ export default function InvoicesClient({ initialInvoices }: { initialInvoices: a
             <option value="Grade 6">Grade 6</option>
             <option value="Grade 7">Grade 7</option>
             <option value="Grade 8">Grade 8</option>
+          </select>
+          <select value={termFilter} onChange={e => setTermFilter(e.target.value)} className="input-field" style={{ width: '130px' }}>
+            <option value="All">All Terms</option>
+            <option value="Term 1">Term 1</option>
+            <option value="Term 2">Term 2</option>
+            <option value="Term 3">Term 3</option>
           </select>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
