@@ -19,19 +19,38 @@ interface Invoice {
 }
 
 export default function FeeRemindersForm({
-  invoices,
+  invoices, // Now represents grouped students
   sendRemindersAction
 }: {
-  invoices: Invoice[]
+  invoices: any[]
   sendRemindersAction: (formData: FormData) => Promise<void>
 }) {
   const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({})
   const [sending, setSending] = useState(false)
+  const [classFilter, setClassFilter] = useState('All')
+  const [termFilter, setTermFilter] = useState('All')
+  const [paymentPctFilter, setPaymentPctFilter] = useState('All')
+
+  // Extract unique options for filters
+  const classes = Array.from(new Set(invoices.map(s => s.gradeLevel))).filter(Boolean).sort()
+  const terms = Array.from(new Set(invoices.flatMap(s => s.terms))).filter(Boolean).sort()
+
+  const filteredStudents = invoices.filter(student => {
+    if (classFilter !== 'All' && student.gradeLevel !== classFilter) return false
+    if (termFilter !== 'All' && !student.terms.includes(termFilter)) return false
+    if (paymentPctFilter !== 'All') {
+      // paymentPctFilter looks for students who have paid LESS THAN this % of their net amount
+      const pctPaid = student.total_net_amount > 0 ? (student.total_paid / student.total_net_amount) * 100 : 0
+      const threshold = Number(paymentPctFilter)
+      if (pctPaid >= threshold) return false
+    }
+    return true
+  })
 
   const handleSelectAll = (checked: boolean) => {
     const updated: Record<string, boolean> = {}
     if (checked) {
-      invoices.forEach(inv => {
+      filteredStudents.forEach(inv => {
         updated[inv.id] = true
       })
     }
@@ -56,7 +75,7 @@ export default function FeeRemindersForm({
     setSending(true)
     const formData = new FormData()
     ids.forEach(id => {
-      formData.append(`invoice_${id}`, id)
+      formData.append(`student_${id}`, id)
     })
 
     try {
@@ -79,7 +98,7 @@ export default function FeeRemindersForm({
     }).format(val)
   }
 
-  const isAllSelected = invoices.length > 0 && invoices.every(inv => selectedIds[inv.id])
+  const isAllSelected = filteredStudents.length > 0 && filteredStudents.every(inv => selectedIds[inv.id])
 
   return (
     <form onSubmit={handleTriggerReminders} className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
@@ -101,6 +120,34 @@ export default function FeeRemindersForm({
         </button>
       </div>
 
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1, minWidth: '150px' }}>
+          <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>Class</label>
+          <select className="input-field" value={classFilter} onChange={e => setClassFilter(e.target.value)}>
+            <option value="All">All Classes</option>
+            {classes.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1, minWidth: '150px' }}>
+          <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>Term</label>
+          <select className="input-field" value={termFilter} onChange={e => setTermFilter(e.target.value)}>
+            <option value="All">All Terms</option>
+            {terms.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1, minWidth: '150px' }}>
+          <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>Payment %</label>
+          <select className="input-field" value={paymentPctFilter} onChange={e => setPaymentPctFilter(e.target.value)}>
+            <option value="All">All Students</option>
+            <option value="25">Paid less than 25%</option>
+            <option value="50">Paid less than 50%</option>
+            <option value="75">Paid less than 75%</option>
+            <option value="100">Paid less than 100%</option>
+          </select>
+        </div>
+      </div>
+
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
@@ -113,28 +160,21 @@ export default function FeeRemindersForm({
                   style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                 />
               </th>
-              <th style={{ padding: '1rem' }}>Student ID & Name</th>
-              <th style={{ padding: '1rem' }}>Invoice Details</th>
-              <th style={{ padding: '1rem' }}>Net Amount</th>
-              <th style={{ padding: '1rem' }}>Paid Amount</th>
+              <th style={{ padding: '1rem' }}>Student Details</th>
+              <th style={{ padding: '1rem' }}>Class</th>
+              <th style={{ padding: '1rem' }}>Included Terms</th>
+              <th style={{ padding: '1rem' }}>Total Billed</th>
+              <th style={{ padding: '1rem' }}>Total Paid</th>
               <th style={{ padding: '1rem' }}>Remaining Balance</th>
               <th style={{ padding: '1rem' }}>Status</th>
             </tr>
           </thead>
           <tbody>
-            {invoices.map((inv) => {
-              // Safe resolve student profile
-              const rawProf = inv.student?.profiles
-              const prof = Array.isArray(rawProf) ? rawProf[0] : rawProf
-              const derivedName = prof ? `${prof.first_name || ''} ${prof.last_name || ''}`.trim() : 'Student'
-              
-              const studentName = inv.studentName || derivedName
-              const admissionNo = inv.admissionNo || inv.student?.student_id
-              
-              const paidAmount = inv.paid_amount || 0
-              const balance = inv.amount_due !== undefined ? inv.amount_due : (Number(inv.net_amount) - paidAmount)
-
+            {filteredStudents.map((inv) => {
               const isChecked = !!selectedIds[inv.id]
+              
+              const pctPaid = inv.total_net_amount > 0 ? Math.round((inv.total_paid / inv.total_net_amount) * 100) : 0
+
               return (
                 <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: isChecked ? 'rgba(59, 179, 195, 0.02)' : 'transparent' }}>
                   <td style={{ padding: '1rem' }}>
@@ -147,33 +187,47 @@ export default function FeeRemindersForm({
                   </td>
                   <td style={{ padding: '1rem' }}>
                     <div style={{ fontWeight: 600 }}>
-                      {studentName}
+                      {inv.studentName}
                     </div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                      ID: {admissionNo}
+                      ID: {inv.admissionNo}
                     </div>
                   </td>
                   <td style={{ padding: '1rem' }}>
-                    <div style={{ fontWeight: 500 }}>{inv.invoice_number}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{inv.term}</div>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{inv.gradeLevel}</span>
                   </td>
-                  <td style={{ padding: '1rem' }}>{formatTZS(inv.net_amount)}</td>
-                  <td style={{ padding: '1rem', color: 'var(--color-success)' }}>{formatTZS(paidAmount)}</td>
+                  <td style={{ padding: '1rem' }}>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                      {inv.terms.join(', ')}
+                    </div>
+                  </td>
+                  <td style={{ padding: '1rem' }}>{formatTZS(inv.total_net_amount)}</td>
+                  <td style={{ padding: '1rem', color: 'var(--color-success)' }}>
+                    {formatTZS(inv.total_paid)}
+                  </td>
                   <td style={{ padding: '1rem', fontWeight: 700, color: 'var(--color-error)' }}>
-                    {formatTZS(balance)}
+                    {formatTZS(inv.amount_due)}
                   </td>
                   <td style={{ padding: '1rem' }}>
                     <span style={{
                       padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600,
-                      backgroundColor: inv.status === 'Partial' || inv.status === 'Partially Paid' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                      color: inv.status === 'Partial' || inv.status === 'Partially Paid' ? 'var(--color-warning)' : 'var(--color-error)'
+                      backgroundColor: pctPaid > 0 ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                      color: pctPaid > 0 ? 'var(--color-warning)' : 'var(--color-error)'
                     }}>
-                      {inv.status}
+                      {pctPaid}% Paid
                     </span>
                   </td>
                 </tr>
               )
             })}
+            
+            {filteredStudents.length === 0 && (
+              <tr>
+                <td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                  No students match the selected filters.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

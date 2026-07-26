@@ -43,6 +43,7 @@ export default async function AccountantFeeRemindersPage() {
         id,
         student_id,
         admission_number,
+        grade_level,
         profiles (
           first_name,
           last_name
@@ -55,46 +56,70 @@ export default async function AccountantFeeRemindersPage() {
     .neq('status', 'Paid')
     .order('created_at', { ascending: false })
 
-  // 4. Filter to keep only current or past invoices, calculate actual amount due on client
-  const outstandingInvoices = (invoices || [])
+  // 4. Group by student, calculating aggregated amounts for current/past terms
+  const groupedInvoicesMap = new Map<string, any>()
+
+  ;(invoices || [])
     .filter(inv => isCurrentOrPast(inv.academic_year, inv.term, currentYear, currentTerm))
-    .map(inv => {
+    .forEach(inv => {
       const studentInfo: any = inv.student
       const prof: any = Array.isArray(studentInfo?.profiles) ? studentInfo.profiles[0] : studentInfo?.profiles
       const firstName = prof?.first_name || ''
       const lastName = prof?.last_name || ''
       const studentName = `${firstName} ${lastName}`.trim()
       const admissionNo = studentInfo?.student_id || studentInfo?.admission_number || ''
+      const gradeLevel = studentInfo?.grade_level || 'Unknown'
 
       const paid = (inv.payments as any[] || []).reduce((sum, p) => sum + Number(p.amount), 0)
       const netAmount = Number(inv.net_amount || inv.total_amount)
       const outstanding = netAmount - paid
 
-      return {
-        ...inv,
-        studentName,
-        admissionNo,
-        amount_due: outstanding
+      if (outstanding > 0) {
+        if (!groupedInvoicesMap.has(studentInfo.id)) {
+          groupedInvoicesMap.set(studentInfo.id, {
+            id: studentInfo.id, // Using student.id as row ID
+            student_id: studentInfo.id,
+            studentName,
+            admissionNo,
+            gradeLevel,
+            total_net_amount: 0,
+            total_paid: 0,
+            amount_due: 0,
+            terms: [],
+            invoiceIds: []
+          })
+        }
+        
+        const group = groupedInvoicesMap.get(studentInfo.id)
+        group.total_net_amount += netAmount
+        group.total_paid += paid
+        group.amount_due += outstanding
+        if (!group.terms.includes(inv.term)) group.terms.push(inv.term)
+        group.invoiceIds.push(inv.id)
       }
     })
-    .filter(inv => inv.amount_due > 0)
+
+  const outstandingStudents = Array.from(groupedInvoicesMap.values())
 
   // Server Action to trigger fee reminders to parents
   async function handleSendFeeRemindersAction(formData: FormData) {
     'use server'
     const supabase = await createClient()
+    const { WhatsAppService } = await import('@/lib/whatsapp/WhatsAppService')
+    const { isCurrentOrPast } = await import('@/utils/billing')
+    const { termName: currTerm, academicYearName: currYear } = await getCurrentTermAndYear()
     
-    // Parse selected invoice IDs
-    const selectedInvoiceIds: string[] = []
+    // Parse selected student IDs
+    const selectedStudentIds: string[] = []
     formData.forEach((value, key) => {
-      if (key.startsWith('invoice_')) {
-        selectedInvoiceIds.push(value as string)
+      if (key.startsWith('student_')) {
+        selectedStudentIds.push(value as string)
       }
     })
 
-    if (selectedInvoiceIds.length === 0) return
+    if (selectedStudentIds.length === 0) return
 
-    // Fetch invoice details with payments and correct student profile join
+    // Fetch invoice details for these students
     const { data: selectInvs } = await supabase
       .from('invoices')
       .select(`
@@ -103,6 +128,7 @@ export default async function AccountantFeeRemindersPage() {
           id,
           student_id,
           admission_number,
+          grade_level,
           profiles (
             first_name,
             last_name
@@ -112,41 +138,63 @@ export default async function AccountantFeeRemindersPage() {
           amount
         )
       `)
-      .in('id', selectedInvoiceIds)
+      .in('student_id', selectedStudentIds)
+      .neq('status', 'Paid')
 
     if (selectInvs) {
+      // Group the invoices by student to construct the message
+      const studentGroups = new Map<string, any>()
+
       for (const inv of selectInvs) {
-        const studentInfo: any = inv.student
-        const prof: any = Array.isArray(studentInfo?.profiles) ? studentInfo.profiles[0] : studentInfo?.profiles
-        const studentName = prof ? `${prof.first_name} ${prof.last_name}`.trim() : 'Student'
+        if (!isCurrentOrPast(inv.academic_year, inv.term, currYear, currTerm)) continue
         
-        // Calculate outstanding balance due
+        const studentInfo: any = inv.student
+        if (!studentInfo) continue
+
         const paid = (inv.payments as any[] || []).reduce((sum, p) => sum + Number(p.amount), 0)
         const netAmount = Number(inv.net_amount || inv.total_amount)
         const outstanding = netAmount - paid
 
-        const formattedAmt = new Intl.NumberFormat('en-TZ', {
-          style: 'currency',
-          currency: 'TZS',
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 0
-        }).format(outstanding)
+        if (outstanding <= 0) continue
 
-        const msg = `Fee Reminder: An outstanding balance of ${formattedAmt} is due for ${studentName} (${inv.term}). Please clear the balance promptly.`
+        if (!studentGroups.has(studentInfo.id)) {
+          const prof: any = Array.isArray(studentInfo.profiles) ? studentInfo.profiles[0] : studentInfo.profiles
+          const studentName = prof ? `${prof.first_name} ${prof.last_name}`.trim() : 'Student'
+          
+          studentGroups.set(studentInfo.id, {
+            studentId: studentInfo.id,
+            studentName,
+            totalOutstanding: 0,
+            breakdown: []
+          })
+        }
+
+        const group = studentGroups.get(studentInfo.id)
+        group.totalOutstanding += outstanding
+
+        const fmtAmt = new Intl.NumberFormat('en-TZ', { minimumFractionDigits: 0 }).format(outstanding)
+        group.breakdown.push(`- ${inv.term} (${inv.academic_year}): TZS ${fmtAmt}`)
+      }
+
+      // Dispatch WhatsApp for each student group
+      for (const group of studentGroups.values()) {
+        const totalFmt = new Intl.NumberFormat('en-TZ', { minimumFractionDigits: 0 }).format(group.totalOutstanding)
+        
+        const msg = `*Fee Reminder*\nDear Parent, an outstanding balance of *TZS ${totalFmt}* is due for *${group.studentName}* for current and past terms.\n\n*Breakdown:*\n${group.breakdown.join('\n')}\n\nPlease clear the balance promptly. For queries, contact the Accounts Office.`
 
         // Fetch parent links
         const { data: parents } = await supabase
           .from('student_parents')
           .select(`
             parent_id,
-            profiles:parent_id (first_name, last_name, phone, email)
+            profiles:parent_id (first_name, last_name, phone)
           `)
-          .eq('student_id', inv.student_id)
+          .eq('student_id', group.studentId)
 
         if (parents) {
           for (const link of parents) {
             const parentProfile: any = Array.isArray(link.profiles) ? link.profiles[0] : link.profiles
-            if (!parentProfile) continue
+            if (!parentProfile || !parentProfile.phone) continue
 
             // A. Create In-App Notification
             await supabase.from('notifications').insert({
@@ -155,56 +203,12 @@ export default async function AccountantFeeRemindersPage() {
               link_url: `/dashboard/parent/billing`
             })
 
-            // B. Dispatch SMS
-            if (parentProfile.phone) {
-              await sendSMS(parentProfile.phone, msg)
-            }
-
-            // C. Dispatch Email Reminder
-            if (parentProfile.email) {
-              const parentName = `${parentProfile.first_name} ${parentProfile.last_name}`
-              const emailHtml = `
-                <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.6;">
-                  <h2 style="color: #3bb3c3;">Fee Outstanding Reminder</h2>
-                  <p>Dear ${parentName},</p>
-                  <p>${msg}</p>
-                  <p>Please log in to your parent dashboard to view billing records and make payments.</p>
-                  <br/>
-                  <p>Best regards,</p>
-                  <p><strong>Leaders International School Accounts Department</strong></p>
-                </div>
-              `
-              await sendEmail(parentProfile.email, 'Outstanding Fee Payment Reminder', emailHtml)
-            }
-
-            // D. Dispatch Twilio WhatsApp statement PDF
-            if (parentProfile.phone) {
-              try {
-                const { WhatsAppService } = await import('@/lib/whatsapp/WhatsAppService')
-                const invNo = inv.invoice_number || `INV-${inv.id.substring(0, 8)}`
-                const pdfBytes = await WhatsAppService.generateInvoicePDF(
-                  invNo,
-                  studentName,
-                  studentInfo?.grade_level || '-',
-                  inv.term,
-                  netAmount,
-                  paid,
-                  new Date().toLocaleDateString()
-                )
-                const pdfUrl = await WhatsAppService.uploadInvoice(invNo, pdfBytes)
-                
-                const parentName = `${parentProfile.first_name} ${parentProfile.last_name}`
-                const waMsg = `Dear ${parentName}, please find the outstanding fee statement for ${studentName} (${inv.term}) attached here: ${pdfUrl}`
-                await WhatsAppService.sendWhatsAppPDF(parentProfile.phone, `Statement-${invNo}.pdf`, pdfUrl, waMsg)
-              } catch (waErr) {
-                console.error('[WHATSAPP REMINDER ERROR] Failed to send PDF statement via WhatsApp:', waErr)
-              }
-            }
+            // B. Dispatch WhatsApp Message
+            await WhatsAppService.sendWhatsAppText(parentProfile.phone, msg)
           }
         }
       }
     }
-
     revalidatePath('/dashboard/accountant/fee-reminders')
   }
 
@@ -220,16 +224,19 @@ export default async function AccountantFeeRemindersPage() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-        {outstandingInvoices.length > 0 ? (
-          <FeeRemindersForm
-            invoices={outstandingInvoices}
-            sendRemindersAction={handleSendFeeRemindersAction}
-          />
-        ) : (
-          <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)', borderRadius: 'var(--radius-lg)' }}>
-            No outstanding balances found. All student invoices are fully paid!
-          </div>
-        )}
+        {/* Main Content Area */}
+        <div style={{ padding: '2rem' }}>
+          {outstandingStudents.length > 0 ? (
+            <FeeRemindersForm
+              invoices={outstandingStudents}
+              sendRemindersAction={handleSendFeeRemindersAction}
+            />
+          ) : (
+            <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)', borderRadius: 'var(--radius-lg)' }}>
+              No outstanding balances found. All student invoices are fully paid!
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

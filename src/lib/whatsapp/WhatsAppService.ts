@@ -115,6 +115,115 @@ export class WhatsAppService {
     const text = `Dear Parent, please find the official payment receipt for REC-${receiptNumber.split('-').pop() || receiptNumber} here: ${pdfUrl}`
     await this.sendWhatsAppPDF(phone, `Receipt-${receiptNumber}.pdf`, pdfUrl, text)
   }
+  /**
+   * Generic method to dispatch a text message via WhatsApp.
+   */
+  static async sendWhatsAppText(phone: string, messageText: string): Promise<boolean> {
+    const supabase = createServiceClient()
+
+    // Fetch active WhatsApp config
+    const { data: config } = await supabase
+      .from('integration_config')
+      .select('*')
+      .eq('provider_type', 'WHATSAPP')
+      .eq('is_active', true)
+      .single()
+
+    if (!config) {
+      console.warn('[WHATSAPP] No active WhatsApp provider configured.')
+      return false
+    }
+
+    const providerName = config.provider_name || 'CONSOLE_STUB'
+    let dispatchStatus = 'FAILED'
+
+    try {
+      if (config.api_key) {
+        let response: Response
+        const pNameLower = providerName.toLowerCase()
+
+        if (pNameLower.includes('twilio')) {
+          const accountSid = config.api_key
+          const authToken = config.api_secret
+          const fromNumber = config.webhook_secret // Default Sender ID
+
+          if (!fromNumber) {
+            console.error('[WHATSAPP] Failed to dispatch via Twilio: No default WhatsApp sender registered.')
+            return false
+          }
+
+          const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
+          const params = new URLSearchParams()
+          
+          let twilioTo = phone
+          if (twilioTo.startsWith('whatsapp:')) twilioTo = twilioTo.replace('whatsapp:', '')
+          if (!twilioTo.startsWith('+')) twilioTo = '+' + twilioTo
+
+          const twilioFrom = fromNumber.startsWith('whatsapp:') ? fromNumber : `whatsapp:${fromNumber}`
+
+          params.append('To', `whatsapp:${twilioTo}`)
+          params.append('From', twilioFrom)
+          params.append('Body', messageText)
+
+          const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64')
+
+          response = await fetch(twilioUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Basic ${auth}`,
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: params.toString()
+          })
+        } else {
+          // Standard JSON payload for Meta / WhatsApp Cloud
+          if (!config.api_url) {
+            throw new Error(`API URL is missing for active WHATSAPP provider: ${providerName}`)
+          }
+
+          const payload = {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: phone.replace('+', ''),
+            type: "text",
+            text: {
+              body: messageText
+            }
+          }
+
+          response = await fetch(config.api_url, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${config.api_key}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          })
+        }
+
+        if (response.ok) {
+          dispatchStatus = 'SENT'
+        } else {
+          console.error(`[WHATSAPP] Provider returned ${response.status}: ${await response.text()}`)
+        }
+      } else {
+        dispatchStatus = 'SENT_STUB'
+      }
+    } catch (e) {
+      console.error('[WHATSAPP] Dispatch failed:', e)
+    }
+
+    // Log to whatsapp_logs
+    await supabase.from('whatsapp_logs').insert({
+      phone_number: phone,
+      message_type: 'TEXT',
+      reference_id: 'REMINDER',
+      status: dispatchStatus
+    })
+
+    return dispatchStatus === 'SENT' || dispatchStatus === 'SENT_STUB'
+  }
+
 
   /**
    * Generic method to dispatch a PDF document link via WhatsApp.
