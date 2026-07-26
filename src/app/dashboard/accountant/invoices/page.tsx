@@ -5,12 +5,12 @@ import InvoicesClient from './InvoicesClient'
 export default async function InvoicesPage() {
   const supabase = await createClient()
 
-  // Fetch all invoices joining students and profiles
-  const { data: invoices, error } = await supabase
+  // Fetch all invoices joining students, profiles, and payments
+  const { data: invoicesRaw, error } = await supabase
     .from('invoices')
     .select(`
       *,
-      students (
+      students:student_id (
         id,
         student_id,
         grade_level,
@@ -19,9 +19,21 @@ export default async function InvoicesPage() {
           last_name,
           email
         )
+      ),
+      payments (
+        amount
       )
     `)
     .order('created_at', { ascending: false })
+
+  const invoices = (invoicesRaw || []).map(inv => {
+    const paid = (inv.payments || []).reduce((sum: number, p: any) => sum + Number(p.amount), 0)
+    return {
+      ...inv,
+      total_paid: paid,
+      students: inv.students // Map relation name correctly for the client
+    }
+  })
 
   function formatTZS(amount: number) {
     return new Intl.NumberFormat('en-TZ', {
