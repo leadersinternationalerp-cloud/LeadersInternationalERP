@@ -1,12 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
+import { submitLessonPlanAction } from '../actions'
+import { Upload, FileText, CheckCircle2, ArrowLeft, AlertCircle } from 'lucide-react'
+import Link from 'next/link'
 
-export function LessonPlanForm({ classSubjects, teacherId }: { classSubjects: any[], teacherId: string }) {
+export function LessonPlanForm({ classSubjects }: { classSubjects: any[], teacherId?: string }) {
+  const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -16,136 +21,176 @@ export function LessonPlanForm({ classSubjects, teacherId }: { classSubjects: an
 
     try {
       const formData = new FormData(e.currentTarget)
-      const classSubjectPair = formData.get('class_subject') as string
-      const [class_id, subject_id] = classSubjectPair.split('|')
-      const week_number = parseInt(formData.get('week_number') as string)
-      const term = formData.get('term') as string
-      const file = formData.get('file') as File
+      const res = await submitLessonPlanAction(formData)
 
-      if (!file || file.size === 0) {
-        throw new Error('Please select a file to upload.')
+      if (res.error) {
+        setError(res.error)
+      } else {
+        setSuccess(true)
+        setTimeout(() => {
+          router.push('/dashboard/teacher/lesson-plans')
+        }, 1500)
       }
-
-      // Initialize Supabase Client (assuming ANON key allows upload based on RLS)
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-
-      // 1. Upload File to Storage
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${teacherId}-${class_id}-${subject_id}-week${week_number}-${Math.random()}.${fileExt}`
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('lesson_plans')
-        .upload(fileName, file)
-
-      if (uploadError) throw uploadError
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('lesson_plans')
-        .getPublicUrl(fileName)
-
-      // 2. Insert into lesson_plans table
-      // In a real app we'd get academic_year from settings, hardcoding 2025-2026 for now
-      const { error: dbError } = await supabase
-        .from('lesson_plans')
-        .insert({
-          teacher_id: teacherId,
-          class_id,
-          subject_id,
-          week_number,
-          term,
-          academic_year: '2025-2026',
-          file_url: publicUrl,
-          status: 'Submitted'
-        })
-
-      if (dbError) throw dbError
-
-      // 3. Notify Deans and Heads of Section
-      try {
-        const { data: teacherProfile } = await supabase
-          .from('profiles')
-          .select('first_name, last_name')
-          .eq('id', teacherId)
-          .single()
-
-        const teacherName = teacherProfile ? `${teacherProfile.first_name} ${teacherProfile.last_name}` : 'A teacher'
-
-        const { data: allProfiles } = await supabase
-          .from('profiles')
-          .select('id, role, roles')
-
-        const targetUsers = (allProfiles || []).filter(p => {
-          const userRoles = p.roles && Array.isArray(p.roles) && p.roles.length > 0
-            ? p.roles
-            : (p.role ? p.role.split(',').map((r: string) => r.trim()) : [])
-          return userRoles.includes('Head of Section') || userRoles.includes('Dean')
-        })
-
-        if (targetUsers.length > 0) {
-          const notifications = targetUsers.map(u => ({
-            user_id: u.id,
-            message: `New lesson plan submitted by ${teacherName} (Week ${week_number}). Please review.`,
-            link_url: `/dashboard/hos/lesson-plans`
-          }))
-          await supabase.from('notifications').insert(notifications)
-        }
-      } catch (notifErr) {
-        console.error('Error triggering lesson plan notifications:', notifErr)
-      }
-
-      setSuccess(true)
-      e.currentTarget.reset()
-
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message || 'An unexpected error occurred.')
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) {
+      setSelectedFileName(file.name)
+    } else {
+      setSelectedFileName(null)
+    }
+  }
+
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {error && <div className="auth-error">{error}</div>}
-      {success && <div style={{ color: 'var(--color-success)', padding: '1rem', background: 'rgba(0,255,0,0.1)', borderRadius: 'var(--radius-md)' }}>Lesson Plan submitted successfully!</div>}
+      {error && (
+        <div style={{ color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+          <AlertCircle size={18} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {success && (
+        <div style={{ color: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+          <CheckCircle2 size={18} />
+          <span>Lesson Plan submitted successfully! Redirecting to your dashboard...</span>
+        </div>
+      )}
 
       <div className="form-group">
-        <label className="form-label">Class & Subject</label>
-        <select name="class_subject" className="input-field" required>
-          <option value="">Select...</option>
+        <label className="form-label" style={{ fontWeight: 600 }}>Class & Subject</label>
+        <select name="class_subject" className="input-field" required style={{ fontSize: '0.95rem' }}>
+          <option value="">Select class and subject...</option>
           {classSubjects.map(cs => (
             <option key={cs.id} value={`${cs.class_id}|${cs.subject_id}`}>
-              {cs.classes.name} - {cs.subjects.name}
+              {cs.classes.name} — {cs.subjects.name}
             </option>
           ))}
         </select>
+        {classSubjects.length === 0 && (
+          <span style={{ fontSize: '0.8rem', color: '#ef4444', marginTop: '0.25rem' }}>
+            No subject assignments found for your account. Please contact your school administrator.
+          </span>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <div className="form-group">
-          <label className="form-label">Term</label>
-          <select name="term" className="input-field" required>
+          <label className="form-label" style={{ fontWeight: 600 }}>Term</label>
+          <select name="term" className="input-field" required defaultValue="Term 1" style={{ fontSize: '0.95rem' }}>
             <option value="Term 1">Term 1</option>
             <option value="Term 2">Term 2</option>
             <option value="Term 3">Term 3</option>
           </select>
         </div>
         <div className="form-group">
-          <label className="form-label">Week Number</label>
-          <input type="number" name="week_number" min="1" max="15" className="input-field" required />
+          <label className="form-label" style={{ fontWeight: 600 }}>Week Number</label>
+          <input
+            type="number"
+            name="week_number"
+            min="1"
+            max="20"
+            defaultValue="1"
+            className="input-field"
+            required
+            style={{ fontSize: '0.95rem' }}
+          />
         </div>
       </div>
 
       <div className="form-group">
-        <label className="form-label">Lesson Plan File (PDF/Word)</label>
-        <input type="file" name="file" accept=".pdf,.doc,.docx" className="input-field" required />
+        <label className="form-label" style={{ fontWeight: 600 }}>Academic Year</label>
+        <input
+          type="text"
+          name="academic_year"
+          defaultValue="2025-2026"
+          className="input-field"
+          required
+          style={{ fontSize: '0.95rem' }}
+        />
       </div>
 
-      <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-        {isSubmitting ? 'Uploading...' : 'Submit Lesson Plan'}
-      </button>
+      {/* Custom Drag and Drop File Input Box */}
+      <div className="form-group">
+        <label className="form-label" style={{ fontWeight: 600 }}>Lesson Plan Document File (PDF / DOCX / DOC)</label>
+        <div
+          style={{
+            border: '2px dashed var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '2rem 1.5rem',
+            textAlign: 'center',
+            backgroundColor: selectedFileName ? 'rgba(59, 130, 246, 0.04)' : 'rgba(0,0,0,0.01)',
+            cursor: 'pointer',
+            position: 'relative',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <input
+            type="file"
+            name="file"
+            accept=".pdf,.doc,.docx"
+            onChange={handleFileChange}
+            required
+            style={{
+              position: 'absolute',
+              inset: 0,
+              opacity: 0,
+              width: '100%',
+              height: '100%',
+              cursor: 'pointer'
+            }}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', pointerEvents: 'none' }}>
+            {selectedFileName ? (
+              <>
+                <FileText size={36} style={{ color: '#3b82f6' }} />
+                <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--color-primary)' }}>{selectedFileName}</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Click to replace file</span>
+              </>
+            ) : (
+              <>
+                <Upload size={36} style={{ color: 'var(--color-text-muted)' }} />
+                <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>Drag & drop file here or click to browse</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Supports PDF, Word (.doc, .docx) up to 10MB</span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="form-group">
+        <label className="form-label" style={{ fontWeight: 600 }}>Optional Teacher Notes / Objectives</label>
+        <textarea
+          name="teacher_comments"
+          rows={3}
+          className="input-field"
+          placeholder="Specify key learning outcomes, special materials, or comments for HOS / Dean..."
+          style={{ fontSize: '0.9rem' }}
+        />
+      </div>
+
+      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '0.5rem' }}>
+        <Link href="/dashboard/teacher/lesson-plans" className="btn btn-secondary" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+          <ArrowLeft size={16} />
+          <span>Cancel</span>
+        </Link>
+
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={isSubmitting || classSubjects.length === 0}
+          style={{ flex: 1, padding: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+        >
+          <Upload size={18} />
+          <span>{isSubmitting ? 'Uploading & Submitting...' : 'Submit Lesson Plan'}</span>
+        </button>
+      </div>
     </form>
   )
 }

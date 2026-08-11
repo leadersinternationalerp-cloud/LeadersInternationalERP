@@ -80,7 +80,8 @@ export default async function PrincipalLessonPlanReviewPage({
       .update({
         status,
         review_notes: notes || '',
-        reviewer_id: user?.id
+        reviewer_id: user?.id,
+        reviewed_at: new Date().toISOString()
       })
       .eq('id', planId)
 
@@ -103,10 +104,11 @@ export default async function PrincipalLessonPlanReviewPage({
         if (plan) {
           const className = (plan.classes as any)?.name || 'Class'
           const subjectName = (plan.subjects as any)?.name || 'Subject'
+          const statusText = status === 'Approved' ? 'approved' : 'returned for revision'
           await supabase.from('notifications').insert({
             user_id: plan.teacher_id,
-            message: `Your lesson plan for ${className} - ${subjectName} (Week ${plan.week_number}) was ${status}. Notes: ${notes || 'None'}`,
-            link_url: `/dashboard/teacher`
+            message: `Your lesson plan for ${className} - ${subjectName} (Week ${plan.week_number}) was ${statusText} by Principal. Remarks: ${notes || 'None'}`,
+            link_url: '/dashboard/teacher/lesson-plans'
           })
         }
       } catch (notifErr) {
