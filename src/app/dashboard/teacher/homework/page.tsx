@@ -86,11 +86,30 @@ export default async function TeacherHomeworkPage() {
     // 2. Fetch all students in this class to alert them
     const selectedClass = classes?.find(c => c.id === classId)
     if (selectedClass) {
-      const { data: students } = await supabase
+      let { data: students } = await supabase
         .from('students')
         .select('id')
-        .eq('grade_level', selectedClass.name)
-        .eq('section', selectedClass.section)
+        .eq('class_id', classId)
+
+      if (!students || students.length === 0) {
+        const { data: scData } = await supabase
+          .from('student_classes')
+          .select('student_id')
+          .eq('class_id', classId)
+
+        if (scData && scData.length > 0) {
+          students = scData.map(sc => ({ id: sc.student_id }))
+        }
+      }
+
+      if (!students || students.length === 0) {
+        const { data: gradeStudents } = await supabase
+          .from('students')
+          .select('id')
+          .eq('grade_level', selectedClass.name)
+
+        students = gradeStudents || []
+      }
 
       if (students && students.length > 0) {
         for (const stud of students) {

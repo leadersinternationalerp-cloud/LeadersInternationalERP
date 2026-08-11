@@ -39,7 +39,7 @@ export default async function TeacherAttendancePage({
   const selectedClassId = params.class_id || (classes && classes.length > 0 ? classes[0].id : '')
   const selectedDate = params.date || new Date().toISOString().split('T')[0]
 
-  // Fetch students in selected class
+  // Fetch students in selected class using multi-strategy fallback
   let classStudents: any[] = []
   let isLocked = false
   let existingLogs: any[] = []
@@ -47,21 +47,99 @@ export default async function TeacherAttendancePage({
   if (selectedClassId) {
     const selectedClass = classes?.find(c => c.id === selectedClassId)
     if (selectedClass) {
-      // Query students whose grade_level and section match the class name/section
-      // In the database: students has grade_level and section
-      const { data: students } = await supabase
+      let rawStudents: any[] = []
+      const classNameCandidates = [selectedClass.name, selectedClass.class_name, selectedClass.grade_level]
+        .filter(Boolean)
+        .map((label: string) => label.trim())
+        .filter(Boolean)
+
+      // Strategy 1: Query by direct class_id match
+      const { data: directStudents } = await supabase
         .from('students')
         .select(`
           id,
           student_id,
           grade_level,
           section,
+          class_id,
           profiles:id (first_name, last_name)
         `)
-        .eq('grade_level', selectedClass.name)
-        .eq('section', selectedClass.section)
-      
-      classStudents = students || []
+        .eq('class_id', selectedClassId)
+
+      rawStudents = directStudents || []
+
+      // Strategy 2: Query by student_classes junction table if direct class_id returns nothing
+      if (rawStudents.length === 0) {
+        const { data: scData } = await supabase
+          .from('student_classes')
+          .select(`
+            student_id,
+            students:student_id (
+              id,
+              student_id,
+              grade_level,
+              section,
+              class_id,
+              profiles:id (first_name, last_name)
+            )
+          `)
+          .eq('class_id', selectedClassId)
+
+        if (scData && scData.length > 0) {
+          rawStudents = scData.map(sc => (sc as any).students).filter(Boolean)
+        }
+      }
+
+      // Strategy 3: Fallback by class label match
+      if (rawStudents.length === 0 && classNameCandidates.length > 0) {
+        let query = supabase
+          .from('students')
+          .select(`
+            id,
+            student_id,
+            grade_level,
+            section,
+            class_id,
+            profiles:id (first_name, last_name)
+          `)
+
+        if (classNameCandidates.length === 1) {
+          query = query.eq('grade_level', classNameCandidates[0])
+        } else {
+          query = query.in('grade_level', classNameCandidates)
+        }
+
+        let { data: gradeStudents } = await query
+
+        if (gradeStudents && gradeStudents.length > 0) {
+          if (selectedClass.section) {
+            const sectionMatched = gradeStudents.filter(
+              s => s.section && s.section.toLowerCase() === selectedClass.section.toLowerCase()
+            )
+            if (sectionMatched.length > 0) {
+              gradeStudents = sectionMatched
+            }
+          }
+          rawStudents = gradeStudents
+        }
+      }
+
+      // Format and deduplicate student records
+      const studentMap = new Map()
+      for (const s of rawStudents) {
+        if (s && s.id && !studentMap.has(s.id)) {
+          const prof = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles
+          studentMap.set(s.id, {
+            ...s,
+            profiles: {
+              first_name: prof?.first_name || 'Student',
+              last_name: prof?.last_name || `#${s.student_id || s.id.substring(0, 4)}`
+            }
+          })
+        }
+      }
+
+      classStudents = Array.from(studentMap.values())
 
       // Fetch existing attendance logs for this class & date
       const { data: attLogs } = await supabase
@@ -143,7 +221,7 @@ export default async function TeacherAttendancePage({
             await supabase.from('notifications').insert({
               user_id: link.parent_id,
               message: `Alert: ${name} was marked Absent/Late on ${date}. Please contact the school if you have questions.`,
-              link_url: `/dashboard/parent/discipline` // redirect to timeline
+              link_url: `/dashboard/parent/discipline`
             })
           }
         }
