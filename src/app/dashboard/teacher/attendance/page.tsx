@@ -48,10 +48,8 @@ export default async function TeacherAttendancePage({
     const selectedClass = classes?.find(c => c.id === selectedClassId)
     if (selectedClass) {
       let rawStudents: any[] = []
-      const classNameCandidates = [selectedClass.name, selectedClass.class_name, selectedClass.grade_level]
-        .filter(Boolean)
-        .map((label: string) => label.trim())
-        .filter(Boolean)
+      const className = selectedClass.name?.trim() || ''
+      const classBaseName = className.replace(/\s+[A-Z]$/i, '').trim()
 
       // Strategy 1: Query by direct class_id match
       const { data: directStudents } = await supabase
@@ -94,20 +92,14 @@ export default async function TeacherAttendancePage({
         }
       }
 
-      // Strategy 3: Fallback by class label match using grade_level/class_name and section
-      if (rawStudents.length === 0 && classNameCandidates.length > 0) {
-        const queryCandidates = classNameCandidates.reduce((acc: Array<{ grade: string; section?: string | null }>, label) => {
-          if (!label) return acc
-          const parsed = label.trim()
-          if (!parsed) return acc
-          acc.push({ grade: parsed, section: selectedClass.section || null })
-          acc.push({ grade: parsed, section: null })
-          return acc
-        }, [])
+      // Strategy 3: Fallback by exact class name / section match on grade_level
+      if (rawStudents.length === 0 && className) {
+        const gradeLabelCandidates = [className]
+        if (classBaseName && classBaseName !== className) {
+          gradeLabelCandidates.push(classBaseName)
+        }
 
-        const uniqueCandidates = Array.from(new Map(queryCandidates.map(c => [`${c.grade}::${c.section}`, c])).values())
-
-        for (const candidate of uniqueCandidates) {
+        for (const gradeLabel of Array.from(new Set(gradeLabelCandidates))) {
           if (rawStudents.length > 0) break
           let query = supabase
             .from('students')
@@ -119,49 +111,43 @@ export default async function TeacherAttendancePage({
               class_id,
               profiles:id (first_name, last_name)
             `)
-            .eq('grade_level', candidate.grade)
+            .eq('grade_level', gradeLabel)
 
-          if (candidate.section !== null) {
-            query = query.eq('section', candidate.section)
+          if (selectedClass.section) {
+            query = query.eq('section', selectedClass.section)
           }
 
-          const { data: gradeStudents } = await query
-          if (gradeStudents && gradeStudents.length > 0) {
-            rawStudents = gradeStudents
+          const { data: exactStudents } = await query
+          if (exactStudents && exactStudents.length > 0) {
+            rawStudents = exactStudents
             break
           }
         }
       }
 
-      // Strategy 4: Fuzzy fallback for classes like "Grade 1 A" / "Baby Class A"
-      if (rawStudents.length === 0 && selectedClass.name) {
-        const cleanClassName = selectedClass.name.replace(/\s+[A-Z]$/i, '').trim()
-        if (cleanClassName && cleanClassName !== selectedClass.name) {
-          const { data: fuzzyStudents } = await supabase
-            .from('students')
-            .select(`
-              id,
-              student_id,
-              grade_level,
-              section,
-              class_id,
-              profiles:id (first_name, last_name)
-            `)
-            .ilike('grade_level', `%${cleanClassName}%`)
+      // Strategy 4: Fuzzy fallback by partial grade_level match
+      if (rawStudents.length === 0 && className) {
+        const fuzzyLabel = classBaseName || className
+        const { data: fuzzyStudents } = await supabase
+          .from('students')
+          .select(`
+            id,
+            student_id,
+            grade_level,
+            section,
+            class_id,
+            profiles:id (first_name, last_name)
+          `)
+          .ilike('grade_level', `%${fuzzyLabel}%`)
 
-          if (fuzzyStudents && fuzzyStudents.length > 0) {
-            const sectionMatched = selectedClass.section
-              ? fuzzyStudents.filter(
-                  s => s.section && s.section.toLowerCase() === selectedClass.section.toLowerCase()
-                )
-              : fuzzyStudents
+        if (fuzzyStudents && fuzzyStudents.length > 0) {
+          const sectionMatched = selectedClass.section
+            ? fuzzyStudents.filter(
+                s => s.section && s.section.toLowerCase() === selectedClass.section.toLowerCase()
+              )
+            : []
 
-            if (sectionMatched.length > 0) {
-              rawStudents = sectionMatched
-            } else {
-              rawStudents = fuzzyStudents
-            }
-          }
+          rawStudents = sectionMatched.length > 0 ? sectionMatched : fuzzyStudents
         }
       }
 
