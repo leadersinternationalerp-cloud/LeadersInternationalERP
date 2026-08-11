@@ -17,12 +17,17 @@ export async function submitLessonPlanAction(formData: FormData) {
       return { error: 'Please select a valid Class & Subject.' }
     }
 
-    const [class_id, subject_id] = classSubjectPair.split('|')
+    const [class_id, rawSubjectId] = classSubjectPair.split('|')
+    const subject_id = (rawSubjectId && rawSubjectId !== 'null' && rawSubjectId !== 'undefined' && rawSubjectId.trim() !== '') ? rawSubjectId : null
     const week_number = parseInt(formData.get('week_number') as string, 10)
     const term = (formData.get('term') as string) || 'Term 1'
     const academic_year = (formData.get('academic_year') as string) || '2025-2026'
     const teacher_comments = (formData.get('teacher_comments') as string) || ''
     const file = formData.get('file') as File
+
+    if (!class_id || class_id === 'null' || class_id === 'undefined') {
+      return { error: 'Please select a valid Class.' }
+    }
 
     if (!file || file.size === 0) {
       return { error: 'Please select a lesson plan document file to upload.' }
@@ -34,7 +39,7 @@ export async function submitLessonPlanAction(formData: FormData) {
 
     // 1. Upload File to Storage
     const fileExt = file.name.split('.').pop() || 'pdf'
-    const fileName = `${user.id}-${class_id}-${subject_id}-w${week_number}-${Date.now()}.${fileExt}`
+    const fileName = `${user.id}-${class_id}-${subject_id || 'gen'}-w${week_number}-${Date.now()}.${fileExt}`
 
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('lesson_plans')

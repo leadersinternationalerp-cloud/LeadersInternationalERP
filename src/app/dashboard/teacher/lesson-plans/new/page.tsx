@@ -7,7 +7,7 @@ export default async function NewLessonPlanPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Fetch classes & subjects assigned to this teacher
+  // 1. Fetch assigned class_subjects for this teacher
   const { data: classSubjects } = await supabase
     .from('class_subjects')
     .select(`
@@ -18,6 +18,17 @@ export default async function NewLessonPlanPage() {
       subjects (id, name)
     `)
     .eq('teacher_id', user?.id)
+
+  // 2. Fetch all classes and subjects as fallback in case teacher has no explicit class_subjects assigned
+  const { data: allClasses } = await supabase
+    .from('classes')
+    .select('id, name, section')
+    .order('name', { ascending: true })
+
+  const { data: allSubjects } = await supabase
+    .from('subjects')
+    .select('id, name')
+    .order('name', { ascending: true })
 
   return (
     <div style={{ maxWidth: '680px', margin: '0 auto' }}>
@@ -36,7 +47,12 @@ export default async function NewLessonPlanPage() {
       </p>
 
       <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-xl)' }}>
-        <LessonPlanForm classSubjects={classSubjects || []} teacherId={user?.id || ''} />
+        <LessonPlanForm
+          classSubjects={classSubjects || []}
+          allClasses={allClasses || []}
+          allSubjects={allSubjects || []}
+          teacherId={user?.id || ''}
+        />
       </div>
     </div>
   )

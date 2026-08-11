@@ -6,12 +6,22 @@ import { submitLessonPlanAction } from '../actions'
 import { Upload, FileText, CheckCircle2, ArrowLeft, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 
-export function LessonPlanForm({ classSubjects }: { classSubjects: any[], teacherId?: string }) {
+interface LessonPlanFormProps {
+  classSubjects: any[]
+  allClasses?: any[]
+  allSubjects?: any[]
+  teacherId?: string
+}
+
+export function LessonPlanForm({ classSubjects, allClasses = [], allSubjects = [] }: LessonPlanFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null)
+
+  // Use assigned classSubjects if present, otherwise fallback to combinations of allClasses & allSubjects
+  const hasAssigned = classSubjects && classSubjects.length > 0
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -67,15 +77,39 @@ export function LessonPlanForm({ classSubjects }: { classSubjects: any[], teache
         <label className="form-label" style={{ fontWeight: 600 }}>Class & Subject</label>
         <select name="class_subject" className="input-field" required style={{ fontSize: '0.95rem' }}>
           <option value="">Select class and subject...</option>
-          {classSubjects.map(cs => (
-            <option key={cs.id} value={`${cs.class_id}|${cs.subject_id}`}>
-              {cs.classes.name} — {cs.subjects.name}
-            </option>
-          ))}
+
+          {hasAssigned && classSubjects.map(cs => {
+            const className = cs.classes?.name
+              ? `${cs.classes.name}${cs.classes.section ? ` (${cs.classes.section})` : ''}`
+              : 'Class'
+            const subjectName = cs.subjects?.name || 'General / Homeroom'
+            return (
+              <option key={cs.id} value={`${cs.class_id}|${cs.subject_id || ''}`}>
+                {className} — {subjectName}
+              </option>
+            )
+          })}
+
+          {!hasAssigned && allClasses.length > 0 && allClasses.flatMap(c => {
+            const className = `${c.name}${c.section ? ` (${c.section})` : ''}`
+            if (allSubjects.length > 0) {
+              return allSubjects.map(s => (
+                <option key={`${c.id}-${s.id}`} value={`${c.id}|${s.id}`}>
+                  {className} — {s.name}
+                </option>
+              ))
+            }
+            return (
+              <option key={c.id} value={`${c.id}|`}>
+                {className} — General / Homeroom
+              </option>
+            )
+          })}
         </select>
-        {classSubjects.length === 0 && (
+
+        {!hasAssigned && allClasses.length === 0 && (
           <span style={{ fontSize: '0.8rem', color: '#ef4444', marginTop: '0.25rem' }}>
-            No subject assignments found for your account. Please contact your school administrator.
+            No active classes found in system setup. Please contact your school administrator.
           </span>
         )}
       </div>
@@ -116,7 +150,7 @@ export function LessonPlanForm({ classSubjects }: { classSubjects: any[], teache
         />
       </div>
 
-      {/* Custom Drag and Drop File Input Box */}
+      {/* Drag and Drop File Input Box */}
       <div className="form-group">
         <label className="form-label" style={{ fontWeight: 600 }}>Lesson Plan Document File (PDF / DOCX / DOC)</label>
         <div
@@ -184,7 +218,7 @@ export function LessonPlanForm({ classSubjects }: { classSubjects: any[], teache
         <button
           type="submit"
           className="btn btn-primary"
-          disabled={isSubmitting || classSubjects.length === 0}
+          disabled={isSubmitting || (!hasAssigned && allClasses.length === 0)}
           style={{ flex: 1, padding: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
         >
           <Upload size={18} />

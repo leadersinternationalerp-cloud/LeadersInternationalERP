@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS public.lesson_plans (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     teacher_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     class_id UUID NOT NULL REFERENCES public.classes(id) ON DELETE CASCADE,
-    subject_id UUID NOT NULL REFERENCES public.subjects(id) ON DELETE CASCADE,
+    subject_id UUID REFERENCES public.subjects(id) ON DELETE CASCADE,
     week_number INT NOT NULL,
     term TEXT NOT NULL DEFAULT 'Term 1',
     academic_year TEXT NOT NULL DEFAULT '2025-2026',

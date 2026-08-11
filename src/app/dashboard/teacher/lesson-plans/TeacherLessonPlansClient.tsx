@@ -205,7 +205,7 @@ export default function TeacherLessonPlansClient({ plans }: TeacherLessonPlansCl
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div>
                   <h3 style={{ fontSize: '1.15rem', margin: 0, fontWeight: 700, color: 'var(--color-secondary)' }}>
-                    {plan.classes?.name} {plan.classes?.section ? `(${plan.classes.section})` : ''} — {plan.subjects?.name}
+                    {plan.classes?.name || 'Class'} {plan.classes?.section ? `(${plan.classes.section})` : ''} — {plan.subjects?.name || 'General / Homeroom'}
                   </h3>
                   <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', fontSize: '0.825rem', color: 'var(--color-text-muted)', marginTop: '0.35rem' }}>
                     <span>Term: <strong>{plan.term}</strong></span>
@@ -407,7 +407,7 @@ export default function TeacherLessonPlansClient({ plans }: TeacherLessonPlansCl
                 <input
                   type="text"
                   className="input-field"
-                  value={`${selectedPlanForResubmit.classes?.name} — ${selectedPlanForResubmit.subjects?.name} (Week ${selectedPlanForResubmit.week_number}, ${selectedPlanForResubmit.term})`}
+                  value={`${selectedPlanForResubmit.classes?.name || 'Class'} — ${selectedPlanForResubmit.subjects?.name || 'General / Homeroom'} (Week ${selectedPlanForResubmit.week_number}, ${selectedPlanForResubmit.term})`}
                   disabled
                   style={{ opacity: 0.8, backgroundColor: 'rgba(0,0,0,0.03)' }}
                 />
