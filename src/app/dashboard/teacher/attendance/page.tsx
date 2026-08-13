@@ -283,19 +283,6 @@ export default async function TeacherAttendancePage({
         </Link>
       </div>
 
-      {/* Debug panel - temporary, remove when fixed */}
-      {debugInfo && (
-        <div className="glass-panel" style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', backgroundColor: '#fff8db', color: '#5a4631' }}>
-          <strong style={{ display: 'block', marginBottom: 6 }}>Debug: Attendance student lookup</strong>
-          <div style={{ fontSize: '0.85rem' }}>
-            <div>Class: {debugInfo.selectedClassName} ({debugInfo.selectedClassId})</div>
-            <div>Direct students by class_id: {debugInfo.directCount}</div>
-            <div>student_classes rows for class: {debugInfo.junctionCount}</div>
-            <div>Students found after fallbacks: {debugInfo.rawFound}</div>
-            <div>Existing attendance logs for date: {debugInfo.attendanceLogs}</div>
-          </div>
-        </div>
-      )}
 
       {/* Filter Header */}
       <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)', marginBottom: '2rem' }}>
