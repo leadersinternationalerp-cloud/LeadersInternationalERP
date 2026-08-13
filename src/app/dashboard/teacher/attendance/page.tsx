@@ -41,6 +41,7 @@ export default async function TeacherAttendancePage({
 
   // Fetch students in selected class using multi-strategy fallback
   let classStudents: any[] = []
+  let debugInfo: any = null
   let isLocked = false
   let existingLogs: any[] = []
 
@@ -48,6 +49,7 @@ export default async function TeacherAttendancePage({
     const selectedClass = classes?.find(c => c.id === selectedClassId)
     if (selectedClass) {
       let rawStudents: any[] = []
+      let junctionRows: any[] | null = null
       const className = selectedClass.name?.trim() || ''
       const classBaseName = className.replace(/\s+[A-Z]$/i, '').trim()
 
@@ -68,10 +70,12 @@ export default async function TeacherAttendancePage({
 
       // Strategy 2: Query by student_classes junction table if direct class_id returns nothing
       if (rawStudents.length === 0) {
-        const { data: junctionRows } = await supabase
+        const resp = await supabase
           .from('student_classes')
           .select('student_id')
           .eq('class_id', selectedClassId)
+
+        junctionRows = resp.data || []
 
         const studentIds = junctionRows?.map((row: any) => row.student_id).filter(Boolean)
 
@@ -177,6 +181,16 @@ export default async function TeacherAttendancePage({
 
       existingLogs = attLogs || []
       isLocked = existingLogs.some(log => log.is_locked === true)
+
+      // Prepare debug info for troubleshooting student lookup
+      debugInfo = {
+        selectedClassId,
+        selectedClassName: selectedClass.name || null,
+        directCount: (directStudents || []).length,
+        junctionCount: (typeof junctionRows !== 'undefined' && junctionRows ? (junctionRows || []).length : 0),
+        rawFound: (rawStudents || []).length,
+        attendanceLogs: (existingLogs || []).length
+      }
     }
   }
 
@@ -268,6 +282,20 @@ export default async function TeacherAttendancePage({
           Back to Dashboard
         </Link>
       </div>
+
+      {/* Debug panel - temporary, remove when fixed */}
+      {debugInfo && (
+        <div className="glass-panel" style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', backgroundColor: '#fff8db', color: '#5a4631' }}>
+          <strong style={{ display: 'block', marginBottom: 6 }}>Debug: Attendance student lookup</strong>
+          <div style={{ fontSize: '0.85rem' }}>
+            <div>Class: {debugInfo.selectedClassName} ({debugInfo.selectedClassId})</div>
+            <div>Direct students by class_id: {debugInfo.directCount}</div>
+            <div>student_classes rows for class: {debugInfo.junctionCount}</div>
+            <div>Students found after fallbacks: {debugInfo.rawFound}</div>
+            <div>Existing attendance logs for date: {debugInfo.attendanceLogs}</div>
+          </div>
+        </div>
+      )}
 
       {/* Filter Header */}
       <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)', marginBottom: '2rem' }}>
