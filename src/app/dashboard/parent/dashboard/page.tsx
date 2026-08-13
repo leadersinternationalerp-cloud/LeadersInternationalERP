@@ -38,7 +38,7 @@ export default async function ParentDashboardPage({
         student_id,
         grade_level,
         section,
-        profiles:id (first_name, last_name)
+        profiles (first_name, last_name)
       )
     `)
     .eq('parent_id', user?.id)

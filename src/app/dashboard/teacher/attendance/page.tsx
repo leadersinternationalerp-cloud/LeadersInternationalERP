@@ -62,7 +62,7 @@ export default async function TeacherAttendancePage({
           grade_level,
           section,
           class_id,
-          profiles:id (first_name, last_name)
+          profiles (first_name, last_name)
         `)
         .eq('class_id', selectedClassId)
 
@@ -88,7 +88,7 @@ export default async function TeacherAttendancePage({
               grade_level,
               section,
               class_id,
-              profiles:id (first_name, last_name)
+              profiles (first_name, last_name)
             `)
             .in('id', studentIds)
 
@@ -113,7 +113,7 @@ export default async function TeacherAttendancePage({
               grade_level,
               section,
               class_id,
-              profiles:id (first_name, last_name)
+              profiles (first_name, last_name)
             `)
             .eq('grade_level', gradeLabel)
 
@@ -140,7 +140,7 @@ export default async function TeacherAttendancePage({
             grade_level,
             section,
             class_id,
-            profiles:id (first_name, last_name)
+            profiles (first_name, last_name)
           `)
           .ilike('grade_level', `%${fuzzyLabel}%`)
 
@@ -245,7 +245,7 @@ export default async function TeacherAttendancePage({
         // Fetch student details
         const { data: stud } = await supabase
           .from('students')
-          .select('profiles:id (first_name, last_name)')
+          .select('profiles (first_name, last_name)')
           .eq('id', studentId)
           .single()
 

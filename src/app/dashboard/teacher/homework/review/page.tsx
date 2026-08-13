@@ -62,7 +62,7 @@ export default async function TeacherHomeworkReviewPage({
       student:student_id (
         id,
         student_id,
-        profiles:id (first_name, last_name)
+        profiles (first_name, last_name)
       )
     `)
     .eq('homework_id', homeworkId)

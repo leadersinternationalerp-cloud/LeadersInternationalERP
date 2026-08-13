@@ -55,7 +55,7 @@ export default async function ParentBillingHistoryPage({
   // Fetch student profile details
   const { data: student } = await supabase
     .from('students')
-    .select('id, student_id, grade_level, profiles:id (first_name, last_name)')
+    .select('id, student_id, grade_level, profiles (first_name, last_name)')
     .eq('id', childId)
     .single()
 

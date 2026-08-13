@@ -30,7 +30,7 @@ export default async function DeanStudentsPage() {
       student_id,
       grade_level,
       section,
-      profiles:id (first_name, last_name)
+      profiles (first_name, last_name)
     `)
     .order('grade_level', { ascending: true })
 

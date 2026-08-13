@@ -55,7 +55,7 @@ export default async function ParentDisciplinePage({
   // Fetch student profile details
   const { data: student } = await supabase
     .from('students')
-    .select('id, student_id, profiles:id (first_name, last_name)')
+    .select('id, student_id, profiles (first_name, last_name)')
     .eq('id', childId)
     .single()
 

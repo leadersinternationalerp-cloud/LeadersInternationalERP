@@ -35,7 +35,7 @@ export default async function ParentActivitiesPage({
   // Fetch all children linked to parent
   const { data: relations } = await supabase
     .from('student_parents')
-    .select('student_id, students:student_id (id, student_id, grade_level, section, profiles:id (first_name, last_name))')
+    .select('student_id, students:student_id (id, student_id, grade_level, section, profiles (first_name, last_name))')
     .eq('parent_id', user.id)
 
   const children = relations?.map(r => r.students) || []

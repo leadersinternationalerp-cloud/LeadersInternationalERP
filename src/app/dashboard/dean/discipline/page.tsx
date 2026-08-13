@@ -31,7 +31,7 @@ export default async function DeanDisciplinePage() {
     .select(`
       id,
       student_id,
-      profiles:id (first_name, last_name)
+      profiles (first_name, last_name)
     `)
 
   // Fetch all logged discipline incidents
@@ -42,7 +42,7 @@ export default async function DeanDisciplinePage() {
       student:student_id (
         id,
         student_id,
-        profiles:id (first_name, last_name)
+        profiles (first_name, last_name)
       ),
       recorder:created_by (first_name, last_name)
     `)
@@ -85,7 +85,7 @@ export default async function DeanDisciplinePage() {
     // 2. Fetch student details for parent alert
     const { data: stud } = await supabase
       .from('students')
-      .select('profiles:id (first_name, last_name)')
+      .select('profiles (first_name, last_name)')
       .eq('id', studentId)
       .single()
 
