@@ -5,45 +5,21 @@ import nodemailer from 'nodemailer'
 
 // Centralized Email Sender - uses Nodemailer with SMTP, fallback to simulator
 export async function sendEmail(to: string, subject: string, htmlContent: string) {
-  const smtpHost = process.env.SMTP_HOST
-  const smtpPort = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587
-  const smtpUser = process.env.SMTP_USER
-  const smtpPass = process.env.SMTP_PASS
-  const fromEmail = process.env.SMTP_FROM_EMAIL || 'noreply@leaders.ac.tz'
-
-  if (smtpHost && smtpUser && smtpPass) {
-    console.log(`[EMAIL SENDER] Dispatching real email to ${to} via SMTP...`)
-    try {
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465, // true for 465, false for other ports
-        auth: {
-          user: smtpUser,
-          pass: smtpPass,
-        },
-      })
-
-      const info = await transporter.sendMail({
-        from: `"Leaders International ERP" <${fromEmail}>`,
-        to: to,
-        subject: subject,
-        html: htmlContent,
-      })
-
-      console.log('[EMAIL SENDER] SMTP email sent successfully:', info.messageId)
-      return { success: true }
-    } catch (e: any) {
-      console.error('[EMAIL SENDER] SMTP request failed:', e.message)
-      return { success: false, error: e.message }
-    }
-  } else {
-    console.log(`[EMAIL SIMULATOR] Outbox to ${to} | Subject: "${subject}" | Content Preview: "${htmlContent.replace(/<[^>]*>/g, '').trim().substring(0, 100)}..."`)
-    return { success: true }
+  const { sendMail } = await import('@/lib/email/mailer');
+  const result = await sendMail({
+    to,
+    subject,
+    html: htmlContent,
+  });
+  if (result.ok) {
+    return { success: true };
   }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(`Failed to send email to ${to}: ${result.error}`);
+  }
+  return { success: false, error: result.error };
 }
 
-// Modular SMS Sender - supports generic local Tanzanian providers (e.g. Beem, NextSMS, or Africa's Talking)
 export async function sendSMS(phone: string, message: string) {
   const apiKey = process.env.SMS_API_KEY
   const senderId = process.env.SMS_SENDER_ID || 'LEADERS'

@@ -8,17 +8,21 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
   },
   projects: [
     {
-      name: 'chromium',
+      name: 'Desktop Chrome',
       use: { ...devices['Desktop Chrome'] },
     },
     {
-      name: 'Mobile Chrome',
+      name: 'Pixel 5',
       use: { ...devices['Pixel 5'] },
+    },
+    {
+      name: 'iPhone 14 (WebKit)',
+      use: { ...devices['iPhone 14'] },
     },
   ],
 });

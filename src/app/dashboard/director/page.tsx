@@ -174,7 +174,7 @@ export default async function DirectorDashboardPage() {
               <span style={{ color: 'var(--color-text)' }}>Pending Salary Advances</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <span style={{ fontWeight: 600, color: (pendingAdvances || 0) > 0 ? 'var(--color-warning)' : 'var(--color-text-muted)' }}>{pendingAdvances || 0}</span>
-                <Link href="/dashboard/director/salary-advances" style={{ fontSize: '0.85rem', color: 'var(--color-primary)', textDecoration: 'none' }}>Review</Link>
+                <Link href="/dashboard/director/advance-requests" style={{ fontSize: '0.85rem', color: 'var(--color-primary)', textDecoration: 'none' }}>Review</Link>
               </div>
             </div>
           </div>

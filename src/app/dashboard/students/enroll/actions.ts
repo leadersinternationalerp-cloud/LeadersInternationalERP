@@ -1,19 +1,33 @@
 'use server'
 
+import crypto from 'crypto'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { revalidatePath } from 'next/cache'
 import { logAuditAction } from '@/utils/audit'
+import { getSessionUser } from '@/lib/auth/session'
+import { hasAnyRole } from '@/lib/auth/roles'
+import { sanitizePostgrestValue, escapeLike } from '@/lib/sanitize'
+
+const ALLOWED_STAFF_ROLES = ['System Admin', 'Director', 'Principal', 'Dean', 'HOS', 'Head of Section'] as const
 
 export async function searchParentsAction(query: string) {
-  const supabase = await createClient()
+  const session = await getSessionUser()
+  if (!session.user || !hasAnyRole(session.roles, ALLOWED_STAFF_ROLES)) {
+    return { error: 'Unauthorized' }
+  }
 
-  // Find parents by name or email
+  const supabase = await createClient()
+  const term = sanitizePostgrestValue(query)
+  if (!term) return { data: [] }
+  const escaped = escapeLike(term)
+
+  // Find parents by name or email with array containment and sanitized ILIKE
   const { data, error } = await supabase
     .from('profiles')
     .select('id, first_name, last_name, email, phone')
-    .like('roles', '%Parent%')
-    .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,email.ilike.%${query}%`)
+    .contains('roles', ['Parent'])
+    .or(`first_name.ilike.%${escaped}%,last_name.ilike.%${escaped}%,email.ilike.%${escaped}%`)
     .limit(10)
 
   if (error) {
@@ -24,16 +38,24 @@ export async function searchParentsAction(query: string) {
 }
 
 export async function enrollStudentAction(formData: any) {
+  const session = await getSessionUser()
+  if (!session.user || !hasAnyRole(session.roles, ALLOWED_STAFF_ROLES)) {
+    return { error: 'Unauthorized' }
+  }
+
   const supabaseService = createServiceClient()
   
-  // 1. Create Auth User
+  // 1. Create Auth User with random temporary secret
   const email = formData.email || `student.${Date.now()}@leaders.ac.tz`
-  const password = 'Password@123'
+  const temporaryPassword = crypto.randomUUID()
 
   const { data: authData, error: authError } = await supabaseService.auth.admin.createUser({
     email,
-    password,
-    email_confirm: true
+    password: temporaryPassword,
+    email_confirm: true,
+    user_metadata: {
+      first_login: true,
+    }
   })
 
   if (authError || !authData.user) {
@@ -53,22 +75,34 @@ export async function enrollStudentAction(formData: any) {
       phone: formData.phone || null,
       role: 'Student', // Legacy
       roles: ['Student'], // New array
-      username: `student.${Date.now()}`
+      username: `student.${Date.now()}`,
+      force_pin_change: true,
     })
 
   if (profileError) {
-    // Attempt rollback
+    // Rollback auth user
     await supabaseService.auth.admin.deleteUser(userId)
     return { error: `Failed to create profile: ${profileError.message}` }
   }
 
-  // 3. Generate Student ID
-  const { count } = await supabaseService
-    .from('students')
-    .select('*', { count: 'exact', head: true })
-  
-  const nextId = (count || 0) + 1
-  const studentIdStr = `STUD-${nextId.toString().padStart(4, '0')}`
+  // 3. Generate Student ID via sequence RPC or fallback
+  let studentIdStr = ''
+  try {
+    const { data: seqVal } = await supabaseService.rpc('nextval_student_code')
+    if (seqVal) {
+      studentIdStr = `STUD-${String(seqVal).padStart(4, '0')}`
+    }
+  } catch {
+    // fallback
+  }
+
+  if (!studentIdStr) {
+    const { count } = await supabaseService
+      .from('students')
+      .select('*', { count: 'exact', head: true })
+    const nextId = (count || 0) + 1000 + Math.floor(Math.random() * 50)
+    studentIdStr = `STUD-${nextId.toString().padStart(4, '0')}`
+  }
 
   // Find class ID matching name or class_name with section fallbacks
   let classId = null
@@ -78,18 +112,18 @@ export async function enrollStudentAction(formData: any) {
 
   if (classList && classList.length > 0) {
     const searchName = `${formData.grade_level} ${formData.section || ''}`.trim().toLowerCase()
-    const exactNameMatch = classList.find(c => c.name.toLowerCase() === searchName)
+    const exactNameMatch = classList.find(c => (c.name || '').toLowerCase() === searchName)
     if (exactNameMatch) {
       classId = exactNameMatch.id
     } else {
       const matchByGrade = classList.find(c => 
-        c.name.toLowerCase().includes(formData.grade_level.toLowerCase()) && 
+        (c.name || '').toLowerCase().includes((formData.grade_level || '').toLowerCase()) && 
         (!formData.section || c.section?.toLowerCase() === formData.section?.toLowerCase())
       )
       if (matchByGrade) {
         classId = matchByGrade.id
       } else {
-        const matchByGradeOnly = classList.find(c => c.name.toLowerCase().includes(formData.grade_level.toLowerCase()))
+        const matchByGradeOnly = classList.find(c => (c.name || '').toLowerCase().includes((formData.grade_level || '').toLowerCase()))
         if (matchByGradeOnly) {
           classId = matchByGradeOnly.id
         }
@@ -156,6 +190,11 @@ export async function enrollStudentAction(formData: any) {
 }
 
 export async function updateStudentAction(studentId: string, formData: any) {
+  const session = await getSessionUser()
+  if (!session.user || !hasAnyRole(session.roles, ALLOWED_STAFF_ROLES)) {
+    return { error: 'Unauthorized' }
+  }
+
   const supabaseService = createServiceClient()
 
   // 1. Update Profile (first_name, last_name, email, phone)
@@ -181,18 +220,18 @@ export async function updateStudentAction(studentId: string, formData: any) {
 
   if (classList && classList.length > 0) {
     const searchName = `${formData.grade_level} ${formData.section || ''}`.trim().toLowerCase()
-    const exactNameMatch = classList.find(c => c.name.toLowerCase() === searchName)
+    const exactNameMatch = classList.find(c => (c.name || '').toLowerCase() === searchName)
     if (exactNameMatch) {
       classId = exactNameMatch.id
     } else {
       const matchByGrade = classList.find(c => 
-        c.name.toLowerCase().includes(formData.grade_level.toLowerCase()) && 
+        (c.name || '').toLowerCase().includes((formData.grade_level || '').toLowerCase()) && 
         (!formData.section || c.section?.toLowerCase() === formData.section?.toLowerCase())
       )
       if (matchByGrade) {
         classId = matchByGrade.id
       } else {
-        const matchByGradeOnly = classList.find(c => c.name.toLowerCase().includes(formData.grade_level.toLowerCase()))
+        const matchByGradeOnly = classList.find(c => (c.name || '').toLowerCase().includes((formData.grade_level || '').toLowerCase()))
         if (matchByGradeOnly) {
           classId = matchByGradeOnly.id
         }
@@ -240,7 +279,7 @@ export async function updateStudentAction(studentId: string, formData: any) {
       email: formData.email
     })
     if (authError) {
-      console.warn('Failed to update auth email (normal if email is duplicate):', authError.message)
+      console.warn('Failed to update auth email:', authError.message)
     }
   }
 
@@ -251,6 +290,11 @@ export async function updateStudentAction(studentId: string, formData: any) {
 }
 
 export async function toggleStudentActiveAction(studentId: string, currentActiveStatus: boolean) {
+  const session = await getSessionUser()
+  if (!session.user || !hasAnyRole(session.roles, ALLOWED_STAFF_ROLES)) {
+    return { error: 'Unauthorized' }
+  }
+
   const supabaseService = createServiceClient()
   const newStatus = !currentActiveStatus
 
@@ -285,7 +329,12 @@ export async function toggleStudentActiveAction(studentId: string, currentActive
   return { success: true, is_active: newStatus }
 }
 
-export async function cleanupOldInactiveStudents() {
+export async function cleanupOldInactiveStudents(dryRun: boolean = true) {
+  const session = await getSessionUser()
+  if (!session.user || !hasAnyRole(session.roles, ['System Admin', 'Director'])) {
+    return { error: 'Unauthorized' }
+  }
+
   const supabase = createServiceClient()
 
   // 1. Fetch all profiles that are inactive (is_active = false) and updated more than 1 year ago
@@ -300,7 +349,6 @@ export async function cleanupOldInactiveStudents() {
     .lt('updated_at', oneYearAgoISO)
 
   if (fetchErr) {
-    console.error('[CLEANUP ERROR] Failed to fetch inactive profiles:', fetchErr.message)
     return { error: fetchErr.message }
   }
 
@@ -310,26 +358,29 @@ export async function cleanupOldInactiveStudents() {
   )
 
   if (studentProfiles.length === 0) {
-    return { success: true, count: 0 }
+    return { success: true, count: 0, dryRun }
   }
 
-  console.log(`[CLEANUP] Found ${studentProfiles.length} inactive student profiles to delete.`)
+  if (dryRun) {
+    return {
+      success: true,
+      dryRun: true,
+      count: studentProfiles.length,
+      candidates: studentProfiles.map(p => ({ id: p.id, name: `${p.first_name} ${p.last_name}` }))
+    }
+  }
 
   let deleteCount = 0
   for (const prof of studentProfiles) {
     try {
-      // Delete auth user (cascades to profiles, students, and other dependent tables)
       const { error: deleteErr } = await supabase.auth.admin.deleteUser(prof.id)
-      if (deleteErr) {
-        console.error(`[CLEANUP ERROR] Failed to delete user ${prof.id}:`, deleteErr.message)
-      } else {
-        console.log(`[CLEANUP] Successfully deleted deactivated student: ${prof.first_name} ${prof.last_name} (${prof.id})`)
+      if (!deleteErr) {
         deleteCount++
       }
-    } catch (e: any) {
-      console.error(`[CLEANUP ERROR] Exception for student ${prof.id}:`, e.message)
+    } catch {
+      // ignore
     }
   }
 
-  return { success: true, count: deleteCount }
+  return { success: true, count: deleteCount, dryRun: false }
 }

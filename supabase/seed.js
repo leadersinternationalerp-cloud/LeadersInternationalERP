@@ -366,6 +366,7 @@ async function seedCambridgeSyllabus() {
     }
   }
 }
+}
 
 async function seed() {
   console.log('\n--- Seeding academic years & terms ---');

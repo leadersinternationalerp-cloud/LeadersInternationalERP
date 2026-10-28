@@ -29,7 +29,7 @@ export default async function DeanDashboardPage() {
 
   // 2. Open Discipline Cases
   const { count: disciplineCount } = await supabase
-    .from('discipline')
+    .from('discipline_records')
     .select('*', { count: 'exact', head: true })
     .eq('status', 'Open')
 

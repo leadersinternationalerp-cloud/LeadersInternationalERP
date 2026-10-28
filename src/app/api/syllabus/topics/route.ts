@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import curriculumData from '@/lib/data/curriculum/all_subjects.json'
+import { withAuth } from '@/lib/api/guard'
 
 // Normalize subject names so variants like 'Art & Craft' and 'Art and Craft' match.
 const normalizeKey = (value: string) =>
@@ -55,100 +55,113 @@ const getTopicsFromLocalCurriculum = (subjectName: string, stageNumber: string) 
     }))
 }
 
-export async function GET(request: Request) {
-  const url = new URL(request.url)
-  const subjectName = url.searchParams.get('subjectName') || ''
-  const gradeLevel = url.searchParams.get('gradeLevel') || 'Grade 1'
+export const GET = withAuth(
+  async (request: NextRequest, { supabase }) => {
+    const url = new URL(request.url)
+    const subjectName = url.searchParams.get('subjectName') || ''
+    const gradeLevel = url.searchParams.get('gradeLevel') || 'Grade 1'
 
-  if (!subjectName) {
-    return NextResponse.json({ success: false, error: 'subjectName is required' }, { status: 400 })
-  }
-
-  const stageNumber = getStageNumber(gradeLevel)
-  const localTopics = getTopicsFromLocalCurriculum(subjectName, stageNumber)
-
-  try {
-    const supabase = await createClient()
-
-    // Match the stage by its numeric level so both 'Stage 3' and legacy
-    // labels like 'Primary Stage 3' resolve correctly.
-    const { data: stages, error: stageError } = await supabase
-      .from('cambridge_stages')
-      .select('id, stage_name')
-
-    if (stageError) {
-      console.error('Syllabus topics route stage error:', stageError.message)
-      return NextResponse.json({ success: true, topics: localTopics, source: 'local' })
+    if (!subjectName) {
+      return NextResponse.json({ success: false, error: 'subjectName is required' }, { status: 400 })
     }
 
-    const stage = (stages || []).find((row: any) => {
-      const match = String(row.stage_name || '').match(/\d+/)
-      return match && match[0] === stageNumber
-    })
+    const stageNumber = getStageNumber(gradeLevel)
+    const localTopics = getTopicsFromLocalCurriculum(subjectName, stageNumber)
 
-    if (!stage) {
-      console.warn(`Syllabus stage not found for level ${stageNumber}; using local curriculum fallback`)
-      return NextResponse.json({ success: true, topics: localTopics, source: 'local' })
-    }
+    try {
+      // Match the stage by its numeric level so both 'Stage 3' and legacy
+      // labels like 'Primary Stage 3' resolve correctly.
+      const { data: stages, error: stageError } = await supabase
+        .from('cambridge_stages')
+        .select('id, stage_name')
 
-    const { data: subjects, error: subjectsError } = await supabase
-      .from('cambridge_subjects')
-      .select('id, subject_name')
-      .eq('stage_id', stage.id)
+      if (stageError) {
+        console.error('Syllabus topics route stage error:', stageError.message)
+        return NextResponse.json({ success: true, topics: localTopics, source: 'local' })
+      }
 
-    if (subjectsError) {
-      console.error('Syllabus topics route subjects error:', subjectsError.message)
-      return NextResponse.json({ success: true, topics: localTopics, source: 'local' })
-    }
-    if (!subjects || !subjects.length) {
-      return NextResponse.json({ success: true, topics: localTopics, source: 'local' })
-    }
-
-    const matchingSubject = findBestMatchingSubject(subjects, subjectName)
-    if (!matchingSubject) {
-      return NextResponse.json({ success: true, topics: localTopics, source: 'local' })
-    }
-
-    const { data: units, error: unitsError } = await supabase
-      .from('cambridge_units')
-      .select('id, unit_title, topics:cambridge_topics(id, topic_number, topic_title, objectives:cambridge_learning_objectives(objective_text))')
-      .eq('cambridge_subject_id', matchingSubject.id)
-
-    if (unitsError) {
-      console.error('Syllabus topics route units error:', unitsError.message)
-      return NextResponse.json({ success: true, topics: localTopics, source: 'local' })
-    }
-
-    const topics = (units || []).flatMap((unit: any) =>
-      (unit.topics || []).map((topic: any) => {
-        let objectives = (topic.objectives || []).map((o: any) => o.objective_text || '')
-        if (!objectives.length) {
-          const matchingLocal = localTopics.find(
-            (lt) => normalizeKey(lt.topicTitle) === normalizeKey(topic.topic_title)
-              || normalizeKey(lt.topicNumber) === normalizeKey(topic.topic_number)
-          )
-          if (matchingLocal) {
-            objectives = matchingLocal.objectives
-          }
-        }
-        return {
-          id: topic.id,
-          topicNumber: topic.topic_number,
-          topicTitle: topic.topic_title,
-          unitTitle: unit.unit_title,
-          objectives
-        }
+      const stage = (stages || []).find((row: any) => {
+        const match = String(row.stage_name || '').match(/\d+/)
+        return match && match[0] === stageNumber
       })
-    )
 
-    // If the DB has no topics for this subject/stage yet, fall back to the local schemes JSON.
-    if (!topics.length) {
+      if (!stage) {
+        console.warn(`Syllabus stage not found for level ${stageNumber}; using local curriculum fallback`)
+        return NextResponse.json({ success: true, topics: localTopics, source: 'local' })
+      }
+
+      // Find the Cambridge subject linked to this stage
+      const { data: cambridgeSubjects, error: subError } = await supabase
+        .from('cambridge_subjects')
+        .select('id, subject_name')
+        .eq('stage_id', stage.id)
+
+      if (subError) {
+        console.error('Syllabus topics route subject error:', subError.message)
+        return NextResponse.json({ success: true, topics: localTopics, source: 'local' })
+      }
+
+      const cambridgeSubject = findBestMatchingSubject(cambridgeSubjects || [], subjectName)
+      if (!cambridgeSubject) {
+        return NextResponse.json({ success: true, topics: localTopics, source: 'local' })
+      }
+
+      // Fetch units and nested topics
+      const { data: units, error: unitError } = await supabase
+        .from('cambridge_units')
+        .select(`
+          id,
+          unit_title,
+          unit_number,
+          topics:cambridge_topics (
+            id,
+            topic_number,
+            topic_title,
+            objectives:cambridge_learning_objectives (
+              id,
+              objective_text
+            )
+          )
+        `)
+        .eq('cambridge_subject_id', cambridgeSubject.id)
+        .order('unit_number', { ascending: true })
+
+      if (unitError) {
+        console.error('Syllabus topics route units error:', unitError.message)
+        return NextResponse.json({ success: true, topics: localTopics, source: 'local' })
+      }
+
+      const topics = (units || []).flatMap((unit: any) =>
+        (unit.topics || []).map((topic: any) => {
+          let objectives = (topic.objectives || []).map((o: any) => o.objective_text || '')
+          if (!objectives.length) {
+            const matchingLocal = localTopics.find(
+              (lt) => normalizeKey(lt.topicTitle) === normalizeKey(topic.topic_title)
+                || normalizeKey(lt.topicNumber) === normalizeKey(topic.topic_number)
+            )
+            if (matchingLocal) {
+              objectives = matchingLocal.objectives
+            }
+          }
+          return {
+            id: topic.id,
+            topicNumber: topic.topic_number,
+            topicTitle: topic.topic_title,
+            unitTitle: unit.unit_title,
+            objectives
+          }
+        })
+      )
+
+      // If the DB has no topics for this subject/stage yet, fall back to the local schemes JSON.
+      if (!topics.length) {
+        return NextResponse.json({ success: true, topics: localTopics, source: 'local' })
+      }
+
+      return NextResponse.json({ success: true, topics, source: 'database' })
+    } catch (error: any) {
+      console.error('Syllabus topics route unexpected error:', error?.message || error)
       return NextResponse.json({ success: true, topics: localTopics, source: 'local' })
     }
-
-    return NextResponse.json({ success: true, topics, source: 'database' })
-  } catch (error: any) {
-    console.error('Syllabus topics route unexpected error:', error?.message || error)
-    return NextResponse.json({ success: true, topics: localTopics, source: 'local' })
   }
-}
+)

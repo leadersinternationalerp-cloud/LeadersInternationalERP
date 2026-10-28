@@ -43,7 +43,7 @@ export default async function DeanStudentsPage() {
   const [attRes, marksRes, discRes] = await Promise.all([
     supabase.from('attendance').select('student_id, status'),
     supabase.from('marks').select('student_id, score').eq('is_released', true),
-    supabase.from('discipline').select('student_id, status')
+    supabase.from('discipline_records').select('student_id, status')
   ])
 
   const attendanceMap = new Map<string, any[]>()

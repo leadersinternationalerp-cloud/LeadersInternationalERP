@@ -80,7 +80,7 @@ export default async function TeacherDashboard() {
           <Link href="/dashboard/teacher/lesson-plans/new" className="btn btn-primary">
             + Lesson Plan
           </Link>
-          <Link href="/dashboard/teacher/homework/new" className="btn" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+          <Link href="/dashboard/teacher/homework" className="btn" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
             + Homework
           </Link>
         </div>

@@ -167,7 +167,7 @@ export class AccountingService {
     );
 
     const supabase = await createClient();
-    await supabase.from('payroll').update({ journal_entry_id: journalId }).eq('id', payrollId);
+    await supabase.from('payrolls').update({ journal_entry_id: journalId }).eq('id', payrollId);
     return journalId;
   }
 }

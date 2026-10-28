@@ -8,20 +8,29 @@ export default function PWARegister() {
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
-    // Register service worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker
-        .register('/sw.js')
-        .then((registration) => {
-          console.log('Service Worker registered:', registration);
-        })
-        .catch((error) => {
-          console.error('Service Worker registration failed:', error);
-        });
+    // Register service worker in production
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+      const onLoad = () => {
+        navigator.serviceWorker
+          .register('/sw.js', { updateViaCache: 'none' })
+          .then((registration) => {
+            console.log('Service Worker registered successfully:', registration.scope);
+          })
+          .catch((error) => {
+            console.error('Service Worker registration failed:', error);
+          });
+      };
+
+      if (document.readyState === 'complete') {
+        onLoad();
+      } else {
+        window.addEventListener('load', onLoad);
+        return () => window.removeEventListener('load', onLoad);
+      }
     }
 
     // Check if app is already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
+    if (typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches) {
       setIsInstalled(true);
     }
 
@@ -37,7 +46,6 @@ export default function PWARegister() {
       setIsInstalled(true);
       setIsInstallable(false);
       setDeferredPrompt(null);
-      console.log('PWA was installed');
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -74,7 +82,7 @@ export default function PWARegister() {
         <div className="fixed bottom-4 right-4 z-50">
           <button
             onClick={handleInstallClick}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg flex items-center gap-2"
+            className="btn btn-primary shadow-lg flex items-center gap-2"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

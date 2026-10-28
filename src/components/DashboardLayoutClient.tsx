@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { 
-  LayoutDashboard, CalendarDays, Users, UserCog, BookOpen, FileSpreadsheet, 
+  CalendarCheck, ShieldAlert, LayoutDashboard, CalendarDays, Users, UserCog, BookOpen, FileSpreadsheet, 
   Settings, Wallet, Receipt, Bell, Menu, X, LogOut,
   UsersRound, Scale, Plug, Fingerprint, Package, Bus, School,
   ClipboardCheck, PenLine, Baby, Puzzle, Layers, Sparkles,
@@ -469,9 +469,14 @@ export default function DashboardLayoutClient({
               )}
 
               {(userRoles.includes('System Admin') || userRoles.includes('Principal')) && (
+                <>
+                  <NavLink href="/dashboard/principal/collection-report" icon={FileSpreadsheet}>
+                  Fee Collection Report
+                </NavLink>
                 <NavLink href="/dashboard/principal/report-cards" icon={FileSpreadsheet}>
                   Report Cards (Principal)
                 </NavLink>
+                </>
               )}
 
               {(userRoles.includes('System Admin') || 

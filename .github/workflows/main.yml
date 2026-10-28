@@ -7,7 +7,7 @@ on:
     branches: [ main, master ]
 
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,9 +22,16 @@ jobs:
     - name: Install dependencies
       run: npm ci
       
-    - name: Build project
+    - name: TypeScript Check
+      run: npm run typecheck
+
+    - name: Unit & Link Integrity Tests
+      run: npm run test:unit
+      
+    - name: Build Project
       run: npm run build
       env:
-        # Ignore TypeScript errors during initial build setup if necessary,
-        # but ideal to run without it. Next.js fails builds on TS errors.
         NEXT_TELEMETRY_DISABLED: 1
+        NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder
+        SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder

@@ -12,12 +12,12 @@ export default async function AdvancesPage() {
   let netSalary = 1500000 // Default fallback TZS
   try {
     const { data: sal } = await supabase
-      .from('salaries')
-      .select('basic_pay')
+      .from('salary_settings')
+      .select('basic_salary')
       .eq('employee_id', user?.id)
       .maybeSingle()
     if (sal) {
-      netSalary = Number(sal.basic_pay)
+      netSalary = Number(sal.basic_salary)
     }
   } catch (e) {
     // Ignore and use fallback
