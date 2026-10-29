@@ -33,7 +33,7 @@ export default async function FinancialStatementsPage({ searchParams }: { search
   let tb: any[] = []
   let pl: any = { revenue: [], expenses: [], totalRevenue: 0, totalExpenses: 0, netIncome: 0 }
   let bs: any = { assets: [], liabilities: [], equity: [], totalAssets: 0, totalLiabilities: 0, totalEquity: 0 }
-  let budgetsMap: Record<string, number> = {}
+  const budgetsMap: Record<string, number> = {}
   let errorMsg = null
 
   try {

@@ -89,7 +89,7 @@ export async function generateDetailedReceiptPdfBuffer(paymentId: string): Promi
   doc.on('data', chunk => chunks.push(chunk))
 
   // Start drawing receipt body contents below the letterhead (Y=105)
-  let boxY = 105
+  const boxY = 105
   doc.strokeColor('#e2e8f0').lineWidth(0.5)
   
   // Box 1 (Left): Student Details
@@ -122,7 +122,7 @@ export async function generateDetailedReceiptPdfBuffer(paymentId: string): Promi
   doc.text(paidStr, 385, boxY + 62)
 
   // 3. Vote Head Breakdown Table
-  let tableY = 195
+  const tableY = 195
   doc.rect(40, tableY, 515, 20).fill('#f8fafc')
   doc.strokeColor('#e2e8f0').rect(40, tableY, 515, 20).stroke()
   

@@ -306,7 +306,7 @@ export async function GET(request: Request) {
       // Fetch class info
       let className = student.grade_level || 'Grade 1'
       let classSection = student.section || ''
-      let classId = student.class_id
+      const classId = student.class_id
 
       if (classId) {
         const { data: classData } = await supabase
@@ -448,9 +448,9 @@ export async function GET(request: Request) {
         .eq('term_id', term_id)
         .maybeSingle()
 
-      let conductGrade = reportCardRecord?.conduct_grade || 'A'
-      let conductRemark = reportCardRecord?.conduct_remark || 'Excellent conduct shown in all learning fields.'
-      let classTeacherComment = reportCardRecord?.class_teacher_comment || 'A hardworking student who shows keen focus in all classes.'
+      const conductGrade = reportCardRecord?.conduct_grade || 'A'
+      const conductRemark = reportCardRecord?.conduct_remark || 'Excellent conduct shown in all learning fields.'
+      const classTeacherComment = reportCardRecord?.class_teacher_comment || 'A hardworking student who shows keen focus in all classes.'
       let principalComment = reportCardRecord?.principal_comment || ''
 
       // Fetch principal grade comments if empty

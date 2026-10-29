@@ -117,7 +117,7 @@ export async function POST(request: Request) {
           .eq('is_current', true)
           .maybeSingle();
 
-        let termName = activeTerm?.name || 'Term 3';
+        const termName = activeTerm?.name || 'Term 3';
         let academicYearName = '2025-2026';
 
         if (activeTerm?.academic_year_id) {

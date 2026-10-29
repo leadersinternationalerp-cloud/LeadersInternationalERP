@@ -361,7 +361,7 @@ export async function getCurrentTermAndYear() {
     .eq('is_current', true)
     .maybeSingle()
 
-  let termName = activeTerm?.name || 'Term 3'
+  const termName = activeTerm?.name || 'Term 3'
   let academicYearName = '2025-2026'
 
   const joinedYear: any = activeTerm?.academic_years

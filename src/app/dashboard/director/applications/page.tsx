@@ -71,7 +71,7 @@ export default async function DirectorApplicationsInbox({
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    let status = action === 'approve' ? 'Approved' : action === 'decline' ? 'Declined' : 'Returned'
+    const status = action === 'approve' ? 'Approved' : action === 'decline' ? 'Declined' : 'Returned'
 
     if (type === 'leave') {
       await supabase.from('leave_applications').update({

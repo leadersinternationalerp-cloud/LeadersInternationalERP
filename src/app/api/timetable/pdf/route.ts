@@ -18,7 +18,7 @@ export const GET = withAuth(
         slotClassQuery = slotClassQuery.is('class_id', null)
       }
 
-      let { data: slots, error: slotErr } = await slotClassQuery
+      const { data: initialSlots, error: slotErr } = await slotClassQuery; let slots = initialSlots
       if (slotErr) return NextResponse.json({ error: slotErr.message }, { status: 500 })
 
       // Fallback if class slots empty

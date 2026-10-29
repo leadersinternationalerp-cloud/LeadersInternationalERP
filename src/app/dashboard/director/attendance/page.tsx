@@ -52,7 +52,7 @@ export default async function DirectorAttendanceReportsPage({
 
   // Determine date filter threshold
   const today = new Date()
-  let thresholdDate = new Date()
+  const thresholdDate = new Date()
   if (dateRange === 'weekly') {
     thresholdDate.setDate(today.getDate() - 7)
   } else if (dateRange === 'monthly') {

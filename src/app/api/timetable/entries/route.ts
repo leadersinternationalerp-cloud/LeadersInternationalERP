@@ -66,8 +66,8 @@ export async function POST(request: NextRequest) {
       }
 
       // 1. Fetch Slots
-      let slotQuery = supabase.from('timetable_slots').select('*').order('period_number', { ascending: true })
-      let { data: slots, error: slotErr } = await slotQuery.eq('class_id', class_id)
+      const slotQuery = supabase.from('timetable_slots').select('*').order('period_number', { ascending: true })
+      const { data: initialSlots, error: slotErr } = await slotQuery.eq('class_id', class_id); let slots = initialSlots
       if (slotErr) return NextResponse.json({ error: slotErr.message }, { status: 500 })
 
       if (!slots || slots.length === 0) {

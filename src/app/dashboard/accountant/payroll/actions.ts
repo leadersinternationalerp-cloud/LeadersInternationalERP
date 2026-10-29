@@ -84,7 +84,7 @@ export async function generatePayrollAction(month: number, year: number, notes?:
   const payslipsToInsert = staffProfiles.map(staff => {
     const setting = settingsMap.get(staff.id)
     let basicPay = setting ? Number(setting.basic_salary) : 1500000
-    let allowances = setting ? Number(setting.allowances) : 0
+    const allowances = setting ? Number(setting.allowances) : 0
     let deductions = setting ? Number(setting.deductions) : 0
 
     // fallback base pay if no setting exists

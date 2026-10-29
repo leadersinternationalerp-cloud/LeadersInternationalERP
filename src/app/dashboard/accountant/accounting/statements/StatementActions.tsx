@@ -4,13 +4,13 @@ export function StatementActions() {
   const exportExcel = () => {
     // Very basic CSV export logic grabbing all table data
     const tables = document.querySelectorAll('table')
-    let csv: string[] = []
+    const csv: string[] = []
     
     tables.forEach(table => {
       const rows = table.querySelectorAll('tr')
       rows.forEach(row => {
-        let cols = row.querySelectorAll('td, th')
-        let rowData: string[] = []
+        const cols = row.querySelectorAll('td, th')
+        const rowData: string[] = []
         cols.forEach(col => rowData.push('"' + (col.textContent || '').trim().replace(/"/g, '""') + '"'))
         csv.push(rowData.join(','))
       })
