@@ -335,16 +335,16 @@ export default function AdmissionsClient({ initialApplications }: Props) {
 
       {/* 4. Applications Data Table */}
       <div className="table-wrapper">
-        <table style={{ width: '100%', minWidth: '950px' }}>
+        <table style={{ width: '100%', minWidth: '900px' }}>
           <thead>
             <tr>
-              <th>Application #</th>
-              <th>Candidate / Student</th>
-              <th>Class & Curriculum</th>
-              <th>Parent / Contact</th>
-              <th>Submitted</th>
-              <th>Status</th>
-              <th style={{ textAlign: 'right' }}>Actions</th>
+              <th style={{ width: '130px', whiteSpace: 'nowrap' }}>Application #</th>
+              <th style={{ minWidth: '160px' }}>Candidate / Student</th>
+              <th style={{ minWidth: '150px' }}>Class & Curriculum</th>
+              <th style={{ width: '220px', maxWidth: '240px' }}>Parent / Contact</th>
+              <th style={{ width: '110px', whiteSpace: 'nowrap' }}>Submitted</th>
+              <th style={{ width: '140px', whiteSpace: 'nowrap' }}>Status</th>
+              <th style={{ width: '180px', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -373,7 +373,7 @@ export default function AdmissionsClient({ initialApplications }: Props) {
 
                 return (
                   <tr key={app.id}>
-                    <td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
                       <span
                         style={{
                           fontFamily: 'monospace',
@@ -407,24 +407,43 @@ export default function AdmissionsClient({ initialApplications }: Props) {
                         {app.curriculum || 'Cambridge Curriculum'}
                       </div>
                     </td>
-                    <td>
-                      <div style={{ fontWeight: 500, color: 'var(--color-text)' }}>{app.parent_name}</div>
+                    <td style={{ maxWidth: '240px' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {app.parent_name}
+                      </div>
                       <div
                         style={{
                           fontSize: '0.78rem',
                           color: 'var(--color-text-muted)',
                           display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.75rem',
-                          marginTop: '0.15rem',
+                          flexDirection: 'column',
+                          gap: '0.2rem',
+                          marginTop: '0.2rem',
+                          maxWidth: '220px',
                         }}
                       >
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <Phone size={12} color="var(--color-text-muted)" /> {app.parent_phone}
-                        </span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <Mail size={12} color="var(--color-text-muted)" /> {app.parent_email}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
+                          <Phone size={12} color="var(--color-text-muted)" style={{ flexShrink: 0 }} />
+                          <span>{app.parent_phone}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <Mail size={12} color="var(--color-text-muted)" style={{ flexShrink: 0 }} />
+                          <a
+                            href={`mailto:${app.parent_email}`}
+                            title={app.parent_email}
+                            style={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              display: 'block',
+                              maxWidth: '190px',
+                              color: 'var(--color-secondary)',
+                              textDecoration: 'none',
+                            }}
+                          >
+                            {app.parent_email}
+                          </a>
+                        </div>
                       </div>
                     </td>
                     <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
