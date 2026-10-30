@@ -34,7 +34,7 @@ export default async function PrincipalAdmissionsPage() {
   const applications: AdmissionApplication[] = (data || []) as AdmissionApplication[]
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+    <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
       <AdmissionsClient initialApplications={applications} />
     </div>
   )

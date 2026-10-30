@@ -5,20 +5,19 @@ import {
   FileText,
   Download,
   Search,
-  Filter,
   CheckCircle2,
   Clock,
-  UserCheck,
-  XCircle,
+  Calendar,
   Eye,
   X,
   Phone,
   Mail,
   MapPin,
-  Calendar,
-  AlertCircle,
   Sparkles,
-  ChevronRight,
+  School,
+  User,
+  HeartHandshake,
+  Check,
 } from 'lucide-react'
 import { updateApplicationStatusAction } from './actions'
 
@@ -75,14 +74,17 @@ interface Props {
   initialApplications: AdmissionApplication[]
 }
 
-const STATUS_LABELS: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  submitted: { label: 'New / Received', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
-  under_review: { label: 'Under Review', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
-  interview_scheduled: { label: 'Interview Scheduled', color: 'text-purple-700', bg: 'bg-purple-50', border: 'border-purple-200' },
-  accepted: { label: 'Accepted', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' },
-  enrolled: { label: 'Enrolled', color: 'text-teal-700', bg: 'bg-teal-50', border: 'border-teal-200' },
-  rejected: { label: 'Declined', color: 'text-rose-700', bg: 'bg-rose-50', border: 'border-rose-200' },
-  cancelled: { label: 'Cancelled', color: 'text-slate-600', bg: 'bg-slate-100', border: 'border-slate-200' },
+const STATUS_CONFIG: Record<
+  string,
+  { label: string; badgeClass: string; icon: React.ComponentType<{ size?: number }> }
+> = {
+  submitted: { label: 'New / Received', badgeClass: 'badge-primary', icon: Sparkles },
+  under_review: { label: 'Under Review', badgeClass: 'badge-warning', icon: Clock },
+  interview_scheduled: { label: 'Interview Scheduled', badgeClass: 'badge-accent', icon: Calendar },
+  accepted: { label: 'Accepted', badgeClass: 'badge-success', icon: CheckCircle2 },
+  enrolled: { label: 'Enrolled', badgeClass: 'badge-success', icon: Check },
+  rejected: { label: 'Declined', badgeClass: 'badge-error', icon: X },
+  cancelled: { label: 'Cancelled', badgeClass: 'badge-muted', icon: X },
 }
 
 export default function AdmissionsClient({ initialApplications }: Props) {
@@ -134,6 +136,12 @@ export default function AdmissionsClient({ initialApplications }: Props) {
     })
   }, [applications, searchTerm, statusFilter, curriculumFilter])
 
+  const openModal = (app: AdmissionApplication) => {
+    setSelectedApp(app)
+    setNotesInput(app.notes || '')
+    setStatusMessage(null)
+  }
+
   const handleUpdateStatus = (appId: string, nextStatus: string) => {
     startTransition(async () => {
       setStatusMessage(null)
@@ -161,397 +169,781 @@ export default function AdmissionsClient({ initialApplications }: Props) {
               : null
           )
         }
-        setStatusMessage(`Application updated to ${STATUS_LABELS[nextStatus]?.label || nextStatus}`)
+        setStatusMessage(`Application status updated to "${STATUS_CONFIG[nextStatus]?.label || nextStatus}"`)
       } else {
         setStatusMessage(res.error || 'Failed to update application')
       }
     })
   }
 
-  const openModal = (app: AdmissionApplication) => {
-    setSelectedApp(app)
-    setNotesInput(app.notes || '')
-    setStatusMessage(null)
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Top Banner & Header */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem', width: '100%' }}>
+      {/* 1. Header Banner */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '1rem',
+        }}
+      >
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 style={{ fontSize: '1.85rem', color: 'var(--color-primary)', margin: 0, fontWeight: 700 }}>
             Student Admissions Desk
           </h1>
-          <p className="text-sm text-slate-500">
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginTop: '0.25rem', margin: 0 }}>
             Incoming online admissions from website, official 2027 PDF application forms, and applicant review.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-800">
-            <Sparkles className="h-3.5 w-3.5 text-sky-600" /> Auto-Dispatched to admissions@leaderinternationalschool.ac.tz
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <span
+            className="badge badge-primary"
+            style={{
+              padding: '0.45rem 1rem',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            <Sparkles size={14} color="var(--color-secondary)" />
+            admissions@leaderinternationalschool.ac.tz
           </span>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-medium text-slate-500">Total Applications</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{metrics.total}</p>
-        </div>
-        <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 shadow-sm">
-          <p className="text-xs font-medium text-blue-600">New / Unreviewed</p>
-          <p className="mt-1 text-2xl font-bold text-blue-900">{metrics.submitted}</p>
-        </div>
-        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 shadow-sm">
-          <p className="text-xs font-medium text-amber-600">Under Review</p>
-          <p className="mt-1 text-2xl font-bold text-amber-900">{metrics.underReview}</p>
-        </div>
-        <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-4 shadow-sm">
-          <p className="text-xs font-medium text-purple-600">Interviews Scheduled</p>
-          <p className="mt-1 text-2xl font-bold text-purple-900">{metrics.interview}</p>
-        </div>
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-sm">
-          <p className="text-xs font-medium text-emerald-600">Accepted / Enrolled</p>
-          <p className="mt-1 text-2xl font-bold text-emerald-900">{metrics.accepted}</p>
-        </div>
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          {/* Search box */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by student, application #, parent email, or phone..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-4 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
-            />
+      {/* 2. Stat Cards / KPI Grid */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '1rem',
+        }}
+      >
+        <div className="stat-card">
+          <div className="stat-icon" style={{ backgroundColor: 'rgba(0, 38, 75, 0.08)' }}>
+            <FileText size={20} color="var(--color-primary)" />
           </div>
+          <div className="stat-label">Total Applications</div>
+          <div className="stat-value" style={{ color: 'var(--color-primary)' }}>
+            {metrics.total}
+          </div>
+        </div>
 
-          {/* Quick Filter Selectors */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-1 text-xs">
-              <span className="px-2 font-medium text-slate-500">Status:</span>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-transparent font-medium text-slate-800 outline-none"
-              >
-                <option value="all">All Statuses</option>
-                <option value="submitted">New / Received</option>
-                <option value="under_review">Under Review</option>
-                <option value="interview_scheduled">Interview Scheduled</option>
-                <option value="accepted">Accepted</option>
-                <option value="enrolled">Enrolled</option>
-                <option value="rejected">Declined</option>
-              </select>
-            </div>
+        <div className="stat-card">
+          <div className="stat-icon" style={{ backgroundColor: 'rgba(59, 179, 195, 0.12)' }}>
+            <Sparkles size={20} color="var(--color-secondary)" />
+          </div>
+          <div className="stat-label">New / Unreviewed</div>
+          <div className="stat-value" style={{ color: 'var(--color-secondary)' }}>
+            {metrics.submitted}
+          </div>
+        </div>
 
-            <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-1 text-xs">
-              <span className="px-2 font-medium text-slate-500">Curriculum:</span>
-              <select
-                value={curriculumFilter}
-                onChange={(e) => setCurriculumFilter(e.target.value)}
-                className="bg-transparent font-medium text-slate-800 outline-none"
-              >
-                <option value="all">All Curricula</option>
-                <option value="cambridge">Cambridge</option>
-                <option value="necta">NECTA</option>
-              </select>
-            </div>
+        <div className="stat-card">
+          <div className="stat-icon" style={{ backgroundColor: 'rgba(245, 158, 11, 0.12)' }}>
+            <Clock size={20} color="var(--color-warning)" />
+          </div>
+          <div className="stat-label">Under Review</div>
+          <div className="stat-value" style={{ color: 'var(--color-warning)' }}>
+            {metrics.underReview}
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-icon" style={{ backgroundColor: 'rgba(247, 178, 57, 0.15)' }}>
+            <Calendar size={20} color="var(--color-accent)" />
+          </div>
+          <div className="stat-label">Interviews Scheduled</div>
+          <div className="stat-value" style={{ color: '#d97706' }}>
+            {metrics.interview}
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-icon" style={{ backgroundColor: 'rgba(16, 185, 129, 0.12)' }}>
+            <CheckCircle2 size={20} color="var(--color-success)" />
+          </div>
+          <div className="stat-label">Accepted / Enrolled</div>
+          <div className="stat-value" style={{ color: 'var(--color-success)' }}>
+            {metrics.accepted}
           </div>
         </div>
       </div>
 
-      {/* Applications Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="border-b border-slate-200 bg-slate-50/75 text-xs uppercase tracking-wider text-slate-500">
+      {/* 3. Search and Filters Bar */}
+      <div
+        className="glass-panel"
+        style={{
+          padding: '1.25rem',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '1rem',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <div style={{ flex: '1', minWidth: '280px', position: 'relative' }}>
+          <Search
+            size={18}
+            color="var(--color-text-muted)"
+            style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }}
+          />
+          <input
+            type="text"
+            className="input-field"
+            style={{ paddingLeft: '2.5rem' }}
+            placeholder="Search candidate name, reference, parent email, or phone..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ minWidth: '180px' }}>
+            <select
+              className="input-field"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="all">All Statuses</option>
+              <option value="submitted">New / Received</option>
+              <option value="under_review">Under Review</option>
+              <option value="interview_scheduled">Interview Scheduled</option>
+              <option value="accepted">Accepted</option>
+              <option value="enrolled">Enrolled</option>
+              <option value="rejected">Declined</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+
+          <div style={{ minWidth: '160px' }}>
+            <select
+              className="input-field"
+              value={curriculumFilter}
+              onChange={(e) => setCurriculumFilter(e.target.value)}
+            >
+              <option value="all">All Curricula</option>
+              <option value="cambridge">Cambridge</option>
+              <option value="necta">NECTA</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Applications Data Table */}
+      <div className="table-wrapper">
+        <table style={{ width: '100%', minWidth: '950px' }}>
+          <thead>
+            <tr>
+              <th>Application #</th>
+              <th>Candidate / Student</th>
+              <th>Class & Curriculum</th>
+              <th>Parent / Contact</th>
+              <th>Submitted</th>
+              <th>Status</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
               <tr>
-                <th scope="col" className="px-4 py-3.5">Application #</th>
-                <th scope="col" className="px-4 py-3.5">Candidate / Student</th>
-                <th scope="col" className="px-4 py-3.5">Class & Curriculum</th>
-                <th scope="col" className="px-4 py-3.5">Parent / Contact</th>
-                <th scope="col" className="px-4 py-3.5">Submitted</th>
-                <th scope="col" className="px-4 py-3.5">Status</th>
-                <th scope="col" className="px-4 py-3.5 text-right">Actions</th>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--color-text-muted)' }}>
+                  <FileText size={36} color="var(--color-border)" style={{ margin: '0 auto 0.75rem' }} />
+                  <div style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--color-text)' }}>
+                    No admission applications found
+                  </div>
+                  <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem' }}>
+                    Adjust your search query or filters to inspect incoming forms.
+                  </p>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
-                    <FileText className="mx-auto mb-2 h-8 w-8 text-slate-300" />
-                    No admission applications found matching your filter criteria.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((app) => {
-                  const badge = STATUS_LABELS[app.status] || STATUS_LABELS.submitted
-                  const dateDisplay = app.created_at ? new Date(app.created_at).toLocaleDateString('en-GB') : '—'
-                  return (
-                    <tr key={app.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="whitespace-nowrap px-4 py-3.5">
-                        <span className="font-mono text-xs font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">
-                          {app.application_no}
+            ) : (
+              filtered.map((app) => {
+                const conf = STATUS_CONFIG[app.status] || STATUS_CONFIG.submitted
+                const dateDisplay = app.created_at
+                  ? new Date(app.created_at).toLocaleDateString('en-GB', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  : '—'
+
+                return (
+                  <tr key={app.id}>
+                    <td>
+                      <span
+                        style={{
+                          fontFamily: 'monospace',
+                          fontSize: '0.82rem',
+                          fontWeight: 700,
+                          padding: '0.3rem 0.65rem',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: 'rgba(0, 38, 75, 0.06)',
+                          color: 'var(--color-primary)',
+                          border: '1px solid rgba(0, 38, 75, 0.1)',
+                          display: 'inline-block',
+                        }}
+                      >
+                        {app.application_no}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                        {app.first_name} {app.last_name}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
+                        {app.gender ? `${app.gender} • ` : ''}
+                        {app.date_of_birth ? `DOB: ${app.date_of_birth}` : ''}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 600, color: 'var(--color-primary)' }}>
+                        {app.class_applied_for}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+                        {app.curriculum || 'Cambridge Curriculum'}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 500, color: 'var(--color-text)' }}>{app.parent_name}</div>
+                      <div
+                        style={{
+                          fontSize: '0.78rem',
+                          color: 'var(--color-text-muted)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          marginTop: '0.15rem',
+                        }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <Phone size={12} color="var(--color-text-muted)" /> {app.parent_phone}
                         </span>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="font-semibold text-slate-900">
-                          {app.first_name} {app.last_name}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {app.gender ? `${app.gender} • ` : ''}
-                          {app.date_of_birth ? `DOB: ${app.date_of_birth}` : ''}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="font-medium text-slate-800">{app.class_applied_for}</div>
-                        <div className="text-xs text-slate-500">{app.curriculum || 'Cambridge'}</div>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="font-medium text-slate-800">{app.parent_name}</div>
-                        <div className="text-xs text-slate-500 flex items-center gap-2">
-                          <span className="flex items-center gap-0.5"><Phone className="h-3 w-3 text-slate-400" /> {app.parent_phone}</span>
-                          <span className="flex items-center gap-0.5"><Mail className="h-3 w-3 text-slate-400" /> {app.parent_email}</span>
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3.5 text-xs text-slate-500">
-                        {dateDisplay}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3.5">
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border ${badge.bg} ${badge.color} ${badge.border}`}>
-                          {badge.label}
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <Mail size={12} color="var(--color-text-muted)" /> {app.parent_email}
                         </span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {/* Official PDF Form Download */}
-                          <a
-                            href={`/api/admissions/apply?reference=${encodeURIComponent(app.application_no)}&download=1`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900"
-                            title="Download Official 3-Page 2027 Admission Form PDF"
-                          >
-                            <Download className="h-3.5 w-3.5 text-sky-600" /> PDF Form
-                          </a>
-                          {/* Inspect / Edit Modal */}
-                          <button
-                            type="button"
-                            onClick={() => openModal(app)}
-                            className="inline-flex items-center gap-1 rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white shadow-sm hover:bg-slate-800"
-                          >
-                            <Eye className="h-3.5 w-3.5" /> Details
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                      </div>
+                    </td>
+                    <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                      {dateDisplay}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <span className={`badge ${conf.badgeClass}`}>
+                        <span
+                          style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            backgroundColor: 'currentColor',
+                          }}
+                        />
+                        {conf.label}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'inline-flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                        {/* Download Official PDF */}
+                        <a
+                          href={`/api/admissions/apply?reference=${encodeURIComponent(app.application_no)}&download=1`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-sm btn-primary"
+                          title="Download Official 3-Page 2027 Admission Form PDF"
+                        >
+                          <Download size={14} /> PDF Form
+                        </a>
+
+                        {/* Review / Details Modal */}
+                        <button
+                          type="button"
+                          onClick={() => openModal(app)}
+                          className="btn btn-sm btn-secondary"
+                        >
+                          <Eye size={14} /> Review
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {/* Application Details Modal */}
+      {/* 5. Application Details & Review Modal */}
       {selectedApp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}
+          onClick={() => setSelectedApp(null)}
+        >
+          <div
+            className="glass-panel"
+            style={{
+              padding: '2rem',
+              borderRadius: 'var(--radius-xl)',
+              backgroundColor: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              boxShadow: 'var(--shadow-xl)',
+              maxWidth: '850px',
+              width: '100%',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.5rem',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                borderBottom: '1px solid var(--color-border)',
+                paddingBottom: '1rem',
+              }}
+            >
               <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-bold text-slate-900">
-                    {selectedApp.first_name} {selectedApp.last_name}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <h2 style={{ fontSize: '1.45rem', margin: 0, fontWeight: 700, color: 'var(--color-primary)' }}>
+                    {selectedApp.first_name} {selectedApp.middle_name ? `${selectedApp.middle_name} ` : ''}
+                    {selectedApp.last_name}
                   </h2>
-                  <span className="font-mono text-xs font-bold bg-slate-100 text-slate-800 px-2 py-0.5 rounded">
+                  <span
+                    style={{
+                      fontFamily: 'monospace',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      padding: '0.25rem 0.6rem',
+                      backgroundColor: 'rgba(59, 179, 195, 0.1)',
+                      color: 'var(--color-secondary)',
+                      borderRadius: 'var(--radius-sm)',
+                    }}
+                  >
                     {selectedApp.application_no}
                   </span>
+                  <span className={`badge ${STATUS_CONFIG[selectedApp.status]?.badgeClass || 'badge-primary'}`}>
+                    {STATUS_CONFIG[selectedApp.status]?.label || selectedApp.status}
+                  </span>
                 </div>
-                <p className="mt-0.5 text-sm text-slate-500">
-                  Application for <strong>{selectedApp.class_applied_for}</strong> ({selectedApp.curriculum || 'Cambridge'}) • Submitted on {selectedApp.created_at ? new Date(selectedApp.created_at).toLocaleDateString('en-GB') : '—'}
+                <p style={{ margin: '0.35rem 0 0', fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
+                  Applying for <strong>{selectedApp.class_applied_for}</strong> ({selectedApp.curriculum || 'Cambridge Curriculum'}) • Received on{' '}
+                  {selectedApp.created_at
+                    ? new Date(selectedApp.created_at).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric',
+                      })
+                    : '—'}
                 </p>
               </div>
+
               <button
                 type="button"
                 onClick={() => setSelectedApp(null)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--color-text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Close"
               >
-                <X className="h-5 w-5" />
+                <X size={20} />
               </button>
             </div>
 
+            {/* Status Message Notification */}
             {statusMessage && (
-              <div className="mt-4 rounded-lg bg-sky-50 border border-sky-200 p-3 text-xs text-sky-800 flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-sky-600 shrink-0" />
+              <div
+                style={{
+                  padding: '0.75rem 1rem',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                  color: 'var(--color-success)',
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                  fontSize: '0.875rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                <CheckCircle2 size={16} />
                 <span>{statusMessage}</span>
               </div>
             )}
 
-            {/* Modal Content Sections */}
-            <div className="mt-5 space-y-6 text-sm">
-              {/* 1. Student Details */}
+            {/* Official PDF Download Hero Card */}
+            <div
+              style={{
+                borderRadius: 'var(--radius-lg)',
+                border: '1.5px solid rgba(59, 179, 195, 0.3)',
+                background: 'linear-gradient(135deg, rgba(59, 179, 195, 0.08) 0%, rgba(0, 38, 75, 0.04) 100%)',
+                padding: '1.25rem 1.5rem',
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '1rem',
+              }}
+            >
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                  1. Student Information
-                </h3>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 rounded-xl bg-slate-50 p-4 border border-slate-100">
-                  <div>
-                    <span className="text-xs text-slate-400 block">Full Name:</span>
-                    <span className="font-semibold text-slate-800">{selectedApp.first_name} {selectedApp.last_name}</span>
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--color-primary)' }}>
+                  Official 2027 Admission Form PDF
+                </h4>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+                  The 3-page stamped legal admission form filled with all candidate, parent, and co-curricular details.
+                </p>
+              </div>
+
+              <a
+                href={`/api/admissions/apply?reference=${encodeURIComponent(selectedApp.application_no)}&download=1`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-primary"
+                style={{ padding: '0.65rem 1.4rem' }}
+              >
+                <Download size={16} /> Download Official PDF
+              </a>
+            </div>
+
+            {/* Section 1: Candidate Details */}
+            <div>
+              <div
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  color: 'var(--color-text-muted)',
+                  marginBottom: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                }}
+              >
+                <User size={14} color="var(--color-secondary)" /> 1. Student Information
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '1rem',
+                  padding: '1rem',
+                  backgroundColor: 'var(--color-bg)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Full Name</div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                    {selectedApp.first_name} {selectedApp.middle_name || ''} {selectedApp.last_name}
                   </div>
-                  <div>
-                    <span className="text-xs text-slate-400 block">Date of Birth:</span>
-                    <span className="font-semibold text-slate-800">{selectedApp.date_of_birth || 'Not specified'}</span>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Date of Birth</div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                    {selectedApp.date_of_birth || 'Not specified'}
                   </div>
-                  <div>
-                    <span className="text-xs text-slate-400 block">Gender:</span>
-                    <span className="font-semibold text-slate-800">{selectedApp.gender || 'Not specified'}</span>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Gender</div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                    {selectedApp.gender || 'Not specified'}
                   </div>
-                  <div>
-                    <span className="text-xs text-slate-400 block">Nationality:</span>
-                    <span className="font-semibold text-slate-800">{selectedApp.nationality || 'Tanzanian'}</span>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Place of Birth</div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                    {selectedApp.place_of_birth || '—'}
                   </div>
-                  <div>
-                    <span className="text-xs text-slate-400 block">Place of Birth:</span>
-                    <span className="font-semibold text-slate-800">{selectedApp.place_of_birth || '—'}</span>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Nationality</div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                    {selectedApp.nationality || 'Tanzanian'}
                   </div>
-                  <div>
-                    <span className="text-xs text-slate-400 block">Previous School:</span>
-                    <span className="font-semibold text-slate-800">{selectedApp.previous_school || 'None / Fresh Start'}</span>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Birth Cert / Passport ID</div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                    {selectedApp.id_number || '—'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Class Applied For</div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-primary)' }}>
+                    {selectedApp.class_applied_for} ({selectedApp.curriculum || 'Cambridge'})
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Previous School</div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                    {selectedApp.previous_school || 'None / Fresh Start'}
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* 2. Parent & Guardian Details */}
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                  2. Parent & Guardian Contact
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl bg-slate-50 p-4 border border-slate-100">
-                  <div>
-                    <span className="text-xs text-slate-400 block">Primary Contact:</span>
-                    <span className="font-semibold text-slate-800">{selectedApp.parent_name} ({selectedApp.parent_relationship || 'Parent'})</span>
+            {/* Section 2: Parent / Guardian Information */}
+            <div>
+              <div
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  color: 'var(--color-text-muted)',
+                  marginBottom: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                }}
+              >
+                <HeartHandshake size={14} color="var(--color-secondary)" /> 2. Parent & Guardian Contact
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: '1rem',
+                  padding: '1rem',
+                  backgroundColor: 'var(--color-bg)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Primary Contact</div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                    {selectedApp.parent_name} ({selectedApp.parent_relationship || 'Parent'})
                   </div>
-                  <div>
-                    <span className="text-xs text-slate-400 block">Email:</span>
-                    <a href={`mailto:${selectedApp.parent_email}`} className="font-semibold text-sky-600 hover:underline">
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Occupation & Employer</div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                    {selectedApp.parent_occupation ? `${selectedApp.parent_occupation}` : '—'}
+                    {selectedApp.parent_employer ? ` at ${selectedApp.parent_employer}` : ''}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Phone Number</div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>{selectedApp.parent_phone}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Email Address</div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-secondary)' }}>
+                    <a href={`mailto:${selectedApp.parent_email}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                       {selectedApp.parent_email}
                     </a>
                   </div>
-                  <div>
-                    <span className="text-xs text-slate-400 block">Phone / Mobile:</span>
-                    <span className="font-semibold text-slate-800">{selectedApp.parent_phone}</span>
-                  </div>
-                  <div>
-                    <span className="text-xs text-slate-400 block">WhatsApp:</span>
-                    <span className="font-semibold text-slate-800">{selectedApp.parent_whatsapp || selectedApp.parent_phone}</span>
-                  </div>
-                  {selectedApp.parent_address && (
-                    <div className="sm:col-span-2">
-                      <span className="text-xs text-slate-400 block">Residential Address:</span>
-                      <span className="font-medium text-slate-800">{selectedApp.parent_address}</span>
-                    </div>
-                  )}
-                  {selectedApp.guardian2_name && (
-                    <div className="sm:col-span-2 mt-2 pt-2 border-t border-slate-200">
-                      <span className="text-xs font-semibold text-slate-600 block">Secondary Guardian:</span>
-                      <span className="text-slate-800">{selectedApp.guardian2_name} ({selectedApp.guardian2_relationship || 'Guardian'}) • {selectedApp.guardian2_phone} • {selectedApp.guardian2_email}</span>
-                    </div>
-                  )}
                 </div>
-              </div>
-
-              {/* 3. Services, Term & Preferences */}
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                  3. Services, Fee Plan & Notes
-                </h3>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 rounded-xl bg-slate-50 p-4 border border-slate-100">
-                  <div>
-                    <span className="text-xs text-slate-400 block">School Transport:</span>
-                    <span className="font-semibold text-slate-800">
-                      {selectedApp.transport_required ? '✅ Required' : '❌ Not required'}
-                    </span>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Residential Address</div>
+                  <div style={{ fontWeight: 500, color: 'var(--color-text)' }}>
+                    {selectedApp.parent_address || '—'}
                   </div>
-                  <div>
-                    <span className="text-xs text-slate-400 block">Fee Payment Plan:</span>
-                    <span className="font-semibold text-slate-800">{selectedApp.fee_plan || 'Standard'}</span>
-                  </div>
-                  <div>
-                    <span className="text-xs text-slate-400 block">Intake Start Term:</span>
-                    <span className="font-semibold text-slate-800">{selectedApp.start_term || 'January 2027'}</span>
-                  </div>
-                  {selectedApp.clubs && selectedApp.clubs.length > 0 && (
-                    <div className="sm:col-span-3">
-                      <span className="text-xs text-slate-400 block">Selected Clubs / Talents:</span>
-                      <span className="font-semibold text-slate-800">{selectedApp.clubs.join(', ')}</span>
-                    </div>
-                  )}
-                  {selectedApp.medical_conditions && (
-                    <div className="sm:col-span-3">
-                      <span className="text-xs text-slate-400 block">Medical Conditions:</span>
-                      <span className="text-slate-800">{selectedApp.medical_conditions}</span>
-                    </div>
-                  )}
-                  {selectedApp.additional_notes && (
-                    <div className="sm:col-span-3">
-                      <span className="text-xs text-slate-400 block">Parent Additional Notes:</span>
-                      <span className="text-slate-800">{selectedApp.additional_notes}</span>
-                    </div>
-                  )}
                 </div>
-              </div>
 
-              {/* 4. Official PDF Form Download & Office Action */}
-              <div className="rounded-xl border border-sky-100 bg-sky-50/50 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h4 className="font-semibold text-sky-950">Official 2027 Admission Form PDF</h4>
-                    <p className="text-xs text-sky-800">
-                      The official 3-page printable application form stamped with candidate details.
-                    </p>
-                  </div>
-                  <a
-                    href={`/api/admissions/apply?reference=${encodeURIComponent(selectedApp.application_no)}&download=1`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-sky-500 shrink-0"
+                {/* Secondary Guardian if provided */}
+                {selectedApp.guardian2_name && (
+                  <div
+                    style={{
+                      gridColumn: '1 / -1',
+                      borderTop: '1px dashed var(--color-border)',
+                      paddingTop: '0.75rem',
+                      marginTop: '0.25rem',
+                    }}
                   >
-                    <Download className="h-4 w-4" /> Download Official PDF
-                  </a>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-primary)' }}>
+                      Secondary Parent / Guardian:
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '0.25rem' }}>
+                      <span>
+                        <strong>{selectedApp.guardian2_name}</strong> ({selectedApp.guardian2_relationship || 'Guardian'})
+                      </span>
+                      {selectedApp.guardian2_occupation && (
+                        <span>
+                          {selectedApp.guardian2_occupation} ({selectedApp.guardian2_employer || '—'})
+                        </span>
+                      )}
+                      <span>📞 {selectedApp.guardian2_phone}</span>
+                      {selectedApp.guardian2_email && <span>✉️ {selectedApp.guardian2_email}</span>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Section 3: Services & Co-curricular */}
+            <div>
+              <div
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  color: 'var(--color-text-muted)',
+                  marginBottom: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                }}
+              >
+                <School size={14} color="var(--color-secondary)" /> 3. Services, Term & Activities
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '1rem',
+                  padding: '1rem',
+                  backgroundColor: 'var(--color-bg)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>School Transport</div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                    {selectedApp.transport_required ? '✅ Required' : '❌ Not required'}
+                  </div>
                 </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Fee Plan</div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                    {selectedApp.fee_plan || 'Standard Termly'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Intake Term</div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                    {selectedApp.start_term || 'January 2027'}
+                  </div>
+                </div>
+
+                {selectedApp.clubs && selectedApp.clubs.length > 0 && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '0.35rem' }}>
+                      Selected Co-Curricular Clubs & Activities:
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      {selectedApp.clubs.map((club, idx) => (
+                        <span key={idx} className="badge badge-accent" style={{ padding: '0.3rem 0.75rem' }}>
+                          {club}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedApp.medical_conditions && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Medical Conditions</div>
+                    <div style={{ fontWeight: 500, color: 'var(--color-text)' }}>
+                      {selectedApp.medical_conditions}
+                    </div>
+                  </div>
+                )}
+
+                {selectedApp.additional_notes && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Additional Notes</div>
+                    <div style={{ fontWeight: 500, color: 'var(--color-text)' }}>
+                      {selectedApp.additional_notes}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Section 4: Admissions Staff Action & Status Management */}
+            <div
+              style={{
+                borderTop: '1px solid var(--color-border)',
+                paddingTop: '1.25rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  color: 'var(--color-primary)',
+                }}
+              >
+                Admissions Status & Staff Review
               </div>
 
-              {/* 5. Status Management */}
-              <div className="border-t border-slate-200 pt-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                  Admissions Status & Staff Notes
-                </h4>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <div className="flex-1">
-                    <label className="block text-xs text-slate-500 mb-1">Update Status:</label>
-                    <select
-                      value={selectedApp.status}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+                    Update Application Status
+                  </label>
+                  <select
+                    className="input-field"
+                    value={selectedApp.status}
+                    disabled={isPending}
+                    onChange={(e) => handleUpdateStatus(selectedApp.id, e.target.value)}
+                  >
+                    <option value="submitted">New / Received</option>
+                    <option value="under_review">Under Review</option>
+                    <option value="interview_scheduled">Interview / Assessment Scheduled</option>
+                    <option value="accepted">Accepted (Offer Letter Issued)</option>
+                    <option value="enrolled">Enrolled in Classes</option>
+                    <option value="rejected">Declined</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+                    Internal Staff Notes
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="Add an internal note..."
+                      value={notesInput}
+                      onChange={(e) => setNotesInput(e.target.value)}
+                    />
+                    <button
+                      type="button"
                       disabled={isPending}
-                      onChange={(e) => handleUpdateStatus(selectedApp.id, e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 p-2 text-sm text-slate-800 font-medium outline-none focus:border-sky-500"
+                      onClick={() => handleUpdateStatus(selectedApp.id, selectedApp.status)}
+                      className="btn btn-secondary btn-sm"
                     >
-                      <option value="submitted">New / Received</option>
-                      <option value="under_review">Under Review</option>
-                      <option value="interview_scheduled">Interview / Assessment Scheduled</option>
-                      <option value="accepted">Accepted (Offer Letter)</option>
-                      <option value="enrolled">Enrolled</option>
-                      <option value="rejected">Declined</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
+                      Save
+                    </button>
                   </div>
                 </div>
               </div>
