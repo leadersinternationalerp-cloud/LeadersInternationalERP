@@ -80,43 +80,43 @@ const STATUS_CONFIG: Record<
 > = {
   submitted: {
     label: 'New / Received',
-    badgeClass: 'bg-sky-50 text-sky-700 border border-sky-200/80 ring-1 ring-sky-500/20',
+    badgeClass: 'bg-sky-50 text-sky-800 border border-sky-200',
     dotClass: 'bg-sky-500',
     icon: Sparkles,
   },
   under_review: {
     label: 'Under Review',
-    badgeClass: 'bg-amber-50 text-amber-800 border border-amber-200/80 ring-1 ring-amber-500/20',
+    badgeClass: 'bg-amber-50 text-amber-900 border border-amber-200',
     dotClass: 'bg-amber-500',
     icon: Clock,
   },
   interview_scheduled: {
     label: 'Interview Scheduled',
-    badgeClass: 'bg-purple-50 text-purple-700 border border-purple-200/80 ring-1 ring-purple-500/20',
+    badgeClass: 'bg-purple-50 text-purple-800 border border-purple-200',
     dotClass: 'bg-purple-500',
     icon: Calendar,
   },
   accepted: {
     label: 'Accepted',
-    badgeClass: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 ring-1 ring-emerald-500/20',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border border-emerald-200',
     dotClass: 'bg-emerald-500',
     icon: CheckCircle2,
   },
   enrolled: {
     label: 'Enrolled',
-    badgeClass: 'bg-teal-50 text-teal-700 border border-teal-200/80 ring-1 ring-teal-500/20',
+    badgeClass: 'bg-teal-50 text-teal-800 border border-teal-200',
     dotClass: 'bg-teal-500',
     icon: Check,
   },
   rejected: {
     label: 'Declined',
-    badgeClass: 'bg-rose-50 text-rose-700 border border-rose-200/80 ring-1 ring-rose-500/20',
+    badgeClass: 'bg-rose-50 text-rose-800 border border-rose-200',
     dotClass: 'bg-rose-500',
     icon: X,
   },
   cancelled: {
     label: 'Cancelled',
-    badgeClass: 'bg-slate-100 text-slate-600 border border-slate-200 ring-1 ring-slate-400/20',
+    badgeClass: 'bg-slate-100 text-slate-700 border border-slate-200',
     dotClass: 'bg-slate-400',
     icon: X,
   },
@@ -232,20 +232,10 @@ export default function AdmissionsClient({ initialApplications }: Props) {
             Incoming online admissions from website, official 2027 PDF application forms, and applicant review.
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span
-            className="badge badge-primary"
-            style={{
-              padding: '0.45rem 1rem',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-            }}
-          >
-            <Sparkles size={14} color="var(--color-secondary)" />
-            admissions@leaderinternationalschool.ac.tz
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-800 border border-sky-200 shadow-2xs whitespace-nowrap leading-normal">
+            <Sparkles size={14} className="text-sky-600 shrink-0" />
+            <span>admissions@leaderinternationalschool.ac.tz</span>
           </span>
         </div>
       </div>
@@ -375,14 +365,14 @@ export default function AdmissionsClient({ initialApplications }: Props) {
       <div className="table-wrapper overflow-x-auto rounded-2xl border border-slate-200/90 shadow-xs bg-white">
         <table className="w-full min-w-[920px] border-collapse text-left text-sm">
           <thead>
-            <tr className="bg-slate-50/80 border-b border-slate-200">
-              <th className="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Application #</th>
-              <th className="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 min-w-[190px]">Candidate / Student</th>
-              <th className="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 min-w-[150px]">Class & Curriculum</th>
-              <th className="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 max-w-[240px]">Parent / Contact</th>
-              <th className="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Submitted</th>
-              <th className="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Status</th>
-              <th className="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right whitespace-nowrap">Actions</th>
+            <tr className="bg-slate-50/90 border-b border-slate-200">
+              <th className="py-3.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap min-w-[150px]">Application #</th>
+              <th className="py-3.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 min-w-[210px]">Candidate / Student</th>
+              <th className="py-3.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 min-w-[160px]">Class & Curriculum</th>
+              <th className="py-3.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 min-w-[220px] max-w-[250px]">Parent / Contact</th>
+              <th className="py-3.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap min-w-[110px]">Submitted</th>
+              <th className="py-3.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap min-w-[170px]">Status</th>
+              <th className="py-3.5 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right whitespace-nowrap min-w-[280px]">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -412,9 +402,9 @@ export default function AdmissionsClient({ initialApplications }: Props) {
                 return (
                   <tr key={app.id} className="hover:bg-sky-50/40 transition-colors border-b border-slate-100 last:border-b-0">
                     <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 border border-slate-200/90 shadow-2xs">
-                        <FileText size={12} className="text-slate-400" />
-                        {app.application_no}
+                      <span className="inline-flex items-center gap-2 font-mono text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-800 border border-slate-200/90 shadow-2xs leading-normal whitespace-nowrap">
+                        <FileText size={13} className="text-slate-400 shrink-0" />
+                        <span>{app.application_no}</span>
                       </span>
                     </td>
                     <td className="py-3.5 px-4">
@@ -423,39 +413,39 @@ export default function AdmissionsClient({ initialApplications }: Props) {
                           {app.first_name?.[0] || 'S'}{app.last_name?.[0] || ''}
                         </div>
                         <div>
-                          <div className="font-bold text-slate-900 leading-tight">
+                          <div className="font-bold text-slate-900 leading-snug">
                             {app.first_name} {app.last_name}
                           </div>
-                          <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          <div className="text-xs text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
                             {app.gender && (
-                              <span className="capitalize px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium text-[11px]">
+                              <span className="capitalize px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium text-[11px] leading-tight border border-slate-200/60">
                                 {app.gender}
                               </span>
                             )}
-                            {app.date_of_birth && <span>DOB: {app.date_of_birth}</span>}
+                            {app.date_of_birth && <span className="whitespace-nowrap">DOB: {app.date_of_birth}</span>}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="py-3.5 px-4">
-                      <div className="font-semibold text-slate-900 leading-tight">
+                      <div className="font-semibold text-slate-900 leading-snug">
                         {app.class_applied_for}
                       </div>
-                      <div className="mt-1">
+                      <div className="mt-1.5">
                         {app.curriculum?.toLowerCase().includes('cambridge') || !app.curriculum ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/80">
-                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                            Cambridge
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/80 whitespace-nowrap leading-tight">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0"></span>
+                            <span>Cambridge</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            NECTA
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 whitespace-nowrap leading-tight">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                            <span>NECTA</span>
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 max-w-[240px]">
+                    <td className="py-3.5 px-4 max-w-[250px]">
                       <div className="font-semibold text-slate-900 truncate" title={app.parent_name}>
                         {app.parent_name}
                       </div>
@@ -469,7 +459,7 @@ export default function AdmissionsClient({ initialApplications }: Props) {
                           <a
                             href={`mailto:${app.parent_email}`}
                             title={app.parent_email}
-                            className="truncate max-w-[185px] text-sky-600 hover:text-sky-800 hover:underline font-medium"
+                            className="truncate max-w-[190px] text-sky-600 hover:text-sky-800 hover:underline font-medium"
                           >
                             {app.parent_email}
                           </a>
@@ -480,21 +470,21 @@ export default function AdmissionsClient({ initialApplications }: Props) {
                       {dateDisplay}
                     </td>
                     <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold shadow-2xs ${conf.badgeClass}`}>
-                        <span className={`w-2 h-2 rounded-full ${conf.dotClass}`} />
-                        {conf.label}
+                      <span className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-2xs whitespace-nowrap leading-normal ${conf.badgeClass}`}>
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${conf.dotClass}`} />
+                        <span>{conf.label}</span>
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                      <div className="inline-flex items-center justify-end gap-1.5">
+                      <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
                         {/* Eye Icon -> Opens PDF in interactive Modal */}
                         <button
                           type="button"
                           onClick={() => setPreviewPdfApp(app)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-sky-600 hover:bg-sky-700 text-white shadow-xs hover:shadow active:scale-95 transition-all cursor-pointer"
+                          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-sky-600 hover:bg-sky-700 text-white shadow-xs hover:shadow active:scale-95 transition-all cursor-pointer whitespace-nowrap shrink-0 leading-normal"
                           title="Preview Official 3-Page 2027 Admission Form PDF in Modal"
                         >
-                          <Eye size={13} />
+                          <Eye size={13} className="shrink-0" />
                           <span>View Form</span>
                         </button>
 
@@ -503,10 +493,10 @@ export default function AdmissionsClient({ initialApplications }: Props) {
                           href={`/api/admissions/apply?reference=${encodeURIComponent(app.application_no)}&download=1`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border border-slate-300 hover:border-sky-500 bg-white hover:bg-sky-50/50 text-slate-700 hover:text-sky-700 shadow-2xs active:scale-95 transition-all"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-slate-300 hover:border-sky-500 bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-700 shadow-2xs active:scale-95 transition-all whitespace-nowrap shrink-0 leading-normal"
                           title="Download Official 3-Page PDF"
                         >
-                          <Download size={13} />
+                          <Download size={13} className="shrink-0" />
                           <span>PDF</span>
                         </a>
 
@@ -514,10 +504,10 @@ export default function AdmissionsClient({ initialApplications }: Props) {
                         <button
                           type="button"
                           onClick={() => openModal(app)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition-all cursor-pointer"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition-all cursor-pointer whitespace-nowrap shrink-0 leading-normal"
                           title="Review applicant data & update status"
                         >
-                          <FileText size={13} />
+                          <FileText size={13} className="shrink-0" />
                           <span>Review</span>
                         </button>
                       </div>
@@ -583,21 +573,12 @@ export default function AdmissionsClient({ initialApplications }: Props) {
                     {selectedApp.first_name} {selectedApp.middle_name ? `${selectedApp.middle_name} ` : ''}
                     {selectedApp.last_name}
                   </h2>
-                  <span
-                    style={{
-                      fontFamily: 'monospace',
-                      fontSize: '0.85rem',
-                      fontWeight: 700,
-                      padding: '0.25rem 0.6rem',
-                      backgroundColor: 'rgba(59, 179, 195, 0.1)',
-                      color: 'var(--color-secondary)',
-                      borderRadius: 'var(--radius-sm)',
-                    }}
-                  >
+                  <span className="font-mono text-xs font-bold px-3 py-1.5 rounded-lg bg-sky-50 text-sky-800 border border-sky-200 shadow-2xs leading-normal whitespace-nowrap">
                     {selectedApp.application_no}
                   </span>
-                  <span className={`badge ${STATUS_CONFIG[selectedApp.status]?.badgeClass || 'badge-primary'}`}>
-                    {STATUS_CONFIG[selectedApp.status]?.label || selectedApp.status}
+                  <span className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-2xs whitespace-nowrap leading-normal ${STATUS_CONFIG[selectedApp.status]?.badgeClass || 'bg-sky-50 text-sky-800 border border-sky-200'}`}>
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_CONFIG[selectedApp.status]?.dotClass || 'bg-sky-500'}`} />
+                    <span>{STATUS_CONFIG[selectedApp.status]?.label || selectedApp.status}</span>
                   </span>
                 </div>
                 <p style={{ margin: '0.35rem 0 0', fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
@@ -923,7 +904,7 @@ export default function AdmissionsClient({ initialApplications }: Props) {
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                       {selectedApp.clubs.map((club, idx) => (
-                        <span key={idx} className="badge badge-accent" style={{ padding: '0.3rem 0.75rem' }}>
+                        <span key={idx} className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-800 border border-purple-200 shadow-2xs leading-normal whitespace-nowrap">
                           {club}
                         </span>
                       ))}
@@ -1044,7 +1025,7 @@ export default function AdmissionsClient({ initialApplications }: Props) {
                     <h3 className="text-base sm:text-lg font-bold text-slate-900 font-[Outfit] m-0">
                       Official 2027 Admission Form
                     </h3>
-                    <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 shadow-2xs">
+                    <span className="font-mono text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-800 border border-slate-200 shadow-2xs leading-normal whitespace-nowrap">
                       {previewPdfApp.application_no}
                     </span>
                   </div>
