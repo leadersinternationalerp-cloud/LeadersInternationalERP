@@ -4,40 +4,54 @@
 
 BEGIN;
 
--- 1. Truncate all demo transactional tables (cascading child references)
-TRUNCATE TABLE
-  public.student_parents,
-  public.student_classes,
-  public.learning_area_progress,
-  public.early_years_evidence,
-  public.early_years_observations,
-  public.marks,
-  public.class_activity_attempts,
-  public.class_activities,
-  public.attendance_exceptions,
-  public.attendance,
-  public.homework_submissions,
-  public.homework,
-  public.discipline_records,
-  public.report_card_constructive_comments,
-  public.report_card_subject_grades,
-  public.report_cards,
-  public.payment_allocations,
-  public.payments,
-  public.invoices,
-  public.fee_balances,
-  public.payroll_items,
-  public.advance_repayments,
-  public.salary_advances,
-  public.payslips,
-  public.payrolls,
-  public.leave_applications,
-  public.lesson_plans,
-  public.students,
-  public.admission_applications,
-  public.notifications,
-  public.email_logs
-CASCADE;
+-- 1. Safely Truncate existing demo transactional tables (cascading child references)
+DO $$
+DECLARE
+  t text;
+  target_tables text[] := ARRAY[
+    'student_parents',
+    'student_classes',
+    'learning_area_progress',
+    'early_years_evidence',
+    'early_years_observations',
+    'marks',
+    'class_activity_attempts',
+    'class_activities',
+    'attendance_exceptions',
+    'attendance',
+    'homework_submissions',
+    'homework',
+    'discipline_records',
+    'report_card_constructive_comments',
+    'report_card_subject_grades',
+    'report_cards',
+    'payment_allocations',
+    'payments',
+    'invoices',
+    'fee_balances',
+    'payroll_items',
+    'advance_repayments',
+    'salary_advances',
+    'payslips',
+    'payrolls',
+    'leave_applications',
+    'lesson_plans',
+    'students',
+    'admission_applications',
+    'notifications',
+    'email_logs'
+  ];
+BEGIN
+  FOREACH t IN ARRAY target_tables
+  LOOP
+    IF EXISTS (
+      SELECT 1 FROM information_schema.tables 
+      WHERE table_schema = 'public' AND table_name = t
+    ) THEN
+      EXECUTE format('TRUNCATE TABLE public.%I CASCADE', t);
+    END IF;
+  END LOOP;
+END $$;
 
 -- 2. Delete demo staff and demo users from profiles
 DELETE FROM public.staff 
