@@ -28,7 +28,8 @@ export async function updateSession(request: NextRequest) {
     const isExemptApi =
       pathname === '/api/attendance/biometric' ||
       pathname === '/api/health' ||
-      pathname === '/api/admissions/apply'
+      pathname === '/api/admissions/apply' ||
+      pathname === '/api/admin/go-live-setup'
 
     if (isExemptApi) {
       return supabaseResponse
@@ -77,7 +78,8 @@ export async function updateSession(request: NextRequest) {
     const isExemptApi =
       pathname === '/api/attendance/biometric' ||
       pathname === '/api/health' ||
-      pathname === '/api/admissions/apply'
+      pathname === '/api/admissions/apply' ||
+      pathname === '/api/admin/go-live-setup'
     if (!isExemptApi && !user) {
       return NextResponse.json(
         { error: { code: 'UNAUTHENTICATED', message: 'Sign in required' } },
