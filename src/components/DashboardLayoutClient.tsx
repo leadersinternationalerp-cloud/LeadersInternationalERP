@@ -67,6 +67,7 @@ export default function DashboardLayoutClient({
 
   // Map routes to dynamic titles
   const getPageTitle = () => {
+    if (pathname.includes('/principal/admissions')) return 'Admissions Desk & Online Applications'
     if (pathname.includes('/director')) return 'Executive Dashboard'
     if (pathname.includes('/principal')) return 'Principal Dashboard'
     if (pathname.includes('/accountant')) return 'Financial Dashboard'
@@ -203,6 +204,16 @@ export default function DashboardLayoutClient({
               {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
                 <NavLink href="/dashboard/users" icon={UsersRound}>
                   User Management
+                </NavLink>
+              )}
+
+              {(userRoles.includes('System Admin') ||
+                userRoles.includes('Director') ||
+                userRoles.includes('Principal') ||
+                userRoles.includes('Head of Section') ||
+                userRoles.includes('Dean')) && (
+                <NavLink href="/dashboard/principal/admissions" icon={FileSpreadsheet}>
+                  Admissions Desk
                 </NavLink>
               )}
 
