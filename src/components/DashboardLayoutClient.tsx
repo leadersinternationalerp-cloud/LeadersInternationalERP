@@ -780,17 +780,14 @@ export default function DashboardLayoutClient({
           
           {/* Notification Dropdown */}
           <div style={{ position: 'relative' }}>
-            <button onClick={toggleNotifications} className="btn btn-icon btn-ghost">
-              <Bell size={20} />
+            <button onClick={toggleNotifications} className="btn btn-icon btn-ghost relative hover:bg-slate-100 transition-colors" aria-label="Notifications">
+              <Bell size={20} className="text-slate-600" />
               {unreadCount > 0 && (
-                <span style={{
-                  position: 'absolute', top: '-5px', right: '-5px',
-                  backgroundColor: 'var(--color-error)', color: '#fff',
-                  fontSize: '0.65rem', fontWeight: 700, borderRadius: '50%',
-                  width: '16px', height: '16px', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center'
-                }}>
-                  {unreadCount}
+                <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-rose-600 text-white text-[10px] font-bold items-center justify-center leading-none">
+                    {unreadCount}
+                  </span>
                 </span>
               )}
             </button>
@@ -827,26 +824,33 @@ export default function DashboardLayoutClient({
             )}
           </div>
 
-          <Link href="/dashboard/profile" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.35rem 0.75rem', borderRadius: 'var(--radius-full)', backgroundColor: 'rgba(0, 38, 75, 0.03)', border: '1px solid var(--color-border)' }}>
+          <Link
+            href="/dashboard/profile"
+            className="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-slate-100/80 hover:bg-slate-200/70 border border-slate-200 transition-all text-inherit no-underline shadow-2xs group"
+          >
             {profile?.avatar_url ? (
-               <img src={profile.avatar_url} alt="Profile" style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover' }} />
+               <img src={profile.avatar_url} alt="Profile" className="w-7 h-7 rounded-full object-cover ring-1 ring-slate-300" />
             ) : (
-               <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.75rem' }}>
+               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-sky-600 to-blue-800 text-white flex items-center justify-center font-bold text-xs shadow-2xs">
                  {profile?.first_name?.charAt(0) || 'U'}{profile?.last_name?.charAt(0) || ''}
                </div>
             )}
-            <div className="hide-mobile" style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', lineHeight: 1.2 }}>
-              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text)' }}>
+            <div className="hidden sm:flex flex-col text-left leading-tight">
+              <span className="text-xs font-bold text-slate-900 group-hover:text-sky-700 transition-colors">
                 {profile?.first_name ? profile.first_name + ' ' + (profile.last_name || '') : 'Staff User'}
               </span>
-              <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--color-secondary)' }}>
+              <span className="text-[11px] font-semibold text-sky-600">
                 {userRoles[0] || profile?.role || 'Staff'}
               </span>
             </div>
           </Link>
-          <form action="/auth/signout" method="post" style={{ margin: 0 }}>
-            <button type="submit" className="btn btn-ghost" style={{ fontSize: '0.8rem' }}>
-              <LogOut size={16} /> Logout
+          <form action="/auth/signout" method="post" className="m-0">
+            <button
+              type="submit"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-all cursor-pointer"
+            >
+              <LogOut size={15} />
+              <span className="hidden sm:inline">Logout</span>
             </button>
           </form>
         </div>

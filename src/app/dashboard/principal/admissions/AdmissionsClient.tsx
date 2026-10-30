@@ -76,15 +76,50 @@ interface Props {
 
 const STATUS_CONFIG: Record<
   string,
-  { label: string; badgeClass: string; icon: React.ComponentType<{ size?: number }> }
+  { label: string; badgeClass: string; dotClass: string; icon: React.ComponentType<{ size?: number }> }
 > = {
-  submitted: { label: 'New / Received', badgeClass: 'badge-primary', icon: Sparkles },
-  under_review: { label: 'Under Review', badgeClass: 'badge-warning', icon: Clock },
-  interview_scheduled: { label: 'Interview Scheduled', badgeClass: 'badge-accent', icon: Calendar },
-  accepted: { label: 'Accepted', badgeClass: 'badge-success', icon: CheckCircle2 },
-  enrolled: { label: 'Enrolled', badgeClass: 'badge-success', icon: Check },
-  rejected: { label: 'Declined', badgeClass: 'badge-error', icon: X },
-  cancelled: { label: 'Cancelled', badgeClass: 'badge-muted', icon: X },
+  submitted: {
+    label: 'New / Received',
+    badgeClass: 'bg-sky-50 text-sky-700 border border-sky-200/80 ring-1 ring-sky-500/20',
+    dotClass: 'bg-sky-500',
+    icon: Sparkles,
+  },
+  under_review: {
+    label: 'Under Review',
+    badgeClass: 'bg-amber-50 text-amber-800 border border-amber-200/80 ring-1 ring-amber-500/20',
+    dotClass: 'bg-amber-500',
+    icon: Clock,
+  },
+  interview_scheduled: {
+    label: 'Interview Scheduled',
+    badgeClass: 'bg-purple-50 text-purple-700 border border-purple-200/80 ring-1 ring-purple-500/20',
+    dotClass: 'bg-purple-500',
+    icon: Calendar,
+  },
+  accepted: {
+    label: 'Accepted',
+    badgeClass: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 ring-1 ring-emerald-500/20',
+    dotClass: 'bg-emerald-500',
+    icon: CheckCircle2,
+  },
+  enrolled: {
+    label: 'Enrolled',
+    badgeClass: 'bg-teal-50 text-teal-700 border border-teal-200/80 ring-1 ring-teal-500/20',
+    dotClass: 'bg-teal-500',
+    icon: Check,
+  },
+  rejected: {
+    label: 'Declined',
+    badgeClass: 'bg-rose-50 text-rose-700 border border-rose-200/80 ring-1 ring-rose-500/20',
+    dotClass: 'bg-rose-500',
+    icon: X,
+  },
+  cancelled: {
+    label: 'Cancelled',
+    badgeClass: 'bg-slate-100 text-slate-600 border border-slate-200 ring-1 ring-slate-400/20',
+    dotClass: 'bg-slate-400',
+    icon: X,
+  },
 }
 
 export default function AdmissionsClient({ initialApplications }: Props) {
@@ -216,96 +251,98 @@ export default function AdmissionsClient({ initialApplications }: Props) {
       </div>
 
       {/* 2. Stat Cards / KPI Grid */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '1rem',
-        }}
-      >
-        <div className="stat-card">
-          <div className="stat-icon" style={{ backgroundColor: 'rgba(0, 38, 75, 0.08)' }}>
-            <FileText size={20} color="var(--color-primary)" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Applications</span>
+            <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-slate-200/80 transition-colors">
+              <FileText size={18} />
+            </div>
           </div>
-          <div className="stat-label">Total Applications</div>
-          <div className="stat-value" style={{ color: 'var(--color-primary)' }}>
+          <div className="text-2xl font-extrabold text-slate-900 font-[Outfit]">
             {metrics.total}
           </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">All received online forms</div>
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-slate-400 to-slate-600 opacity-60 group-hover:opacity-100 transition-opacity" />
         </div>
 
-        <div className="stat-card">
-          <div className="stat-icon" style={{ backgroundColor: 'rgba(59, 179, 195, 0.12)' }}>
-            <Sparkles size={20} color="var(--color-secondary)" />
+        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-sky-700">New / Unreviewed</span>
+            <div className="p-2.5 rounded-xl bg-sky-50 text-sky-600 ring-1 ring-sky-500/20 group-hover:bg-sky-100 transition-colors">
+              <Sparkles size={18} />
+            </div>
           </div>
-          <div className="stat-label">New / Unreviewed</div>
-          <div className="stat-value" style={{ color: 'var(--color-secondary)' }}>
+          <div className="text-2xl font-extrabold text-sky-700 font-[Outfit]">
             {metrics.submitted}
           </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Awaiting initial desk review</div>
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 to-blue-600 opacity-80 group-hover:opacity-100 transition-opacity" />
         </div>
 
-        <div className="stat-card">
-          <div className="stat-icon" style={{ backgroundColor: 'rgba(245, 158, 11, 0.12)' }}>
-            <Clock size={20} color="var(--color-warning)" />
+        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-700">Under Review</span>
+            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 ring-1 ring-amber-500/20 group-hover:bg-amber-100 transition-colors">
+              <Clock size={18} />
+            </div>
           </div>
-          <div className="stat-label">Under Review</div>
-          <div className="stat-value" style={{ color: 'var(--color-warning)' }}>
+          <div className="text-2xl font-extrabold text-amber-700 font-[Outfit]">
             {metrics.underReview}
           </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Currently being processed</div>
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-amber-600 opacity-80 group-hover:opacity-100 transition-opacity" />
         </div>
 
-        <div className="stat-card">
-          <div className="stat-icon" style={{ backgroundColor: 'rgba(247, 178, 57, 0.15)' }}>
-            <Calendar size={20} color="var(--color-accent)" />
+        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-purple-700">Interviews</span>
+            <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600 ring-1 ring-purple-500/20 group-hover:bg-purple-100 transition-colors">
+              <Calendar size={18} />
+            </div>
           </div>
-          <div className="stat-label">Interviews Scheduled</div>
-          <div className="stat-value" style={{ color: '#d97706' }}>
+          <div className="text-2xl font-extrabold text-purple-700 font-[Outfit]">
             {metrics.interview}
           </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Assessment sessions booked</div>
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-400 to-purple-600 opacity-80 group-hover:opacity-100 transition-opacity" />
         </div>
 
-        <div className="stat-card">
-          <div className="stat-icon" style={{ backgroundColor: 'rgba(16, 185, 129, 0.12)' }}>
-            <CheckCircle2 size={20} color="var(--color-success)" />
+        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">Enrolled / Accepted</span>
+            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-500/20 group-hover:bg-emerald-100 transition-colors">
+              <CheckCircle2 size={18} />
+            </div>
           </div>
-          <div className="stat-label">Accepted / Enrolled</div>
-          <div className="stat-value" style={{ color: 'var(--color-success)' }}>
+          <div className="text-2xl font-extrabold text-emerald-700 font-[Outfit]">
             {metrics.accepted}
           </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Offers issued & registered</div>
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-600 opacity-80 group-hover:opacity-100 transition-opacity" />
         </div>
       </div>
 
       {/* 3. Search and Filters Bar */}
-      <div
-        className="glass-panel"
-        style={{
-          padding: '1.25rem',
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div style={{ flex: '1', minWidth: '280px', position: 'relative' }}>
+      <div className="glass-panel p-4 rounded-2xl border border-slate-200/90 shadow-xs flex flex-wrap gap-3.5 items-center justify-between">
+        <div className="flex-1 min-w-[280px] relative">
           <Search
-            size={18}
-            color="var(--color-text-muted)"
-            style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }}
+            size={17}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
           />
           <input
             type="text"
-            className="input-field"
-            style={{ paddingLeft: '2.5rem' }}
+            className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all shadow-2xs placeholder:text-slate-400"
             placeholder="Search candidate name, reference, parent email, or phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ minWidth: '180px' }}>
+        <div className="flex gap-2.5 flex-wrap items-center">
+          <div className="min-w-[170px]">
             <select
-              className="input-field"
+              className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all shadow-2xs font-medium text-slate-700 cursor-pointer"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
@@ -320,9 +357,9 @@ export default function AdmissionsClient({ initialApplications }: Props) {
             </select>
           </div>
 
-          <div style={{ minWidth: '160px' }}>
+          <div className="min-w-[150px]">
             <select
-              className="input-field"
+              className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all shadow-2xs font-medium text-slate-700 cursor-pointer"
               value={curriculumFilter}
               onChange={(e) => setCurriculumFilter(e.target.value)}
             >
@@ -335,28 +372,28 @@ export default function AdmissionsClient({ initialApplications }: Props) {
       </div>
 
       {/* 4. Applications Data Table */}
-      <div className="table-wrapper">
-        <table style={{ width: '100%', minWidth: '900px' }}>
+      <div className="table-wrapper overflow-x-auto rounded-2xl border border-slate-200/90 shadow-xs bg-white">
+        <table className="w-full min-w-[920px] border-collapse text-left text-sm">
           <thead>
-            <tr>
-              <th style={{ width: '130px', whiteSpace: 'nowrap' }}>Application #</th>
-              <th style={{ minWidth: '160px' }}>Candidate / Student</th>
-              <th style={{ minWidth: '150px' }}>Class & Curriculum</th>
-              <th style={{ width: '220px', maxWidth: '240px' }}>Parent / Contact</th>
-              <th style={{ width: '110px', whiteSpace: 'nowrap' }}>Submitted</th>
-              <th style={{ width: '140px', whiteSpace: 'nowrap' }}>Status</th>
-              <th style={{ width: '180px', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
+            <tr className="bg-slate-50/80 border-b border-slate-200">
+              <th className="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Application #</th>
+              <th className="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 min-w-[190px]">Candidate / Student</th>
+              <th className="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 min-w-[150px]">Class & Curriculum</th>
+              <th className="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 max-w-[240px]">Parent / Contact</th>
+              <th className="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Submitted</th>
+              <th className="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Status</th>
+              <th className="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--color-text-muted)' }}>
-                  <FileText size={36} color="var(--color-border)" style={{ margin: '0 auto 0.75rem' }} />
-                  <div style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--color-text)' }}>
+                <td colSpan={7} className="text-center py-14 px-4 text-slate-500">
+                  <FileText size={38} className="mx-auto mb-3 text-slate-300" />
+                  <div className="font-bold text-base text-slate-800">
                     No admission applications found
                   </div>
-                  <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem' }}>
+                  <p className="mt-1 text-xs text-slate-500">
                     Adjust your search query or filters to inspect incoming forms.
                   </p>
                 </td>
@@ -373,107 +410,92 @@ export default function AdmissionsClient({ initialApplications }: Props) {
                   : '—'
 
                 return (
-                  <tr key={app.id}>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      <span
-                        style={{
-                          fontFamily: 'monospace',
-                          fontSize: '0.82rem',
-                          fontWeight: 700,
-                          padding: '0.3rem 0.65rem',
-                          borderRadius: 'var(--radius-sm)',
-                          backgroundColor: 'rgba(0, 38, 75, 0.06)',
-                          color: 'var(--color-primary)',
-                          border: '1px solid rgba(0, 38, 75, 0.1)',
-                          display: 'inline-block',
-                        }}
-                      >
+                  <tr key={app.id} className="hover:bg-sky-50/40 transition-colors border-b border-slate-100 last:border-b-0">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 border border-slate-200/90 shadow-2xs">
+                        <FileText size={12} className="text-slate-400" />
                         {app.application_no}
                       </span>
                     </td>
-                    <td>
-                      <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>
-                        {app.first_name} {app.last_name}
-                      </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
-                        {app.gender ? `${app.gender} • ` : ''}
-                        {app.date_of_birth ? `DOB: ${app.date_of_birth}` : ''}
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-sky-600 to-blue-800 text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0 ring-2 ring-white">
+                          {app.first_name?.[0] || 'S'}{app.last_name?.[0] || ''}
+                        </div>
+                        <div>
+                          <div className="font-bold text-slate-900 leading-tight">
+                            {app.first_name} {app.last_name}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                            {app.gender && (
+                              <span className="capitalize px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium text-[11px]">
+                                {app.gender}
+                              </span>
+                            )}
+                            {app.date_of_birth && <span>DOB: {app.date_of_birth}</span>}
+                          </div>
+                        </div>
                       </div>
                     </td>
-                    <td>
-                      <div style={{ fontWeight: 600, color: 'var(--color-primary)' }}>
+                    <td className="py-3.5 px-4">
+                      <div className="font-semibold text-slate-900 leading-tight">
                         {app.class_applied_for}
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-                        {app.curriculum || 'Cambridge Curriculum'}
+                      <div className="mt-1">
+                        {app.curriculum?.toLowerCase().includes('cambridge') || !app.curriculum ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/80">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                            Cambridge
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            NECTA
+                          </span>
+                        )}
                       </div>
                     </td>
-                    <td style={{ maxWidth: '240px' }}>
-                      <div style={{ fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <td className="py-3.5 px-4 max-w-[240px]">
+                      <div className="font-semibold text-slate-900 truncate" title={app.parent_name}>
                         {app.parent_name}
                       </div>
-                      <div
-                        style={{
-                          fontSize: '0.78rem',
-                          color: 'var(--color-text-muted)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.2rem',
-                          marginTop: '0.2rem',
-                          maxWidth: '220px',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
-                          <Phone size={12} color="var(--color-text-muted)" style={{ flexShrink: 0 }} />
-                          <span>{app.parent_phone}</span>
+                      <div className="mt-1 flex flex-col gap-1 text-xs text-slate-500">
+                        <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                          <Phone size={12} className="text-slate-400 shrink-0" />
+                          <span className="font-medium text-slate-700">{app.parent_phone}</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <Mail size={12} color="var(--color-text-muted)" style={{ flexShrink: 0 }} />
+                        <div className="inline-flex items-center gap-1.5">
+                          <Mail size={12} className="text-slate-400 shrink-0" />
                           <a
                             href={`mailto:${app.parent_email}`}
                             title={app.parent_email}
-                            style={{
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              display: 'block',
-                              maxWidth: '190px',
-                              color: 'var(--color-secondary)',
-                              textDecoration: 'none',
-                            }}
+                            className="truncate max-w-[185px] text-sky-600 hover:text-sky-800 hover:underline font-medium"
                           >
                             {app.parent_email}
                           </a>
                         </div>
                       </div>
                     </td>
-                    <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                    <td className="py-3.5 px-4 text-xs font-medium text-slate-600 whitespace-nowrap">
                       {dateDisplay}
                     </td>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      <span className={`badge ${conf.badgeClass}`}>
-                        <span
-                          style={{
-                            width: '6px',
-                            height: '6px',
-                            borderRadius: '50%',
-                            backgroundColor: 'currentColor',
-                          }}
-                        />
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold shadow-2xs ${conf.badgeClass}`}>
+                        <span className={`w-2 h-2 rounded-full ${conf.dotClass}`} />
                         {conf.label}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'inline-flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                      <div className="inline-flex items-center justify-end gap-1.5">
                         {/* Eye Icon -> Opens PDF in interactive Modal */}
                         <button
                           type="button"
                           onClick={() => setPreviewPdfApp(app)}
-                          className="btn btn-sm btn-primary"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-sky-600 hover:bg-sky-700 text-white shadow-xs hover:shadow active:scale-95 transition-all cursor-pointer"
                           title="Preview Official 3-Page 2027 Admission Form PDF in Modal"
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                         >
-                          <Eye size={14} /> View Form
+                          <Eye size={13} />
+                          <span>View Form</span>
                         </button>
 
                         {/* Direct PDF Download */}
@@ -481,21 +503,22 @@ export default function AdmissionsClient({ initialApplications }: Props) {
                           href={`/api/admissions/apply?reference=${encodeURIComponent(app.application_no)}&download=1`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="btn btn-sm btn-outline-primary"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border border-slate-300 hover:border-sky-500 bg-white hover:bg-sky-50/50 text-slate-700 hover:text-sky-700 shadow-2xs active:scale-95 transition-all"
                           title="Download Official 3-Page PDF"
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                         >
-                          <Download size={14} /> PDF
+                          <Download size={13} />
+                          <span>PDF</span>
                         </a>
 
                         {/* Review / Details Modal */}
                         <button
                           type="button"
                           onClick={() => openModal(app)}
-                          className="btn btn-sm btn-secondary"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition-all cursor-pointer"
                           title="Review applicant data & update status"
                         >
-                          <FileText size={14} /> Review
+                          <FileText size={13} />
+                          <span>Review</span>
                         </button>
                       </div>
                     </td>
@@ -1003,97 +1026,41 @@ export default function AdmissionsClient({ initialApplications }: Props) {
       {/* 6. Interactive 3-Page Official PDF Form Preview Modal */}
       {previewPdfApp && (
         <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            zIndex: 1100,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '1rem',
-          }}
+          className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[100] flex items-center justify-center p-3 sm:p-5"
           onClick={() => setPreviewPdfApp(null)}
         >
           <div
-            className="glass-panel"
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-xl)',
-              boxShadow: 'var(--shadow-xl)',
-              maxWidth: '1150px',
-              width: '100%',
-              height: '92vh',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
+            className="bg-white rounded-3xl border border-slate-200/90 shadow-2xl max-w-6xl w-full h-[94vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* PDF Modal Header */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '1rem 1.5rem',
-                borderBottom: '1px solid var(--color-border)',
-                backgroundColor: 'var(--color-surface)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div
-                  style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: 'var(--radius-md)',
-                    backgroundColor: 'rgba(59, 179, 195, 0.1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--color-secondary)',
-                  }}
-                >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white/95 backdrop-blur-xs">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 ring-1 ring-sky-500/20 flex items-center justify-center shrink-0">
                   <FileText size={20} />
                 </div>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <h3 style={{ fontSize: '1.15rem', margin: 0, fontWeight: 700, color: 'var(--color-primary)' }}>
-                      Official 2027 Admission Form Preview
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h3 className="text-base sm:text-lg font-bold text-slate-900 font-[Outfit] m-0">
+                      Official 2027 Admission Form
                     </h3>
-                    <span
-                      style={{
-                        fontFamily: 'monospace',
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        padding: '0.2rem 0.5rem',
-                        backgroundColor: 'rgba(0, 38, 75, 0.08)',
-                        color: 'var(--color-primary)',
-                        borderRadius: 'var(--radius-sm)',
-                      }}
-                    >
+                    <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 shadow-2xs">
                       {previewPdfApp.application_no}
                     </span>
                   </div>
-                  <p style={{ margin: '0.15rem 0 0', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                    Candidate: <strong>{previewPdfApp.first_name} {previewPdfApp.last_name}</strong> • {previewPdfApp.class_applied_for} ({previewPdfApp.curriculum || 'Cambridge'})
+                  <p className="text-xs text-slate-500 m-0 mt-0.5">
+                    Candidate: <strong className="text-slate-800">{previewPdfApp.first_name} {previewPdfApp.last_name}</strong> • {previewPdfApp.class_applied_for} ({previewPdfApp.curriculum || 'Cambridge Curriculum'})
                   </p>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <div className="flex items-center gap-2">
                 {/* Open in full browser tab */}
                 <a
                   href={`/api/admissions/apply?reference=${encodeURIComponent(previewPdfApp.application_no)}&preview=1`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn btn-sm btn-secondary"
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors shadow-2xs"
                   title="Open raw PDF in new browser tab"
                 >
                   Open in Tab ↗
@@ -1104,43 +1071,30 @@ export default function AdmissionsClient({ initialApplications }: Props) {
                   href={`/api/admissions/apply?reference=${encodeURIComponent(previewPdfApp.application_no)}&download=1`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn btn-sm btn-primary"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-sky-600 hover:bg-sky-700 text-white shadow-xs hover:shadow transition-all active:scale-95"
                   title="Download filled PDF form"
                 >
-                  <Download size={14} /> Download PDF
+                  <Download size={13} />
+                  <span>Download PDF</span>
                 </a>
 
                 {/* Close Button */}
                 <button
                   type="button"
                   onClick={() => setPreviewPdfApp(null)}
-                  className="btn btn-ghost"
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    padding: 0,
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
                   title="Close Preview"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
             </div>
 
             {/* Interactive PDF iFrame Viewer */}
-            <div style={{ flex: 1, backgroundColor: '#525659', position: 'relative' }}>
+            <div className="flex-1 bg-slate-700 relative">
               <iframe
                 src={`/api/admissions/apply?reference=${encodeURIComponent(previewPdfApp.application_no)}&preview=1`}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  border: 'none',
-                  display: 'block',
-                }}
+                className="w-full h-full border-none block"
                 title={`Official Admission Form - ${previewPdfApp.application_no}`}
               />
             </div>
