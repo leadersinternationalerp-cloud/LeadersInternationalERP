@@ -93,6 +93,7 @@ export default function AdmissionsClient({ initialApplications }: Props) {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [curriculumFilter, setCurriculumFilter] = useState<string>('all')
   const [selectedApp, setSelectedApp] = useState<AdmissionApplication | null>(null)
+  const [previewPdfApp, setPreviewPdfApp] = useState<AdmissionApplication | null>(null)
   const [notesInput, setNotesInput] = useState('')
   const [isPending, startTransition] = useTransition()
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
@@ -463,16 +464,28 @@ export default function AdmissionsClient({ initialApplications }: Props) {
                       </span>
                     </td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'inline-flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                        {/* Download Official PDF */}
+                      <div style={{ display: 'inline-flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        {/* Eye Icon -> Opens PDF in interactive Modal */}
+                        <button
+                          type="button"
+                          onClick={() => setPreviewPdfApp(app)}
+                          className="btn btn-sm btn-primary"
+                          title="Preview Official 3-Page 2027 Admission Form PDF in Modal"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                        >
+                          <Eye size={14} /> View Form
+                        </button>
+
+                        {/* Direct PDF Download */}
                         <a
                           href={`/api/admissions/apply?reference=${encodeURIComponent(app.application_no)}&download=1`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="btn btn-sm btn-primary"
-                          title="Download Official 3-Page 2027 Admission Form PDF"
+                          className="btn btn-sm btn-outline-primary"
+                          title="Download Official 3-Page PDF"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                         >
-                          <Download size={14} /> PDF Form
+                          <Download size={14} /> PDF
                         </a>
 
                         {/* Review / Details Modal */}
@@ -480,8 +493,9 @@ export default function AdmissionsClient({ initialApplications }: Props) {
                           type="button"
                           onClick={() => openModal(app)}
                           className="btn btn-sm btn-secondary"
+                          title="Review applicant data & update status"
                         >
-                          <Eye size={14} /> Review
+                          <FileText size={14} /> Review
                         </button>
                       </div>
                     </td>
@@ -638,15 +652,29 @@ export default function AdmissionsClient({ initialApplications }: Props) {
                 </p>
               </div>
 
-              <a
-                href={`/api/admissions/apply?reference=${encodeURIComponent(selectedApp.application_no)}&download=1`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-primary"
-                style={{ padding: '0.65rem 1.4rem' }}
-              >
-                <Download size={16} /> Download Official PDF
-              </a>
+              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const app = selectedApp;
+                    setSelectedApp(null);
+                    setPreviewPdfApp(app);
+                  }}
+                  className="btn btn-primary"
+                  style={{ padding: '0.65rem 1.25rem' }}
+                >
+                  <Eye size={16} /> Preview PDF Form
+                </button>
+                <a
+                  href={`/api/admissions/apply?reference=${encodeURIComponent(selectedApp.application_no)}&download=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-outline-primary"
+                  style={{ padding: '0.65rem 1.25rem' }}
+                >
+                  <Download size={16} /> Download PDF
+                </a>
+              </div>
             </div>
 
             {/* Section 1: Candidate Details */}
@@ -966,6 +994,155 @@ export default function AdmissionsClient({ initialApplications }: Props) {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+    
+
+      {/* 6. Interactive 3-Page Official PDF Form Preview Modal */}
+      {previewPdfApp && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            zIndex: 1100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}
+          onClick={() => setPreviewPdfApp(null)}
+        >
+          <div
+            className="glass-panel"
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-xl)',
+              boxShadow: 'var(--shadow-xl)',
+              maxWidth: '1150px',
+              width: '100%',
+              height: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* PDF Modal Header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '1rem 1.5rem',
+                borderBottom: '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-surface)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div
+                  style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: 'rgba(59, 179, 195, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--color-secondary)',
+                  }}
+                >
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <h3 style={{ fontSize: '1.15rem', margin: 0, fontWeight: 700, color: 'var(--color-primary)' }}>
+                      Official 2027 Admission Form Preview
+                    </h3>
+                    <span
+                      style={{
+                        fontFamily: 'monospace',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        padding: '0.2rem 0.5rem',
+                        backgroundColor: 'rgba(0, 38, 75, 0.08)',
+                        color: 'var(--color-primary)',
+                        borderRadius: 'var(--radius-sm)',
+                      }}
+                    >
+                      {previewPdfApp.application_no}
+                    </span>
+                  </div>
+                  <p style={{ margin: '0.15rem 0 0', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                    Candidate: <strong>{previewPdfApp.first_name} {previewPdfApp.last_name}</strong> • {previewPdfApp.class_applied_for} ({previewPdfApp.curriculum || 'Cambridge'})
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                {/* Open in full browser tab */}
+                <a
+                  href={`/api/admissions/apply?reference=${encodeURIComponent(previewPdfApp.application_no)}&preview=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-sm btn-secondary"
+                  title="Open raw PDF in new browser tab"
+                >
+                  Open in Tab ↗
+                </a>
+
+                {/* Direct Download */}
+                <a
+                  href={`/api/admissions/apply?reference=${encodeURIComponent(previewPdfApp.application_no)}&download=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-sm btn-primary"
+                  title="Download filled PDF form"
+                >
+                  <Download size={14} /> Download PDF
+                </a>
+
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={() => setPreviewPdfApp(null)}
+                  className="btn btn-ghost"
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    padding: 0,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="Close Preview"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Interactive PDF iFrame Viewer */}
+            <div style={{ flex: 1, backgroundColor: '#525659', position: 'relative' }}>
+              <iframe
+                src={`/api/admissions/apply?reference=${encodeURIComponent(previewPdfApp.application_no)}&preview=1`}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                  display: 'block',
+                }}
+                title={`Official Admission Form - ${previewPdfApp.application_no}`}
+              />
             </div>
           </div>
         </div>

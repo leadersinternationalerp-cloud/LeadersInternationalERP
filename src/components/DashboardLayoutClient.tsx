@@ -756,8 +756,17 @@ export default function DashboardLayoutClient({
           <button onClick={toggleCollapsed} className="btn btn-icon btn-ghost desktop-collapse-toggle" aria-label="Toggle Sidebar">
             <Menu size={20} />
           </button>
-          <Image src="/logo.png" alt="Logo" width={40} height={40} />
-          <h2 style={{ fontSize: '1.25rem', margin: 0, fontWeight: 600, display: 'none' }}>Leaders ERP</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <Image src="/crest.svg" alt="Leaders International School" width={38} height={38} priority style={{ height: '38px', width: 'auto' }} />
+            <div className="hide-mobile" style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--color-primary)', fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.01em', lineHeight: 1.1 }}>
+                LEADERS INTERNATIONAL
+              </span>
+              <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--color-secondary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                School Portal • ERP
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Dynamic Page Title (Center) */}
@@ -818,17 +827,22 @@ export default function DashboardLayoutClient({
             )}
           </div>
 
-          <Link href="/dashboard/profile" style={{ textDecoration: 'none', color: 'inherit', textAlign: 'right', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ display: 'none' }}>
-              {/* Could be visible on desktop */}
-            </div>
+          <Link href="/dashboard/profile" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.35rem 0.75rem', borderRadius: 'var(--radius-full)', backgroundColor: 'rgba(0, 38, 75, 0.03)', border: '1px solid var(--color-border)' }}>
             {profile?.avatar_url ? (
-               <img src={profile.avatar_url} alt="Profile" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--color-border)' }} />
+               <img src={profile.avatar_url} alt="Profile" style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover' }} />
             ) : (
-               <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.8rem' }}>
-                 {profile?.first_name?.charAt(0)}{profile?.last_name?.charAt(0)}
+               <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.75rem' }}>
+                 {profile?.first_name?.charAt(0) || 'U'}{profile?.last_name?.charAt(0) || ''}
                </div>
             )}
+            <div className="hide-mobile" style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', lineHeight: 1.2 }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text)' }}>
+                {profile?.first_name ? profile.first_name + ' ' + (profile.last_name || '') : 'Staff User'}
+              </span>
+              <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--color-secondary)' }}>
+                {userRoles[0] || profile?.role || 'Staff'}
+              </span>
+            </div>
           </Link>
           <form action="/auth/signout" method="post" style={{ margin: 0 }}>
             <button type="submit" className="btn btn-ghost" style={{ fontSize: '0.8rem' }}>

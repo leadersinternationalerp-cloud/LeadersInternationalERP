@@ -4,16 +4,16 @@
   /* Brand Colors */
   --color-primary: #00264b;
   --color-primary-light: #003b73;
-  --color-secondary: #3bb3c3;
-  --color-secondary-hover: #48c9d9;
+  --color-secondary: #0284c7;
+  --color-secondary-hover: #0369a1;
   --color-accent: #f7b239;
   --color-warning: #f59e0b;
   
   /* Neutral Colors */
-  --color-bg: #f0f4f8;
+  --color-bg: #f8fafc;
   --color-background: var(--color-bg);
   --color-surface: #ffffff;
-  --color-text: #1e293b;
+  --color-text: #0f172a;
   --color-text-muted: #64748b;
   --color-border: #e2e8f0;
 
@@ -26,7 +26,7 @@
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
   --shadow-lg: 0 10px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.04);
   --shadow-xl: 0 20px 40px -8px rgb(0 0 0 / 0.1), 0 8px 16px -4px rgb(0 0 0 / 0.06);
-  --shadow-glow: 0 0 20px rgba(59, 179, 195, 0.35);
+  --shadow-glow: 0 0 20px rgba(2, 132, 199, 0.35);
   --shadow-glow-accent: 0 0 20px rgba(247, 178, 57, 0.3);
   
   --radius-sm: 0.5rem;
@@ -115,13 +115,13 @@ a { color: var(--color-secondary); }
    GLASS PANEL / CARDS
    ============================== */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(226, 232, 240, 0.6);
-  box-shadow: var(--shadow-md);
-  border-radius: var(--radius-lg);
-  transition: transform var(--transition-smooth), box-shadow var(--transition-smooth);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 4px 20px -2px rgba(0, 38, 75, 0.05), 0 2px 6px -1px rgba(0, 38, 75, 0.03);
+  border-radius: var(--radius-xl);
+  transition: transform var(--transition-smooth), box-shadow var(--transition-smooth), border-color var(--transition-smooth);
 }
 
 .glass-panel:hover {
@@ -131,7 +131,7 @@ a { color: var(--color-secondary); }
 @media (prefers-color-scheme: dark) {
   .glass-panel {
     background: rgba(10, 34, 64, 0.75);
-    border: 1px solid rgba(59, 179, 195, 0.12);
+    border: 1px solid rgba(2, 132, 199, 0.12);
   }
 }
 
@@ -141,7 +141,7 @@ a { color: var(--color-secondary); }
   border-radius: var(--radius-xl);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 8px -1px rgba(0, 38, 75, 0.04);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -230,9 +230,9 @@ a { color: var(--color-secondary); }
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--color-secondary), #2da8b8);
+  background: linear-gradient(135deg, var(--color-secondary), #0369a1);
   color: #fff;
-  box-shadow: 0 4px 14px rgba(59, 179, 195, 0.25);
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.25);
 }
 
 .btn-primary:hover {
@@ -295,7 +295,7 @@ a { color: var(--color-secondary); }
 }
 
 .btn-ghost:hover {
-  background-color: rgba(59, 179, 195, 0.06);
+  background-color: rgba(2, 132, 199, 0.06);
   color: var(--color-secondary);
 }
 
@@ -373,7 +373,7 @@ a { color: var(--color-secondary); }
 }
 
 .badge-primary {
-  background: rgba(59, 179, 195, 0.12);
+  background: rgba(2, 132, 199, 0.12);
   color: var(--color-secondary);
 }
 
@@ -420,12 +420,12 @@ a { color: var(--color-secondary); }
 }
 
 .nav-link:hover {
-  background: rgba(59, 179, 195, 0.08);
+  background: rgba(2, 132, 199, 0.08);
   color: var(--color-text);
 }
 
 .nav-link.active {
-  background: linear-gradient(90deg, rgba(59, 179, 195, 0.12), rgba(59, 179, 195, 0.04));
+  background: linear-gradient(90deg, rgba(2, 132, 199, 0.12), rgba(2, 132, 199, 0.04));
   font-weight: 600;
   color: var(--color-secondary);
   border-left: 3px solid var(--color-secondary);
@@ -482,7 +482,7 @@ table th {
 
 @media (prefers-color-scheme: dark) {
   table th {
-    background: rgba(59, 179, 195, 0.06);
+    background: rgba(2, 132, 199, 0.06);
   }
 }
 
@@ -494,7 +494,7 @@ table td {
 }
 
 table tbody tr:hover {
-  background-color: rgba(59, 179, 195, 0.03);
+  background-color: rgba(2, 132, 199, 0.03);
 }
 
 table tbody tr:last-child td {
@@ -517,14 +517,14 @@ table tbody tr:last-child td {
 }
 
 .input-field:hover {
-  border-color: rgba(59, 179, 195, 0.4);
+  border-color: rgba(2, 132, 199, 0.4);
 }
 
 .input-field:focus {
   outline: none;
   border-color: var(--color-secondary);
-  box-shadow: 0 0 0 3px rgba(59, 179, 195, 0.15);
-  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.18);
+  background-color: var(--color-surface);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -867,4 +867,51 @@ select.input-field {
   .main-content-area {
     padding: 0 !important;
   }
+}
+
+
+/* ==============================
+   ENHANCED PDF PREVIEW & UI SUITE
+   ============================== */
+.pdf-preview-modal {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: fadeIn 0.2s ease;
+}
+
+.pdf-preview-container {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+  max-width: 1100px;
+  width: 100%;
+  height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: scaleUp 0.2s ease;
+}
+
+/* Subtle modern zebra row striping & hover */
+table tbody tr {
+  transition: background-color 150ms ease;
+}
+
+table tbody tr:hover {
+  background-color: rgba(2, 132, 199, 0.04) !important;
+}
+
+.table-wrapper {
+  box-shadow: 0 2px 10px rgba(0, 38, 75, 0.04);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
 }

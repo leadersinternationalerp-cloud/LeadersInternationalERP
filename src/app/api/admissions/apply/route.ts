@@ -374,6 +374,8 @@ export const GET = route(
     const url = new URL(req.url)
     const reference = url.searchParams.get('reference') || url.searchParams.get('application_no')
     const download = url.searchParams.get('download') === '1'
+    const preview = url.searchParams.get('preview') === '1' || url.searchParams.get('inline') === '1'
+    const isPdf = download || preview
 
     if (!reference) {
       throw new ApiError('BAD_REQUEST', 'Missing reference or application_no parameter')
@@ -390,7 +392,7 @@ export const GET = route(
       throw new ApiError('NOT_FOUND', 'Admission application not found')
     }
 
-    if (download) {
+    if (isPdf) {
       const pdfBuffer = await generateAdmissionFormPdf({
         applicationNo: record.application_no,
         dateReceived: record.created_at,
@@ -427,11 +429,13 @@ export const GET = route(
         additionalInfo: record.additional_notes,
       })
 
+      const disposition = preview ? 'inline' : 'attachment'
+
       return new NextResponse(pdfBuffer as unknown as BodyInit, {
         status: 200,
         headers: {
           'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename="Leaders_Admission_Form_${record.application_no}.pdf"`,
+          'Content-Disposition': `${disposition}; filename="Leaders_Admission_Form_${record.application_no}.pdf"`,
           'Cache-Control': 'no-store, max-age=0',
         },
       })
