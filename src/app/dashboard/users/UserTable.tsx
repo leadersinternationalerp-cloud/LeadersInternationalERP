@@ -18,7 +18,8 @@ const AVAILABLE_ROLES = [
   { value: 'Teacher', label: 'Teacher' },
   { value: 'Parent', label: 'Parent' },
   { value: 'Dean', label: 'Dean' },
-  { value: 'Head of Section', label: 'Head of Section' }
+  { value: 'Head of Section', label: 'Head of Section' },
+  { value: 'Student', label: 'Student' }
 ]
 
 export function UserTable({ users, currentUserId }: UserTableProps) {

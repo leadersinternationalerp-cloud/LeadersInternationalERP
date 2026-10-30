@@ -1,36 +1,35 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
+import { route, ok } from '@/lib/api/handler'
+import { STAFF_ROLES, MANAGEMENT_ROLES } from '@/lib/auth/roles'
+import { assertStudentInScope } from '@/lib/api/scope'
+import { badRequest, ApiError } from '@/lib/api/errors'
 
-// GET: returns the public image URL or checking existence
-export async function GET(request: Request) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { searchParams } = new URL(request.url)
+export const GET = route(
+  async ({ user, req, requestId }) => {
+    const { searchParams } = new URL(req.url)
     const student_id = searchParams.get('student_id')
     if (!student_id) {
-      return NextResponse.json({ error: 'Missing student_id' }, { status: 400 })
+      throw badRequest({ student_id: 'Missing student_id' })
     }
+
+    await assertStudentInScope(user, student_id)
 
     const supabaseService = createServiceClient()
-    const { data: files } = await supabaseService.storage
-      .from('student-photos')
-      .list(student_id)
+    const { data: files } = await supabaseService.storage.from('student-photos').list(student_id)
 
-    const exists = files && files.length > 0
+    const exists = Boolean(files && files.length > 0)
     if (searchParams.get('json') === 'true') {
-      return NextResponse.json({
-        exists,
-        photo_url: exists ? `/api/students/photo?student_id=${student_id}` : null
-      })
+      return ok(
+        {
+          exists,
+          photo_url: exists ? `/api/students/photo?student_id=${student_id}` : null,
+        },
+        { requestId }
+      )
     }
 
-    if (exists) {
+    if (exists && files && files.length > 0) {
       const latestFile = files[0]
       const { data: urlData } = supabaseService.storage
         .from('student-photos')
@@ -38,83 +37,103 @@ export async function GET(request: Request) {
       return NextResponse.redirect(urlData.publicUrl)
     }
 
-    return new NextResponse('No Photo Found', { status: 404 })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-}
+    throw new ApiError('NOT_FOUND', 'No photo found for student')
+  },
+  { roles: STAFF_ROLES }
+)
 
-// POST: uploads a photo file to storage
-export async function POST(request: Request) {
-  try {
-    const supabase = await createClient()
-
-    // 1. Verify Auth
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const formData = await request.formData()
-    const file = formData.get('photo') as File
-    const student_id = formData.get('student_id') as string
+export const POST = route(
+  async ({ user, req, requestId }) => {
+    const formData = await req.formData()
+    const file = formData.get('photo') as File | null
+    const student_id = formData.get('student_id') as string | null
 
     if (!file || !student_id) {
-      return NextResponse.json({ error: 'Missing photo file or student_id' }, { status: 400 })
+      throw badRequest({ fields: 'Missing photo file or student_id' })
     }
 
-    // Check size limit: 5MB
+    await assertStudentInScope(user, student_id)
+
     if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json({ error: 'File size exceeds 5MB limit' }, { status: 400 })
+      throw badRequest({ file: 'File size exceeds 5MB limit' })
     }
 
-    // Check MIME type
     const validMimes = ['image/jpeg', 'image/png', 'image/webp']
     if (!validMimes.includes(file.type)) {
-      return NextResponse.json({ error: 'Invalid file format. Only JPEG, PNG, and WebP are allowed' }, { status: 400 })
+      throw badRequest({ file: 'Invalid file format. Only JPEG, PNG, and WebP are allowed' })
     }
 
     const supabaseService = createServiceClient()
 
-    // Remove any existing photos in student's directory
-    const { data: existingFiles } = await supabaseService.storage
-      .from('student-photos')
-      .list(student_id)
+    const { data: existingFiles } = await supabaseService.storage.from('student-photos').list(student_id)
 
     if (existingFiles && existingFiles.length > 0) {
-      const filesToRemove = existingFiles.map(f => `${student_id}/${f.name}`)
+      const filesToRemove = existingFiles.map((f) => `${student_id}/${f.name}`)
       await supabaseService.storage.from('student-photos').remove(filesToRemove)
     }
 
-    // Save new file with timestamped name
     const ext = file.name.split('.').pop() || 'jpg'
     const fileName = `${student_id}/avatar_${Date.now()}.${ext}`
 
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    const { error: uploadError } = await supabaseService.storage
-      .from('student-photos')
-      .upload(fileName, buffer, {
-        contentType: file.type,
-        upsert: true
-      })
+    const { error: uploadError } = await supabaseService.storage.from('student-photos').upload(fileName, buffer, {
+      contentType: file.type,
+      upsert: true,
+    })
 
     if (uploadError) {
-      console.error('Storage upload error:', uploadError)
-      return NextResponse.json({ error: uploadError.message }, { status: 500 })
+      throw new ApiError('INTERNAL', 'Failed to upload student photo')
     }
 
-    const { data: urlData } = supabaseService.storage
-      .from('student-photos')
-      .getPublicUrl(fileName)
+    const {
+      data: { publicUrl },
+    } = supabaseService.storage.from('student-photos').getPublicUrl(fileName)
 
-    return NextResponse.json({
-      success: true,
-      photo_url: urlData.publicUrl
-    })
-  } catch (error: any) {
-    console.error('Photo upload handler error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    // Sync student_photos table if present
+    try {
+      await supabaseService.from('student_photos').upsert(
+        {
+          student_id,
+          photo_url: publicUrl,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'student_id' }
+      )
+    } catch {
+      // Non-fatal
+    }
+
+    return ok({ photo_url: publicUrl }, { requestId }, 201)
+  },
+  {
+    roles: [...MANAGEMENT_ROLES, 'Teacher'],
+    rateLimit: { key: 'photo-upload', max: 20, windowMs: 3600_000 },
   }
-}
+)
+
+export const DELETE = route(
+  async ({ user, req, requestId }) => {
+    const { searchParams } = new URL(req.url)
+    const student_id = searchParams.get('student_id')
+    if (!student_id) {
+      throw badRequest({ student_id: 'Missing student_id' })
+    }
+
+    await assertStudentInScope(user, student_id)
+
+    const supabaseService = createServiceClient()
+    const { data: existingFiles } = await supabaseService.storage.from('student-photos').list(student_id)
+
+    if (existingFiles && existingFiles.length > 0) {
+      const filesToRemove = existingFiles.map((f) => `${student_id}/${f.name}`)
+      await supabaseService.storage.from('student-photos').remove(filesToRemove)
+    }
+
+    await supabaseService.from('student_photos').delete().eq('student_id', student_id)
+
+    return ok({ success: true }, { requestId })
+  },
+  { roles: [...MANAGEMENT_ROLES, 'Teacher'] }
+)

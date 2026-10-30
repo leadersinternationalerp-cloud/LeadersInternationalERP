@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 
@@ -12,7 +13,7 @@ export default async function DeanDashboardPage() {
     .eq('id', user?.id)
     .single()
     
-  const userRoles = profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : []
+  const userRoles = normalizeRoles(profile)
 
   if (!user || (!userRoles.includes('Dean') && !userRoles.includes('System Admin'))) {
     return (
@@ -66,7 +67,7 @@ export default async function DeanDashboardPage() {
     .select('id, first_name, last_name, roles, role')
 
   const teacherList = (teachers || []).filter(t => {
-    const roles = t.roles && Array.isArray(t.roles) ? t.roles : (t.role ? t.role.split(',').map((r: string) => r.trim()) : [])
+    const roles = normalizeRoles(t)
     return roles.includes('Teacher')
   })
 

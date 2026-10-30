@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { reviewReportAction } from '../../staff/self-service/reports/actions'
@@ -28,9 +29,7 @@ export default async function DirectorReportsPage() {
     .select('role, roles')
     .eq('id', user?.id)
     .single()
-  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(profile)
 
   if (!userRoles.includes('Director') && !userRoles.includes('System Admin')) {
     return (

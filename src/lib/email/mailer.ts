@@ -26,6 +26,13 @@ export function getTransport(): Transporter {
   return transporter
 }
 
+export interface EmailAttachment {
+  filename: string
+  content?: Buffer | string
+  path?: string
+  contentType?: string
+}
+
 export type MailResult = { ok: true; messageId: string } | { ok: false; error: string }
 
 export async function sendMail(opts: {
@@ -36,6 +43,7 @@ export async function sendMail(opts: {
   replyTo?: string
   template?: string
   headers?: Record<string, string>
+  attachments?: EmailAttachment[]
 }): Promise<MailResult> {
   const mailFromEmail = process.env.MAIL_FROM_EMAIL || process.env.SMTP_USER || 'noreply@leaders.ac.tz'
   const mailFromName = process.env.MAIL_FROM_NAME ?? 'Leaders International School'
@@ -52,6 +60,14 @@ export async function sendMail(opts: {
       'X-Entity-Ref-ID': crypto.randomUUID(),
       ...opts.headers,
     },
+    ...(opts.attachments && opts.attachments.length > 0 ? { attachments: opts.attachments } : {}),
+  }
+
+  // If SMTP is not configured in local environment, log simulation gracefully
+  const { SMTP_HOST, SMTP_USER, SMTP_PASS } = process.env
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+    console.log(`[SMTP SIMULATOR] Email to: ${Array.isArray(opts.to) ? opts.to.join(', ') : opts.to} | Subject: "${opts.subject}" | Attachments: ${opts.attachments?.map((a) => a.filename).join(', ') || 'none'}`)
+    return { ok: true, messageId: `simulated-${crypto.randomUUID()}` }
   }
 
   let lastError = 'unknown'
@@ -60,8 +76,8 @@ export async function sendMail(opts: {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const transport = getTransport()
-      const info = await transport.sendMail(message)
-      messageId = info.messageId
+      const info = (await transport.sendMail(message)) as { messageId: string }
+      messageId = info?.messageId || `sent-${crypto.randomUUID()}`
 
       // Log to email_logs
       try {

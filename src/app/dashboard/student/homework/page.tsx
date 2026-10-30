@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { formatDate } from '@/utils/date'
@@ -13,9 +14,7 @@ export default async function StudentHomeworkPage() {
     .select('role, roles')
     .eq('id', user?.id)
     .single()
-  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(profile)
 
   if (!userRoles.includes('Student') && !userRoles.includes('System Admin')) {
     return (

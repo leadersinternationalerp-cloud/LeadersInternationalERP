@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -16,9 +17,7 @@ export default async function DashboardPage() {
     .select('*')
     .eq('id', user?.id)
     .single()
-  const userRoles: string[] = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(profile)
 
   // Role-based redirections for pure student/parent users
   if (userRoles.includes('Student') && userRoles.length === 1) {

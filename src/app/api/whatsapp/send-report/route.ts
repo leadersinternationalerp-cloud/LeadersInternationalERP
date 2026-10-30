@@ -1,45 +1,41 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { WhatsAppService } from '@/lib/whatsapp/WhatsAppService'
-import { GET as getPrimaryReport } from '@/app/api/report-cards/download/route'
-import { GET as getEarlyYearsReport } from '@/app/api/early-years/report/route'
+import { route, ok, parseJson } from '@/lib/api/handler'
+import { MANAGEMENT_ROLES } from '@/lib/auth/roles'
+import { assertStudentInScope } from '@/lib/api/scope'
+import { badRequest } from '@/lib/api/errors'
 
-export async function POST(request: Request) {
-  try {
+export const POST = route(
+  async ({ user, req, requestId }) => {
     const supabase = await createClient()
 
-    // 1. Authenticate user & check permission
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const body = await parseJson<{
+      studentId?: string | string[]
+      termId?: string
+      type?: 'PRIMARY' | 'EARLY_YEARS'
+      showRank?: boolean
+    }>(req)
+
+    const { studentId, termId, type = 'PRIMARY', showRank = true } = body
+
+    if (!studentId || !termId) {
+      throw badRequest({ fields: 'Missing studentId or termId' })
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('roles')
-      .eq('id', user.id)
-      .single()
+    const studentIds = (Array.isArray(studentId) ? studentId : String(studentId).split(','))
+      .map((s) => s.trim())
+      .filter(Boolean)
 
-    const roles = profile?.roles || []
-    const allowedRoles = ['Teacher', 'System Admin', 'Director', 'Principal', 'Dean']
-    const isAllowed = roles.some((r: string) => allowedRoles.includes(r))
-
-    if (!isAllowed) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    // 2. Parse request body
-    const body = await request.json()
-    const { studentId, termId, type, showRank = true } = body
-
-    if (!studentId || !termId || !type) {
-      return NextResponse.json({ error: 'Missing studentId, termId, or type' }, { status: 400 })
-    }
-
-    // Split student IDs to support bulk sending
-    const studentIds = String(studentId).split(',').map(s => s.trim()).filter(Boolean)
     if (studentIds.length === 0) {
-      return NextResponse.json({ error: 'No student IDs specified' }, { status: 400 })
+      throw badRequest({ studentId: 'No student IDs specified' })
+    }
+
+    if (studentIds.length > 30) {
+      throw badRequest({ studentId: 'Cannot bulk send WhatsApp reports to more than 30 students at once' })
+    }
+
+    for (const sId of studentIds) {
+      await assertStudentInScope(user, sId)
     }
 
     const results = {
@@ -47,105 +43,91 @@ export async function POST(request: Request) {
       success: 0,
       failed: 0,
       skipped: 0,
-      errors: [] as string[]
+      errors: [] as string[],
     }
 
-    // 3. Process each student
     for (const sId of studentIds) {
       try {
-        // A. Fetch student and parent details
         const { data: student } = await supabase
           .from('students')
           .select(`
             id,
-            profiles (first_name, last_name)
+            profiles (first_name, last_name),
+            student_parents (
+              profiles (first_name, last_name, phone)
+            )
           `)
           .eq('id', sId)
           .single()
 
-        if (!student || !student.profiles) {
+        const sProf = Array.isArray(student?.profiles) ? student.profiles[0] : student?.profiles
+        const studentName = sProf ? `${sProf.first_name} ${sProf.last_name}`.trim() : 'Student'
+
+        const parents = student?.student_parents || []
+        const primaryParentLink = parents[0]
+        const pProf = primaryParentLink?.profiles
+          ? Array.isArray(primaryParentLink.profiles)
+            ? primaryParentLink.profiles[0]
+            : primaryParentLink.profiles
+          : null
+
+        const rawPhone = pProf?.phone || ''
+        const parentName = pProf ? `${pProf.first_name} ${pProf.last_name}`.trim() : 'Parent'
+
+        if (!rawPhone) {
           results.skipped++
-          results.errors.push(`Student with ID ${sId} not found in database`)
+          results.errors.push(`No parent phone number registered for ${studentName}`)
           continue
         }
 
-        const studentProfile: any = Array.isArray(student.profiles) ? student.profiles[0] : student.profiles
-        const studentName = studentProfile 
-          ? `${studentProfile.first_name} ${studentProfile.last_name}`.trim() 
-          : 'Student'
+        const cleanNo = rawPhone.replace(/[+\s-]/g, '')
+        const formattedPhone = cleanNo.startsWith('0') ? '255' + cleanNo.substring(1) : cleanNo
 
-        // Fetch parent details
-        const { data: parents } = await supabase
-          .from('student_parents')
-          .select(`
-            parent_id,
-            profiles:parent_id (first_name, last_name, phone)
-          `)
-          .eq('student_id', sId)
+        const { data: term } = await supabase.from('terms').select('*').eq('id', termId).maybeSingle()
+        const termName = term?.name || term?.term_name || 'Term'
 
-        const parentProfile: any = parents?.[0]?.profiles
-        if (!parentProfile || !parentProfile.phone) {
-          results.skipped++
-          results.errors.push(`Parent phone number not configured for ${studentName}`)
-          continue
-        }
+        const origin = new URL(req.url).origin
+        const endpoint =
+          type === 'EARLY_YEARS'
+            ? `${origin}/api/early-years/report?student_id=${sId}&term_id=${termId}&download=true`
+            : `${origin}/api/report-cards/download?student_id=${sId}&term_id=${termId}&show_rank=${showRank}&download=true`
 
-        const parentPhone = parentProfile.phone.replace(/[+\s-]/g, '')
-        const formattedPhone = parentPhone.startsWith('0') ? '255' + parentPhone.substring(1) : parentPhone
-        const parentName = `${parentProfile.first_name} ${parentProfile.last_name}`
-
-        // Fetch term name
-        const { data: term } = await supabase
-          .from('terms')
-          .select('term_name')
-          .eq('id', termId)
-          .single()
-        const termName = term?.term_name || 'Term'
-
-        // B. Generate PDF internally by calling the GET handler
-        let response: Response
-        if (type === 'PRIMARY') {
-          const downloadUrl = `http://localhost/api/report-cards/download?student_id=${sId}&term_id=${termId}&show_rank=${showRank}`
-          response = await getPrimaryReport(new NextRequest(downloadUrl))
-        } else if (type === 'EARLY_YEARS') {
-          const downloadUrl = `http://localhost/api/early-years/report?student_id=${sId}&term_id=${termId}`
-          response = await getEarlyYearsReport(new NextRequest(downloadUrl))
-        } else {
-          results.skipped++
-          results.errors.push(`Unsupported report type: ${type}`)
-          continue
-        }
+        const response = await fetch(endpoint, {
+          headers: {
+            cookie: req.headers.get('cookie') || '',
+          },
+        })
 
         if (!response.ok) {
-          const errText = await response.text()
           results.failed++
-          results.errors.push(`PDF generation failed for ${studentName}: ${errText}`)
+          results.errors.push(`PDF generation failed for ${studentName}`)
           continue
         }
 
         const pdfBuffer = Buffer.from(await response.arrayBuffer())
 
-        // C. Upload generated PDF buffer to Storage
         const cleanName = studentName.replace(/[^a-zA-Z0-9]/g, '_')
         const cleanTerm = termName.replace(/[^a-zA-Z0-9]/g, '_')
         const fileName = `ReportCard_${cleanName}_${cleanTerm}_${sId}.pdf`
 
         const { error: uploadError } = await supabase.storage.from('receipts').upload(fileName, pdfBuffer, {
           contentType: 'application/pdf',
-          upsert: true
+          upsert: true,
         })
 
         if (uploadError) {
           results.failed++
-          results.errors.push(`Upload failed for ${studentName}: ${uploadError.message}`)
+          results.errors.push(`Upload failed for ${studentName}`)
           continue
         }
 
         const { data } = supabase.storage.from('receipts').getPublicUrl(fileName)
         const pdfUrl = data.publicUrl
 
-        // D. Send via Twilio WhatsApp
-        const waMsg = `Dear ${parentName}, please find the official ${type === 'EARLY_YEARS' ? 'EYFS Progress Report' : 'Term Progress Report Card'} for ${studentName} (${termName}) attached here: ${pdfUrl}`
+        const waMsg = `Dear ${parentName}, please find the official ${
+          type === 'EARLY_YEARS' ? 'EYFS Progress Report' : 'Term Progress Report Card'
+        } for ${studentName} (${termName}) attached here: ${pdfUrl}`
+
         const sendResult = await WhatsAppService.sendWhatsAppPDF(
           formattedPhone,
           `ReportCard_${cleanName}.pdf`,
@@ -159,17 +141,16 @@ export async function POST(request: Request) {
           results.failed++
           results.errors.push(`Twilio delivery failed for parent of ${studentName}`)
         }
-
-      } catch (err: any) {
+      } catch {
         results.failed++
-        results.errors.push(`Error processing ${sId}: ${err.message || err}`)
+        results.errors.push(`Error processing student ${sId}`)
       }
     }
 
-    return NextResponse.json(results)
-
-  } catch (error: any) {
-    console.error('[API Send Report ERROR]', error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+    return ok(results, { requestId })
+  },
+  {
+    roles: [...MANAGEMENT_ROLES, 'Teacher'],
+    rateLimit: { key: 'whatsapp-report', max: 30, windowMs: 3600_000 },
   }
-}
+)

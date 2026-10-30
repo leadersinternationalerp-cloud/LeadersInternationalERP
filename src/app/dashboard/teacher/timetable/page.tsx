@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import TeacherTimetableClient from './TeacherTimetableClient'
@@ -12,9 +13,7 @@ export default async function TeacherTimetablePage() {
   }
 
   const { data: prof } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
-  const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
-    ? prof.roles
-    : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(prof)
 
   const isTeacher = userRoles.includes('Teacher') || userRoles.includes('System Admin')
   if (!isTeacher) {

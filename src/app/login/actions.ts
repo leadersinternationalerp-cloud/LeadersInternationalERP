@@ -1,4 +1,5 @@
 'use server'
+import { normalizeRoles } from '@/lib/auth/roles'
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -36,7 +37,7 @@ export async function loginAction(prevState: FormState, formData: FormData): Pro
   }
 
   const resolvedEmail = profile.email
-  const roles = profile.roles || (profile.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const roles = normalizeRoles(profile)
   const isSystemAdmin = roles.includes('System Admin')
 
   // 2. Check database-level lockout status

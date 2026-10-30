@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
@@ -41,7 +42,7 @@ export default async function FirstLoginPage() {
       .eq('id', user.id)
       .single()
 
-    const roles = profile?.roles || (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+    const roles = normalizeRoles(profile)
     const isSystemAdmin = roles.includes('System Admin')
 
     if (!isSystemAdmin) {

@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import EnrollmentClient from './EnrollmentClient'
 
@@ -12,7 +13,7 @@ export default async function EnrollStudentPage() {
     .eq('id', user?.id)
     .single()
     
-  const userRoles = profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : []
+  const userRoles = normalizeRoles(profile)
 
   if (!user || (!userRoles.includes('System Admin') && !userRoles.includes('Principal') && !userRoles.includes('Dean'))) {
     return (

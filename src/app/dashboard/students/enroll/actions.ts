@@ -9,7 +9,7 @@ import { getSessionUser } from '@/lib/auth/session'
 import { hasAnyRole } from '@/lib/auth/roles'
 import { sanitizePostgrestValue, escapeLike } from '@/lib/sanitize'
 
-const ALLOWED_STAFF_ROLES = ['System Admin', 'Director', 'Principal', 'Dean', 'HOS', 'Head of Section'] as const
+const ALLOWED_STAFF_ROLES = ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section'] as const
 
 export async function searchParentsAction(query: string) {
   const session = await getSessionUser()

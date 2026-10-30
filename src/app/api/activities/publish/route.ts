@@ -1,34 +1,27 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createClient } from '@/utils/supabase/server'
+import { route, ok, parseJson } from '@/lib/api/handler'
+import { MANAGEMENT_ROLES } from '@/lib/auth/roles'
+import { assertClassInScope } from '@/lib/api/scope'
+import { badRequest, ApiError } from '@/lib/api/errors'
 
-export async function POST(request: Request) {
-  try {
-    const supabase = await createClient();
-    
-    // 1. Authenticate user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const POST = route(
+  async ({ user, req, requestId }) => {
+    const supabase = await createClient()
 
-    // Check user role
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, roles')
-      .eq('id', user.id)
-      .single();
+    const body = await parseJson<{
+      class_id?: string
+      title?: string
+      subject?: string
+      topic?: string
+      grade_level?: string
+      activity_type?: string
+      description?: string
+      questions?: unknown[]
+      time_limit_minutes?: number
+      max_attempts?: number
+      due_date?: string | null
+    }>(req)
 
-    const roles = profile?.roles || (profile?.role ? [profile.role] : []);
-    const isTeacher = roles.some((r: string) => 
-      ['System Admin', 'Director', 'Principal', 'Teacher', 'Head of Section', 'Dean'].includes(r)
-    );
-
-    if (!isTeacher) {
-      return NextResponse.json({ error: 'Forbidden: Only teachers and staff can publish activities' }, { status: 403 });
-    }
-
-    // 2. Parse request body
-    const body = await request.json();
     const {
       class_id,
       title,
@@ -40,21 +33,24 @@ export async function POST(request: Request) {
       questions = [],
       time_limit_minutes = 15,
       max_attempts = 1,
-      due_date = null
-    } = body;
+      due_date = null,
+    } = body
 
     if (!class_id || !title || !subject || !topic || !grade_level) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      throw badRequest({
+        fields: 'Missing required fields: class_id, title, subject, topic, grade_level',
+      })
     }
 
-    // 3. Insert activity into the database
+    await assertClassInScope(user, class_id)
+
     const { data, error } = await supabase
       .from('class_activities')
       .insert({
         class_id,
         title,
         subject,
-        date: new Date().toISOString(), // Standard date column
+        date: new Date().toISOString(),
         description,
         topic,
         grade_level,
@@ -62,26 +58,18 @@ export async function POST(request: Request) {
         questions,
         time_limit_minutes,
         max_attempts,
-        is_published: true,
         due_date,
-        total_questions: questions.length,
-        created_by: user.id
+        is_published: true,
+        created_by: user.id,
       })
       .select()
-      .single();
+      .single()
 
     if (error) {
-      throw error;
+      throw new ApiError('INTERNAL', 'Failed to publish activity')
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Class activity published successfully',
-      data
-    });
-
-  } catch (error: any) {
-    console.error('Publish Activity Route Error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
-  }
-}
+    return ok(data, { requestId }, 201)
+  },
+  { roles: [...MANAGEMENT_ROLES, 'Teacher'] }
+)

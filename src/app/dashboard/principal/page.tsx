@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import {
@@ -17,7 +18,7 @@ export default async function PrincipalDashboardPage() {
     .eq('id', user?.id)
     .single()
     
-  const userRoles = profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : []
+  const userRoles = normalizeRoles(profile)
 
   if (!user || (!userRoles.includes('Principal') && !userRoles.includes('System Admin'))) {
     return (
@@ -141,6 +142,13 @@ export default async function PrincipalDashboardPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <span style={{ fontWeight: 600, color: (pendingAdvances || 0) > 0 ? 'var(--color-warning)' : 'var(--color-text-muted)' }}>{pendingAdvances || 0}</span>
                 <Link href="/dashboard/principal/advance-requests" style={{ fontSize: '0.85rem', color: 'var(--color-primary)', textDecoration: 'none' }}>Review</Link>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid var(--color-border)' }}>
+              <span style={{ color: 'var(--color-text)' }}>Student Admissions Desk</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>2027 Forms</span>
+                <Link href="/dashboard/principal/admissions" style={{ fontSize: '0.85rem', color: 'var(--color-primary)', textDecoration: 'none', fontWeight: 600 }}>Open Desk &rarr;</Link>
               </div>
             </div>
           </div>

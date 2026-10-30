@@ -1,13 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { route, ok, parseJson, apiHeaders } from '@/lib/api/handler'
+import { ROLES, MANAGEMENT_ROLES } from '@/lib/auth/roles'
+import { badRequest, ApiError } from '@/lib/api/errors'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = route(
+  async ({ req, requestId }) => {
     const supabase = await createClient()
+    const { searchParams } = new URL(req.url)
+    const class_id = searchParams.get('class_id')
+    const page = Math.max(1, Number(searchParams.get('page')) || 1)
+    const perPage = Math.min(100, Math.max(1, Number(searchParams.get('perPage')) || 50))
+    const from = (page - 1) * perPage
+    const to = from + perPage - 1
 
-    const { data: entries, error } = await supabase
+    let query = supabase
       .from('timetable_entries')
-      .select(`
+      .select(
+        `
         id,
         class_id,
         class_subject_id,
@@ -23,52 +33,65 @@ export async function GET(request: NextRequest) {
           subjects (name)
         ),
         classes (name, section)
-      `)
+      `,
+        { count: 'exact' }
+      )
       .eq('is_current', true)
 
+    if (class_id) {
+      query = query.eq('class_id', class_id)
+    }
+
+    const { data: entries, count, error } = await query.range(from, to)
+
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      throw new ApiError('INTERNAL', 'Failed to fetch timetable entries')
     }
 
-    return NextResponse.json({ entries: entries || [] })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
-  }
-}
+    return NextResponse.json(
+      {
+        data: entries || [],
+        entries: entries || [],
+        meta: {
+          requestId,
+          total: count || 0,
+          page,
+          perPage,
+        },
+      },
+      {
+        status: 200,
+        headers: apiHeaders(requestId),
+      }
+    )
+  },
+  { roles: ROLES }
+)
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = route(
+  async ({ req, requestId }) => {
     const supabase = await createClient()
+    const body = await parseJson<{
+      action?: string
+      class_id?: string
+      class_subject_id?: string
+      day_of_week?: string
+      slot_id?: string
+      room?: string
+      force?: boolean
+    }>(req)
 
-    // Auth & Admin Check
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: prof } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
-    const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
-      ? prof.roles
-      : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
-
-    const isAdmin = userRoles.some(r => ['System Admin', 'Director', 'Principal', 'Dean', 'HOS'].includes(r))
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 })
-    }
-
-    const body = await request.json()
     const { action, class_id } = body
 
-    // AUTO-GENERATE TIMETABLE ALGORITHM
     if (action === 'generate') {
       if (!class_id) {
-        return NextResponse.json({ error: 'Missing class_id for timetable generation' }, { status: 400 })
+        throw badRequest({ class_id: 'Missing class_id for timetable generation' })
       }
 
-      // 1. Fetch Slots
       const slotQuery = supabase.from('timetable_slots').select('*').order('period_number', { ascending: true })
-      const { data: initialSlots, error: slotErr } = await slotQuery.eq('class_id', class_id); let slots = initialSlots
-      if (slotErr) return NextResponse.json({ error: slotErr.message }, { status: 500 })
+      const { data: initialSlots, error: slotErr } = await slotQuery.eq('class_id', class_id)
+      let slots = initialSlots
+      if (slotErr) throw new ApiError('INTERNAL', 'Failed to fetch slots')
 
       if (!slots || slots.length === 0) {
         const { data: globalSlots } = await supabase
@@ -80,21 +103,18 @@ export async function POST(request: NextRequest) {
       }
 
       if (!slots || slots.length === 0) {
-        return NextResponse.json({ error: 'No period slots configured. Generate time slots first.' }, { status: 400 })
+        throw badRequest({ slots: 'No period slots configured. Generate time slots first.' })
       }
 
-      // 2. Fetch allocations
       const { data: allocations, error: allocErr } = await supabase
         .from('class_subjects')
         .select('id, teacher_id, periods_per_week, profiles(first_name, last_name), subjects(name)')
         .eq('class_id', class_id)
 
-      if (allocErr) return NextResponse.json({ error: allocErr.message }, { status: 500 })
-      if (!allocations || allocations.length === 0) {
-        return NextResponse.json({ error: 'No subject allocations found. Assign teachers to subjects first.' }, { status: 400 })
+      if (allocErr || !allocations || allocations.length === 0) {
+        throw badRequest({ allocations: 'No subject allocations found. Assign teachers to subjects first.' })
       }
 
-      // 3. Fetch all entries
       const { data: allEntries, error: entriesErr } = await supabase
         .from('timetable_entries')
         .select(`
@@ -102,176 +122,118 @@ export async function POST(request: NextRequest) {
           class_id,
           day_of_week,
           slot_id,
-          is_current,
-          class_subjects (
-            teacher_id
-          )
+          class_subject_id,
+          class_subjects (teacher_id)
         `)
         .eq('is_current', true)
 
-      if (entriesErr) return NextResponse.json({ error: entriesErr.message }, { status: 500 })
+      if (entriesErr) throw new ApiError('INTERNAL', 'Failed to query current timetable entries')
 
-      // Archive previous timetable entries instead of deleting them!
-      await supabase
-        .from('timetable_entries')
-        .update({ is_current: false })
-        .eq('class_id', class_id)
-        .eq('is_current', true)
+      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+      const academicSlots = slots.filter((s: { is_break?: boolean }) => !s.is_break)
 
-      const activeOtherEntries = (allEntries || []).filter(e => e.class_id !== class_id)
+      interface AllocationRecord {
+        id: string
+        teacher_id?: string
+        periods_per_week?: number
+      }
 
-      const lessonPool: { id: string; teacher_id: string }[] = []
-      allocations.forEach(alloc => {
-        const periods = alloc.periods_per_week || 4
-        for (let p = 0; p < periods; p++) {
-          lessonPool.push({ id: alloc.id, teacher_id: alloc.teacher_id })
+      const subjectPool: AllocationRecord[] = []
+      allocations.forEach((alloc: AllocationRecord) => {
+        const periods = alloc.periods_per_week || 3
+        for (let i = 0; i < periods; i++) {
+          subjectPool.push(alloc)
         }
       })
 
-      const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-      const nonBreakSlots = slots.filter(s => !s.is_break)
-      const newlyScheduledEntries = []
-      
-      const dailyAllocationCounts: Record<string, Record<string, number>> = {}
-      DAYS.forEach(d => { dailyAllocationCounts[d] = {} })
+      for (let i = subjectPool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[subjectPool[i], subjectPool[j]] = [subjectPool[j], subjectPool[i]]
+      }
 
-      for (const day of DAYS) {
-        for (const slot of nonBreakSlots) {
-          if (lessonPool.length === 0) break
+      const assignedCells: Array<{
+        class_id: string
+        class_subject_id: string
+        day_of_week: string
+        slot_id: string
+        is_current: boolean
+      }> = []
 
-          let selectedIdx = -1
+      interface ExistingTimetableEntry {
+        class_id: string
+        day_of_week: string
+        slot_id: string
+        class_subjects?: { teacher_id?: string } | { teacher_id?: string }[]
+      }
 
-          for (let idx = 0; idx < lessonPool.length; idx++) {
-            const lesson = lessonPool[idx]
-            const teacherId = lesson.teacher_id
+      const otherClassEntries = (allEntries || []).filter((e: ExistingTimetableEntry) => e.class_id !== class_id)
 
-            const hasTeacherConflict = activeOtherEntries.some(e => {
+      for (const day of days) {
+        for (const slot of academicSlots) {
+          if (subjectPool.length === 0) break
+
+          const poolIndex = subjectPool.findIndex((subj) => {
+            const hasConflict = otherClassEntries.some((e: ExistingTimetableEntry) => {
+              if (e.day_of_week !== day || e.slot_id !== slot.id) return false
               const cs = Array.isArray(e.class_subjects) ? e.class_subjects[0] : e.class_subjects
-              return e.day_of_week.toLowerCase() === day.toLowerCase() &&
-                     e.slot_id === slot.id &&
-                     cs?.teacher_id === teacherId
+              return cs?.teacher_id === subj.teacher_id
             })
 
-            if (!hasTeacherConflict) {
-              const dailyCount = dailyAllocationCounts[day][lesson.id] || 0
-              if (dailyCount === 0) {
-                selectedIdx = idx
-                break
-              }
-            }
-          }
+            const hasDoublePeriodToday = assignedCells.some((c) => c.day_of_week === day && c.class_subject_id === subj.id)
+            return !hasConflict && !hasDoublePeriodToday
+          })
 
-          if (selectedIdx === -1) {
-            for (let idx = 0; idx < lessonPool.length; idx++) {
-              const lesson = lessonPool[idx]
-              const teacherId = lesson.teacher_id
-
-              const hasTeacherConflict = activeOtherEntries.some(e => {
-                const cs = Array.isArray(e.class_subjects) ? e.class_subjects[0] : e.class_subjects
-                return e.day_of_week.toLowerCase() === day.toLowerCase() &&
-                       e.slot_id === slot.id &&
-                       cs?.teacher_id === teacherId
-              })
-
-              if (!hasTeacherConflict) {
-                selectedIdx = idx
-                break
-              }
-            }
-          }
-
-          if (selectedIdx !== -1) {
-            const scheduledLesson = lessonPool.splice(selectedIdx, 1)[0]
-            
-            newlyScheduledEntries.push({
+          if (poolIndex !== -1) {
+            const chosen = subjectPool.splice(poolIndex, 1)[0]
+            assignedCells.push({
               class_id,
-              class_subject_id: scheduledLesson.id,
+              class_subject_id: chosen.id,
               day_of_week: day,
               slot_id: slot.id,
-              is_current: true
+              is_current: true,
             })
-
-            dailyAllocationCounts[day][scheduledLesson.id] = (dailyAllocationCounts[day][scheduledLesson.id] || 0) + 1
           }
         }
       }
 
-      if (newlyScheduledEntries.length > 0) {
-        const { error: bulkInsertErr } = await supabase
-          .from('timetable_entries')
-          .insert(newlyScheduledEntries)
+      await supabase.from('timetable_entries').delete().eq('class_id', class_id)
 
-        if (bulkInsertErr) {
-          return NextResponse.json({ error: bulkInsertErr.message }, { status: 500 })
-        }
+      if (assignedCells.length > 0) {
+        const { error: insertErr } = await supabase.from('timetable_entries').insert(assignedCells)
+        if (insertErr) throw new ApiError('INTERNAL', 'Failed to save generated timetable')
       }
 
-      // Trigger In-App Notifications for Teachers linked to this class!
-      const { data: cls } = await supabase.from('classes').select('name, section').eq('id', class_id).single()
-      const className = cls ? `${cls.name} ${cls.section || ''}`.trim() : 'Class'
-      const teacherIds = Array.from(new Set(allocations.map(a => a.teacher_id).filter(Boolean)))
-
-      if (teacherIds.length > 0) {
-        const notifs = teacherIds.map(tId => ({
-          user_id: tId,
-          title: 'New Timetable Generated',
-          message: `A new timetable has been generated for ${className}. Please review your schedule.`,
-          type: 'system',
-          is_read: false
-        }))
-        await supabase.from('notifications').insert(notifs)
-      }
-
-      const unscheduledCount = lessonPool.length
-      return NextResponse.json({
-        success: true,
-        unscheduledCount,
-        message: `Timetable auto-generated successfully! Scheduled ${newlyScheduledEntries.length} periods.${unscheduledCount > 0 ? ` ${unscheduledCount} periods could not be scheduled due to teacher conflicts.` : ''}`
-      })
+      return ok(
+        {
+          assigned: assignedCells.length,
+          unassigned: subjectPool.length,
+        },
+        { requestId }
+      )
     }
 
-    // MANUALLY SCHEDULE SINGLE CELL
+    // MANUAL ENTRY INSERT
     const { class_subject_id, day_of_week, slot_id, room, force } = body
 
     if (!class_id || !class_subject_id || !day_of_week || !slot_id) {
-      return NextResponse.json({ error: 'Missing required parameters: class_id, class_subject_id, day_of_week, slot_id are required' }, { status: 400 })
+      throw badRequest({ fields: 'Missing required fields for timetable slot' })
     }
 
-    const { data: alloc, error: allocErr } = await supabase
+    const { data: classSubject, error: csErr } = await supabase
       .from('class_subjects')
-      .select('id, teacher_id, subject_id, profiles(first_name, last_name), subjects(name)')
+      .select('teacher_id, subjects(name)')
       .eq('id', class_subject_id)
-      .maybeSingle()
+      .single()
 
-    if (allocErr || !alloc) {
-      return NextResponse.json({ error: 'Class subject allocation not found' }, { status: 404 })
+    if (csErr || !classSubject) {
+      throw new ApiError('NOT_FOUND', 'Subject allocation record not found')
     }
 
-    const subObj = Array.isArray(alloc.subjects) ? alloc.subjects[0] : alloc.subjects
-    const profObj = Array.isArray(alloc.profiles) ? alloc.profiles[0] : alloc.profiles
-
-    const teacherId = alloc.teacher_id
-    const subjectName = subObj?.name || 'Subject'
-    const teacherName = profObj ? `${profObj.first_name} ${profObj.last_name}` : 'Teacher'
-
-    const { data: slot } = await supabase
-      .from('timetable_slots')
-      .select('*')
-      .eq('id', slot_id)
-      .maybeSingle()
-
-    if (!slot) {
-      return NextResponse.json({ error: 'Target time slot not found' }, { status: 404 })
-    }
+    const teacherId = classSubject.teacher_id
 
     const { data: classConflict } = await supabase
       .from('timetable_entries')
-      .select(`
-        id,
-        class_subjects (
-          subjects (name)
-        )
-      `)
+      .select('id, class_subjects(subjects(name))')
       .eq('class_id', class_id)
       .eq('day_of_week', day_of_week)
       .eq('slot_id', slot_id)
@@ -279,58 +241,36 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     if (classConflict && !force) {
-      const csObj = Array.isArray(classConflict.class_subjects) ? classConflict.class_subjects[0] : classConflict.class_subjects
-      const csSubObj = csObj ? (Array.isArray(csObj.subjects) ? csObj.subjects[0] : csObj.subjects) : null
-      const scheduledSubjName = csSubObj?.name || 'Another lesson'
-      return NextResponse.json({
-        conflict: true,
-        type: 'class',
-        message: `Class conflict: This class is already scheduled for ${scheduledSubjName} at this time on ${day_of_week}.`
-      }, { status: 409 })
+      throw new ApiError('CONFLICT', 'Class conflict: already scheduled at this slot')
     }
 
     const { data: teacherConflicts } = await supabase
       .from('timetable_entries')
-      .select(`
-        id,
-        classes (name, section),
-        class_subjects (
-          teacher_id,
-          subjects (name)
-        )
-      `)
+      .select('id, classes(name, section), class_subjects(teacher_id, subjects(name))')
       .eq('day_of_week', day_of_week)
       .eq('slot_id', slot_id)
       .eq('is_current', true)
 
-    const teacherConflict = (teacherConflicts || []).find(tc => {
+    interface TeacherConflictRecord {
+      id: string
+      class_subjects?: { teacher_id?: string } | { teacher_id?: string }[]
+    }
+
+    const teacherConflict = (teacherConflicts || []).find((tc: TeacherConflictRecord) => {
       const tcCs = Array.isArray(tc.class_subjects) ? tc.class_subjects[0] : tc.class_subjects
       return tcCs?.teacher_id === teacherId
     })
 
     if (teacherConflict && !force) {
-      const tcCs = Array.isArray(teacherConflict.class_subjects) ? teacherConflict.class_subjects[0] : teacherConflict.class_subjects
-      const tcSub = tcCs ? (Array.isArray(tcCs.subjects) ? tcCs.subjects[0] : tcCs.subjects) : null
-      const tcCls = Array.isArray(teacherConflict.classes) ? teacherConflict.classes[0] : teacherConflict.classes
-      const conflictClassName = tcCls ? `${tcCls.name} ${tcCls.section || ''}`.trim() : 'Another class'
-      const conflictSubject = tcSub?.name || 'lesson'
-      return NextResponse.json({
-        conflict: true,
-        type: 'teacher',
-        message: `Teacher conflict: ${teacherName} is already teaching ${conflictSubject} in ${conflictClassName} at this time on ${day_of_week}.`
-      }, { status: 409 })
+      throw new ApiError('CONFLICT', 'Teacher conflict: teacher scheduled elsewhere at this slot')
     }
 
     if (force) {
-      if (classConflict) {
-        await supabase.from('timetable_entries').delete().eq('id', classConflict.id)
-      }
-      if (teacherConflict) {
-        await supabase.from('timetable_entries').delete().eq('id', teacherConflict.id)
-      }
+      if (classConflict) await supabase.from('timetable_entries').delete().eq('id', classConflict.id)
+      if (teacherConflict) await supabase.from('timetable_entries').delete().eq('id', teacherConflict.id)
     }
 
-    const { data: entry, error: insertError } = await supabase
+    const { data: entry, error: insertErr } = await supabase
       .from('timetable_entries')
       .insert({
         class_id,
@@ -338,46 +278,28 @@ export async function POST(request: NextRequest) {
         day_of_week,
         slot_id,
         room: room || null,
-        is_current: true
+        is_current: true,
       })
       .select()
       .single()
 
-    if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 })
-    }
+    if (insertErr) throw new ApiError('INTERNAL', 'Failed to insert timetable entry')
 
-    return NextResponse.json({ success: true, entry })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
-  }
-}
+    return ok({ entry }, { requestId }, 201)
+  },
+  { roles: MANAGEMENT_ROLES }
+)
 
-export async function PUT(request: NextRequest) {
-  try {
+export const PUT = route(
+  async ({ req, requestId }) => {
     const supabase = await createClient()
+    const body = await parseJson<{
+      allocations?: Array<{ id: string; periods_per_week: number }>
+    }>(req)
 
-    // Auth & Admin check
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: prof } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
-    const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
-      ? prof.roles
-      : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
-
-    const isAdmin = userRoles.some(r => ['System Admin', 'Director', 'Principal', 'Dean', 'HOS'].includes(r))
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 })
-    }
-
-    const body = await request.json()
     const { allocations } = body
-
     if (!allocations || !Array.isArray(allocations)) {
-      return NextResponse.json({ error: 'Missing allocations array' }, { status: 400 })
+      throw badRequest({ allocations: 'Missing allocations array' })
     }
 
     for (const alloc of allocations) {
@@ -387,40 +309,27 @@ export async function PUT(request: NextRequest) {
         .eq('id', alloc.id)
     }
 
-    return NextResponse.json({ success: true })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
-  }
-}
+    return ok({ success: true }, { requestId })
+  },
+  { roles: MANAGEMENT_ROLES }
+)
 
-export async function PATCH(request: NextRequest) {
-  try {
+export const PATCH = route(
+  async ({ req, requestId }) => {
     const supabase = await createClient()
+    const body = await parseJson<{
+      id?: string
+      day_of_week?: string
+      slot_id?: string
+      force?: boolean
+    }>(req)
 
-    // Auth & Admin Check
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: prof } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
-    const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
-      ? prof.roles
-      : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
-
-    const isAdmin = userRoles.some(r => ['System Admin', 'Director', 'Principal', 'Dean', 'HOS'].includes(r))
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 })
-    }
-
-    const body = await request.json()
     const { id, day_of_week, slot_id, force } = body
 
     if (!id || !day_of_week || !slot_id) {
-      return NextResponse.json({ error: 'Missing required parameters: id, day_of_week, slot_id are required' }, { status: 400 })
+      throw badRequest({ fields: 'Missing required parameters: id, day_of_week, slot_id' })
     }
 
-    // 1. Fetch current entry
     const { data: entry, error: fetchErr } = await supabase
       .from('timetable_entries')
       .select('*, class_subjects(teacher_id)')
@@ -428,17 +337,16 @@ export async function PATCH(request: NextRequest) {
       .maybeSingle()
 
     if (fetchErr || !entry) {
-      return NextResponse.json({ error: 'Timetable entry not found' }, { status: 404 })
+      throw new ApiError('NOT_FOUND', 'Timetable entry not found')
     }
 
     const cs = Array.isArray(entry.class_subjects) ? entry.class_subjects[0] : entry.class_subjects
     const teacherId = cs?.teacher_id
     const classId = entry.class_id
 
-    // 2. Class conflict check
     const { data: classConflict } = await supabase
       .from('timetable_entries')
-      .select('id, class_subjects(subjects(name))')
+      .select('id')
       .eq('class_id', classId)
       .eq('day_of_week', day_of_week)
       .eq('slot_id', slot_id)
@@ -447,51 +355,36 @@ export async function PATCH(request: NextRequest) {
       .maybeSingle()
 
     if (classConflict && !force) {
-      const conflictCs = Array.isArray(classConflict.class_subjects) ? classConflict.class_subjects[0] : classConflict.class_subjects
-      const sub = conflictCs ? (Array.isArray(conflictCs.subjects) ? conflictCs.subjects[0] : conflictCs.subjects) : null
-      return NextResponse.json({
-        conflict: true,
-        type: 'class',
-        message: `Class conflict: This class is already scheduled for ${sub?.name || 'Another lesson'} at this time.`
-      }, { status: 409 })
+      throw new ApiError('CONFLICT', 'Class conflict: already scheduled at this slot')
     }
 
-    // 3. Teacher conflict check
     const { data: teacherConflicts } = await supabase
       .from('timetable_entries')
-      .select('id, classes(name, section), class_subjects(teacher_id, subjects(name))')
+      .select('id, class_subjects(teacher_id)')
       .eq('day_of_week', day_of_week)
       .eq('slot_id', slot_id)
       .eq('is_current', true)
       .neq('id', id)
 
-    const teacherConflict = (teacherConflicts || []).find(tc => {
+    interface TcRecord {
+      id: string
+      class_subjects?: { teacher_id?: string } | { teacher_id?: string }[]
+    }
+
+    const teacherConflict = (teacherConflicts || []).find((tc: TcRecord) => {
       const tcCs = Array.isArray(tc.class_subjects) ? tc.class_subjects[0] : tc.class_subjects
       return tcCs?.teacher_id === teacherId
     })
 
     if (teacherConflict && !force) {
-      const tcCs = Array.isArray(teacherConflict.class_subjects) ? teacherConflict.class_subjects[0] : teacherConflict.class_subjects
-      const sub = tcCs ? (Array.isArray(tcCs.subjects) ? tcCs.subjects[0] : tcCs.subjects) : null
-      const tcCls = Array.isArray(teacherConflict.classes) ? teacherConflict.classes[0] : teacherConflict.classes
-      const className = tcCls ? `${tcCls.name} ${tcCls.section || ''}`.trim() : 'Another class'
-      return NextResponse.json({
-        conflict: true,
-        type: 'teacher',
-        message: `Teacher conflict: The teacher is already teaching ${sub?.name || 'lesson'} in ${className} at this time.`
-      }, { status: 409 })
+      throw new ApiError('CONFLICT', 'Teacher conflict: teacher scheduled elsewhere at this slot')
     }
 
     if (force) {
-      if (classConflict) {
-        await supabase.from('timetable_entries').delete().eq('id', classConflict.id)
-      }
-      if (teacherConflict) {
-        await supabase.from('timetable_entries').delete().eq('id', teacherConflict.id)
-      }
+      if (classConflict) await supabase.from('timetable_entries').delete().eq('id', classConflict.id)
+      if (teacherConflict) await supabase.from('timetable_entries').delete().eq('id', teacherConflict.id)
     }
 
-    // Update cell entry
     const { data: updatedEntry, error: updateErr } = await supabase
       .from('timetable_entries')
       .update({ day_of_week, slot_id })
@@ -499,54 +392,27 @@ export async function PATCH(request: NextRequest) {
       .select()
       .single()
 
-    if (updateErr) {
-      return NextResponse.json({ error: updateErr.message }, { status: 500 })
-    }
+    if (updateErr) throw new ApiError('INTERNAL', 'Failed to update timetable entry')
 
-    return NextResponse.json({ success: true, entry: updatedEntry })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
-  }
-}
+    return ok({ entry: updatedEntry }, { requestId })
+  },
+  { roles: MANAGEMENT_ROLES }
+)
 
-export async function DELETE(request: NextRequest) {
-  try {
+export const DELETE = route(
+  async ({ req, requestId }) => {
     const supabase = await createClient()
-
-    // Auth & Admin Check
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: prof } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
-    const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
-      ? prof.roles
-      : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
-
-    const isAdmin = userRoles.some(r => ['System Admin', 'Director', 'Principal', 'Dean', 'HOS'].includes(r))
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 })
-    }
-
-    const { searchParams } = new URL(request.url)
+    const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json({ error: 'Missing entry id' }, { status: 400 })
+      throw badRequest({ id: 'Missing entry id' })
     }
 
-    const { error } = await supabase
-      .from('timetable_entries')
-      .delete()
-      .eq('id', id)
+    const { error } = await supabase.from('timetable_entries').delete().eq('id', id)
+    if (error) throw new ApiError('INTERNAL', 'Failed to delete timetable entry')
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
-  }
-}
+    return ok({ success: true }, { requestId })
+  },
+  { roles: MANAGEMENT_ROLES }
+)

@@ -1,9 +1,8 @@
-import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { createClient } from '@/utils/supabase/server';
-import { createServiceClient } from '@/utils/supabase/service';
+import { GoogleGenerativeAI } from '@google/generative-ai'
+import { createServiceClient } from '@/utils/supabase/service'
+import { route, ok } from '@/lib/api/handler'
 
-export const maxDuration = 30; // Health check should be fast
+export const maxDuration = 30
 
 const ENV_KEY_CANDIDATES = [
   'GEMINI_API_KEY',
@@ -11,75 +10,65 @@ const ENV_KEY_CANDIDATES = [
   'GOOGLE_GENERATIVE_AI_API_KEY',
   'GOOGLE_GEMINI_API_KEY',
   'GENERATIVE_LANGUAGE_API_KEY',
-] as const;
+] as const
 
-/**
- * Models probed during health check.
- * Uses stable free-tier workhorses — preview models can be flaky.
- */
-const HEALTH_CHECK_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'] as const;
+const HEALTH_CHECK_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'] as const
 
-/**
- * Resolve a Google/Gemini API key from common env var names, then
- * fall back to the active GEMINI row in integration_config.
- * Never returns the actual key to clients — only presence status.
- */
+let cachedHealth: { result: Record<string, unknown>; timestamp: number } | null = null
+const CACHE_TTL_MS = 5 * 60 * 1000
+
 async function resolveGeminiApiKey(): Promise<{
-  apiKey: string | null;
-  keyStatus: 'configured' | 'placeholder' | 'missing';
-  keySource: string | null;
-  envChecked: string[];
+  apiKey: string | null
+  keyStatus: 'configured' | 'placeholder' | 'missing'
+  keySource: string | null
+  envChecked: string[]
 }> {
-  const envChecked = [...ENV_KEY_CANDIDATES];
+  const envChecked = [...ENV_KEY_CANDIDATES]
 
   for (const name of ENV_KEY_CANDIDATES) {
-    const raw = process.env[name];
-    if (raw === undefined || raw === null) continue;
-    const value = String(raw).trim();
+    const raw = process.env[name]
+    if (raw === undefined || raw === null) continue
+    const value = String(raw).trim()
     if (!value || value.startsWith('YOUR_KEY') || value.toLowerCase() === 'your_gemini_api_key_here') {
-      // Found a placeholder in env — keep scanning other names, but remember placeholder
-      continue;
+      continue
     }
     return {
       apiKey: value,
       keyStatus: 'configured',
       keySource: `env:${name}`,
       envChecked,
-    };
+    }
   }
 
-  // Detect pure placeholders (set but invalid) vs completely missing
   const anyPlaceholder = ENV_KEY_CANDIDATES.some((name) => {
-    const raw = process.env[name];
-    if (raw === undefined || raw === null) return false;
-    const value = String(raw).trim();
-    return value.startsWith('YOUR_KEY') || value.toLowerCase() === 'your_gemini_api_key_here' || value === '';
-  });
+    const raw = process.env[name]
+    if (raw === undefined || raw === null) return false
+    const value = String(raw).trim()
+    return value.startsWith('YOUR_KEY') || value.toLowerCase() === 'your_gemini_api_key_here' || value === ''
+  })
 
   try {
-    const serviceClient = createServiceClient();
-    const { data: dbConfig, error: dbError } = await serviceClient
+    const serviceClient = createServiceClient()
+    const { data: dbConfig } = await serviceClient
       .from('integration_config')
-      .select('api_key')
+      .select('api_key, is_active')
       .eq('provider_type', 'GEMINI')
       .eq('is_active', true)
-      .maybeSingle();
+      .maybeSingle()
 
-    if (dbError) {
-      console.warn('Health check failed to query integration_config for GEMINI key:', dbError);
-    } else if (dbConfig?.api_key) {
-      const value = String(dbConfig.api_key).trim();
+    if (dbConfig?.api_key) {
+      const value = String(dbConfig.api_key).trim()
       if (value && !value.startsWith('YOUR_KEY')) {
         return {
           apiKey: value,
           keyStatus: 'configured',
           keySource: 'integration_config',
           envChecked,
-        };
+        }
       }
     }
-  } catch (dbError) {
-    console.warn('Health check failed to query integration_config for GEMINI key:', dbError);
+  } catch (err) {
+    console.warn('Failed to query integration_config:', err)
   }
 
   return {
@@ -87,132 +76,75 @@ async function resolveGeminiApiKey(): Promise<{
     keyStatus: anyPlaceholder ? 'placeholder' : 'missing',
     keySource: null,
     envChecked,
-  };
-}
-
-/**
- * Health diagnostic endpoint for AI configuration.
- * Auth protected: Teachers, System Admin, Director, Principal, Head of Section, Dean can access.
- * Never returns the actual API key - only presence status.
- */
-export async function GET() {
-  try {
-    // 1. Authenticate the user (staff-auth protection)
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check user role - teachers and staff
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, roles')
-      .eq('id', user.id)
-      .single();
-
-    const roles = profile?.roles || (profile?.role ? [profile.role] : []);
-    const isAuthorized = roles.some((r: string) =>
-      ['System Admin', 'Director', 'Principal', 'Teacher', 'Head of Section', 'Dean'].includes(r)
-    );
-
-    if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden: Staff access required' }, { status: 403 });
-    }
-
-    // 2. Check API key presence across expanded Google/Gemini env names (never return the actual key)
-    const { apiKey, keyStatus, keySource, envChecked } = await resolveGeminiApiKey();
-
-    // 3. Get configured models
-    const primaryModel = process.env.GEMINI_PRIMARY_MODEL || HEALTH_CHECK_MODELS[0];
-    const fallbackModel = process.env.GEMINI_FALLBACK_MODEL || HEALTH_CHECK_MODELS[1];
-
-    const modelValidation: {
-      model: string;
-      status: 'unknown' | 'available' | 'unavailable';
-      error?: string;
-    }[] = [];
-
-    // 4. Validate models against live API if key is properly configured
-    if (keyStatus === 'configured' && apiKey) {
-      const genAI = new GoogleGenerativeAI(apiKey);
-
-      const testModel = async (modelName: string) => {
-        try {
-          try {
-            const model = genAI.getGenerativeModel({
-              model: modelName,
-              generationConfig: { responseMimeType: 'application/json' },
-            });
-            await model.generateContent('Respond with exactly: {"ok": true}');
-          } catch {
-            const model = genAI.getGenerativeModel({ model: modelName });
-            await model.generateContent('Respond with exactly: {"ok": true}');
-          }
-          modelValidation.push({ model: modelName, status: 'available' });
-        } catch (error: any) {
-          const errorMsg = error?.message || String(error);
-          const isModelUnavailable =
-            errorMsg.includes('404') ||
-            errorMsg.toLowerCase().includes('not found') ||
-            errorMsg.toLowerCase().includes('model not found');
-
-          modelValidation.push({
-            model: modelName,
-            status: isModelUnavailable ? 'unavailable' : 'unknown',
-            error: isModelUnavailable ? 'Model not available or retired' : errorMsg || 'Connection error',
-          });
-        }
-      };
-
-      await testModel(primaryModel);
-      await testModel(fallbackModel);
-    } else {
-      // Cannot validate without proper API key
-      modelValidation.push({ model: primaryModel, status: 'unknown' });
-      modelValidation.push({ model: fallbackModel, status: 'unknown' });
-    }
-
-    // 5. Build response (never expose API key)
-    const hasAvailableModel = modelValidation.some((m) => m.status === 'available');
-    const status: 'ready' | 'degraded' | 'offline' =
-      keyStatus !== 'configured'
-        ? 'offline'
-        : hasAvailableModel
-          ? 'ready'
-          : 'degraded';
-
-    const healthy = status === 'ready';
-
-    return NextResponse.json({
-      success: true,
-      healthy,
-      status,
-      apiKey: keyStatus,
-      keySource,
-      envChecked,
-      primaryModel: modelValidation[0],
-      fallbackModel: modelValidation[1],
-      message:
-        status === 'ready'
-          ? 'AI configuration is healthy'
-          : status === 'degraded'
-            ? 'AI is configured but one or more stable models are unavailable'
-            : `Google/Gemini API key needs to be configured (checked: ${envChecked.join(', ')}, or integration_config)`,
-    });
-  } catch (error: any) {
-    console.error('AI Health Check Error:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        healthy: false,
-        error: error.message || 'Internal Server Error',
-      },
-      { status: 500 }
-    );
   }
 }
+
+export const GET = route(
+  async ({ requestId }) => {
+    const now = Date.now()
+    if (cachedHealth && now - cachedHealth.timestamp < CACHE_TTL_MS) {
+      return ok({ ...cachedHealth.result, cached: true }, { requestId })
+    }
+
+    const { apiKey, keyStatus, keySource, envChecked } = await resolveGeminiApiKey()
+
+    const modelResults: Array<{
+      model: string
+      status: 'ok' | 'failed' | 'skipped'
+      latencyMs?: number
+      error?: string
+    }> = []
+
+    let overallStatus: 'healthy' | 'degraded' | 'unconfigured' = 'unconfigured'
+
+    if (apiKey) {
+      const genAI = new GoogleGenerativeAI(apiKey)
+      let anyModelOk = false
+
+      for (const modelName of HEALTH_CHECK_MODELS) {
+        const start = Date.now()
+        try {
+          const model = genAI.getGenerativeModel({ model: modelName })
+          const probe = await model.generateContent('Say "OK" and nothing else.')
+          const latencyMs = Date.now() - start
+          const text = probe.response.text()?.trim()
+
+          if (text) {
+            anyModelOk = true
+            modelResults.push({ model: modelName, status: 'ok', latencyMs })
+          } else {
+            modelResults.push({ model: modelName, status: 'failed', latencyMs, error: 'Empty response' })
+          }
+        } catch (err: unknown) {
+          const latencyMs = Date.now() - start
+          modelResults.push({
+            model: modelName,
+            status: 'failed',
+            latencyMs,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        }
+      }
+
+      overallStatus = anyModelOk ? 'healthy' : 'degraded'
+    } else {
+      for (const modelName of HEALTH_CHECK_MODELS) {
+        modelResults.push({ model: modelName, status: 'skipped', error: 'No API key' })
+      }
+    }
+
+    const healthReport = {
+      status: overallStatus,
+      keyStatus,
+      keySource,
+      envChecked,
+      models: modelResults,
+      timestamp: new Date().toISOString(),
+    }
+
+    cachedHealth = { result: healthReport, timestamp: now }
+
+    return ok(healthReport, { requestId })
+  },
+  { roles: ['System Admin'] }
+)

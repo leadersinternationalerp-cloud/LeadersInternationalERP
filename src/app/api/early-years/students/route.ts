@@ -1,193 +1,104 @@
-import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { route, ok } from '@/lib/api/handler'
+import { MANAGEMENT_ROLES } from '@/lib/auth/roles'
+import { assertClassInScope } from '@/lib/api/scope'
+import { badRequest, ApiError } from '@/lib/api/errors'
 
-export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url)
+export const GET = route(
+  async ({ user, req, requestId }) => {
+    const { searchParams } = new URL(req.url)
     const class_id = searchParams.get('class_id')
 
     if (!class_id) {
-      return NextResponse.json({ error: 'Missing class_id' }, { status: 400 })
+      throw badRequest({ class_id: 'Missing class_id' })
     }
+
+    const page = Math.max(1, Number(searchParams.get('page')) || 1)
+    const perPage = Math.min(100, Math.max(1, Number(searchParams.get('perPage')) || 50))
+    const from = (page - 1) * perPage
+    const to = from + perPage - 1
 
     const supabase = await createClient()
 
-    // 1. Verify Auth
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // 2. Fetch User profile and roles
-    const { data: prof } = await supabase.from('profiles').select('roles, role').eq('id', user.id).single()
-    const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
-      ? prof.roles
-      : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
-
-    const isStaff = userRoles.includes('System Admin') ||
-                    userRoles.includes('Principal') ||
-                    userRoles.includes('Dean') ||
-                    userRoles.includes('HOS') ||
-                    userRoles.includes('Teacher') ||
-                    userRoles.includes('Director')
-
-    if (!isStaff) {
-      return NextResponse.json({ error: 'Unauthorized Access' }, { status: 403 })
-    }
-
-    // 3. Fetch Class Info first to verify if it is an Early Years class
-    const { data: classInfo } = await supabase
-      .from('classes')
-      .select('*')
-      .eq('id', class_id)
-      .single()
+    // 1. Verify Class Existence & Scope
+    const { data: classInfo } = await supabase.from('classes').select('*').eq('id', class_id).maybeSingle()
 
     if (!classInfo) {
-      return NextResponse.json({ error: 'Class not found' }, { status: 404 })
+      throw new ApiError('NOT_FOUND', 'Class not found')
     }
 
-    const isEarlyYears = Boolean(classInfo.is_early_years) ||
-      ['baby', 'nursery', 'reception', 'kg', 'playgroup', 'pre-primary'].some(ey => (classInfo.name || '').toLowerCase().includes(ey))
+    await assertClassInScope(user, class_id)
 
-    // If non-Early-Years class and standard Teacher, verify homeroom or class_subjects assignment
-    if (!isEarlyYears &&
-        userRoles.includes('Teacher') && 
-        !userRoles.includes('System Admin') && 
-        !userRoles.includes('Principal') && 
-        !userRoles.includes('Dean') && 
-        !userRoles.includes('HOS') &&
-        !userRoles.includes('Director')) {
-      
-      const { data: homeroomClass } = await supabase
-        .from('classes')
-        .select('id')
-        .eq('id', class_id)
-        .eq('class_teacher_id', user.id)
-        .maybeSingle()
-
-      if (!homeroomClass) {
-        const { data: assignment } = await supabase
-          .from('class_subjects')
-          .select('id')
-          .eq('class_id', class_id)
-          .eq('teacher_id', user.id)
-          .limit(1)
-          .maybeSingle()
-
-        if (!assignment) {
-          return NextResponse.json({ error: 'Forbidden: You are not assigned to this class.' }, { status: 403 })
-        }
-      }
-    }
-
-    // 4. Fetch Students in Class (Direct class_id match first)
-    let students: any[] = []
-    const { data: directStudents } = await supabase
+    // 2. Fetch students directly by class_id
+    const { data: students, count, error: fetchErr } = await supabase
       .from('students')
-      .select(`
+      .select(
+        `
         id,
         student_id,
-        grade_level,
-        section,
         class_id,
-        dob,
-        gender,
-        medical_info,
-        allergies,
-        language_at_home,
-        previous_school,
-        emergency_contact,
-        profiles (first_name, last_name, email)
-      `)
-      .eq('class_id', class_id)
-
-    students = directStudents || []
-
-    if (students.length === 0) {
-      // Fallback 1: Match by exact grade_level == classInfo.name
-      const { data: fallbackStudents } = await supabase
-        .from('students')
-        .select(`
-          id,
-          student_id,
-          grade_level,
-          section,
-          class_id,
-          dob,
+        grade_level,
+        status,
+        profiles:id (
+          first_name,
+          last_name,
           gender,
-          medical_info,
-          allergies,
-          language_at_home,
-          previous_school,
-          emergency_contact,
-          profiles (first_name, last_name, email)
-        `)
-        .eq('grade_level', classInfo.name)
+          dob
+        )
+      `,
+        { count: 'exact' }
+      )
+      .eq('class_id', class_id)
+      .eq('status', 'Active')
+      .order('student_id', { ascending: true })
+      .range(from, to)
 
-      students = fallbackStudents || []
+    if (fetchErr) {
+      throw new ApiError('INTERNAL', 'Failed to fetch class students')
     }
 
-    if (students.length === 0) {
-      // Fallback 2: Fuzzy match by clean class name
-      const cleanClassName = (classInfo.name || '').replace(/\s+[A-Z]$/i, '').trim()
-      if (cleanClassName) {
-        const { data: fuzzyStudents } = await supabase
-          .from('students')
-          .select(`
-            id,
-            student_id,
-            grade_level,
-            section,
-            class_id,
-            dob,
-            gender,
-            medical_info,
-            allergies,
-            language_at_home,
-            previous_school,
-            emergency_contact,
-            profiles (first_name, last_name, email)
-          `)
-          .ilike('grade_level', `%${cleanClassName}%`)
-
-        students = fuzzyStudents || []
-      }
+    interface StudentRecord {
+      id: string
+      student_id?: string
+      class_id?: string
+      grade_level?: string
+      status?: string
+      profiles?: { first_name?: string; last_name?: string; gender?: string; dob?: string } | { first_name?: string; last_name?: string; gender?: string; dob?: string }[]
     }
 
-    const mappedStudents = students.map((s: any) => {
-      const profs = s.profiles
-      const singleProfile = Array.isArray(profs) ? profs[0] : profs
+    const studentIds = (students || []).map((s: StudentRecord) => s.id)
+    const { data: photos } = await supabase
+      .from('student_photos')
+      .select('student_id, photo_url')
+      .in('student_id', studentIds.length > 0 ? studentIds : ['00000000-0000-0000-0000-000000000000'])
+
+    const photoMap: Record<string, string> = {}
+    photos?.forEach((p: { student_id: string; photo_url: string }) => {
+      photoMap[p.student_id] = p.photo_url
+    })
+
+    const formattedStudents = (students || []).map((s: StudentRecord) => {
+      const p = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles
       return {
         id: s.id,
-        student_id: s.student_id,
-        grade_level: s.grade_level,
-        section: s.section,
-        photo_url: `/api/students/photo?student_id=${s.id}`,
+        student_id: s.student_id || '',
         class_id: s.class_id,
-        dob: s.dob,
-        gender: s.gender,
-        medical_info: s.medical_info,
-        allergies: s.allergies,
-        language_at_home: s.language_at_home,
-        previous_school: s.previous_school,
-        emergency_contact: s.emergency_contact,
-        profiles: singleProfile ? {
-          first_name: singleProfile.first_name,
-          last_name: singleProfile.last_name,
-          email: singleProfile.email
-        } : undefined
+        grade_level: s.grade_level,
+        status: s.status,
+        first_name: p?.first_name || '',
+        last_name: p?.last_name || '',
+        gender: p?.gender || '',
+        dob: p?.dob || '',
+        photo_url: photoMap[s.id] || null,
       }
     })
 
-    return NextResponse.json({
-      classInfo: classInfo ? {
-        ...classInfo,
-        class_name: classInfo.class_name || classInfo.name
-      } : null,
-      students: mappedStudents
+    return ok(formattedStudents, {
+      requestId,
+      total: count || 0,
+      page,
+      perPage,
     })
-  } catch (error: any) {
-    console.error('Fetch early years students error:', error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
-  }
-}
+  },
+  { roles: [...MANAGEMENT_ROLES, 'Teacher'] }
+)

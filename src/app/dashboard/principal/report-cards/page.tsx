@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import ReportCardsGenerator from '@/components/ReportCardsGenerator'
 import Link from 'next/link'
@@ -13,13 +14,11 @@ export default async function PrincipalReportCardsPage() {
   }
 
   const { data: profile } = await supabase.from('profiles').select('roles, role').eq('id', user.id).single()
-  const userRoles: string[] = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(profile)
 
   const isAuthorized = userRoles.includes('Principal') || 
                       userRoles.includes('Dean') || 
-                      userRoles.includes('HOS') || 
+                      userRoles.includes('Head of Section') || 
                       userRoles.includes('Director') || 
                       userRoles.includes('System Admin')
 
@@ -105,7 +104,7 @@ export default async function PrincipalReportCardsPage() {
   if (userRoles.includes('System Admin')) roleLabel = 'System Admin'
   else if (userRoles.includes('Director')) roleLabel = 'Director'
   else if (userRoles.includes('Dean')) roleLabel = 'Dean of Studies'
-  else if (userRoles.includes('HOS')) roleLabel = 'Head of Section'
+  else if (userRoles.includes('Head of Section')) roleLabel = 'Head of Section'
 
   return (
     <div>

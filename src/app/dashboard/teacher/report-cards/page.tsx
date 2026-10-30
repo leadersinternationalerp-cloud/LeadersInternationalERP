@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import ReportCardsGenerator from '@/components/ReportCardsGenerator'
 import Link from 'next/link'
@@ -13,9 +14,7 @@ export default async function TeacherReportCardsPage() {
   }
 
   const { data: profile } = await supabase.from('profiles').select('roles, role').eq('id', user.id).single()
-  const userRoles: string[] = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(profile)
 
   if (!userRoles.includes('Teacher') && !userRoles.includes('System Admin')) {
     return <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}><h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2></div>

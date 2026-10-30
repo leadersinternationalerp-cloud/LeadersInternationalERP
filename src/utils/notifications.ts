@@ -1,3 +1,4 @@
+import { sendPushToUsers, sendPushToRoles } from '@/lib/notifications/webPushServer'
 import { createClient } from '@/utils/supabase/server'
 import { formatDate } from '@/utils/date'
 
@@ -685,3 +686,27 @@ export async function triggerPayrollReviewedDirector(payrollId: string, approve:
   }
 }
 
+
+// Real-time Leadership Attendance Push Dispatcher
+export async function notifyLeadershipOnAttendance(params: {
+  className: string
+  teacherName: string
+  present: number
+  absent: number
+  excused: number
+}) {
+  const supabase = await createClient()
+  const title = `📅 Attendance Marked: ${params.className}`
+  const body = `${params.teacherName} recorded attendance: ${params.present} Present, ${params.absent} Absent, ${params.excused} Excused.`
+
+  return sendPushToRoles(
+    supabase,
+    ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section'],
+    {
+      title,
+      body,
+      url: '/dashboard',
+      tag: `attendance-${params.className}-${new Date().toISOString().slice(0, 10)}`,
+    }
+  ).catch(() => {})
+}

@@ -1,4 +1,5 @@
 'use server'
+import { normalizeRoles } from '@/lib/auth/roles'
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@supabase/supabase-js'
@@ -49,9 +50,7 @@ export async function createUserAction(prevState: FormState, formData: FormData)
       .select('role, roles')
       .eq('id', currentUser.id)
       .single()
-  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(profile)
 
     const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
     if (!isAdmin) {
@@ -92,7 +91,7 @@ export async function createUserAction(prevState: FormState, formData: FormData)
         email,
         username,
         role,
-        roles: role.split(',').map((r: string) => r.trim()),
+        roles: normalizeRoles({ role }),
         is_active: true
       })
 
@@ -137,9 +136,7 @@ export async function updateUserAction(
     .eq('id', currentUser.id)
     .single()
 
-  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(profile)
 
   const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
   if (!isAdmin) {
@@ -182,7 +179,7 @@ export async function updateUserAction(
       first_name,
       last_name,
       role,
-      roles: role.split(',').map((r: string) => r.trim()),
+      roles: normalizeRoles({ role }),
       email
     }
     
@@ -228,9 +225,7 @@ export async function toggleUserStatusAction(
     .eq('id', currentUser.id)
     .single()
 
-  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(profile)
 
   const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
   if (!isAdmin) {
@@ -300,9 +295,7 @@ export async function resetUserPasswordAction(
     .eq('id', currentUser.id)
     .single()
 
-  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(profile)
 
   const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
   if (!isAdmin) {
@@ -328,9 +321,7 @@ export async function resetUserPasswordAction(
   try {
     // Check target user's role to enforce PIN constraints
     const { data: targetProfile } = await supabaseAdmin.from('profiles').select('roles, role').eq('id', userId).single()
-    const targetRoles = targetProfile?.roles && Array.isArray(targetProfile.roles) && targetProfile.roles.length > 0
-      ? targetProfile.roles
-      : (targetProfile?.role ? targetProfile.role.split(',').map((r: string) => r.trim()) : [])
+    const targetRoles = normalizeRoles(targetProfile)
     
     const isTargetSystemAdmin = targetRoles.includes('System Admin')
 

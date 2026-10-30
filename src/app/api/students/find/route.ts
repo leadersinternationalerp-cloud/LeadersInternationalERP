@@ -1,40 +1,37 @@
-import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { route, ok } from '@/lib/api/handler'
+import { STAFF_ROLES } from '@/lib/auth/roles'
+import { assertStudentInScope } from '@/lib/api/scope'
+import { badRequest, ApiError } from '@/lib/api/errors'
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const code = searchParams.get('code')
-  const id = searchParams.get('id')
+export const GET = route(
+  async ({ user, req, requestId }) => {
+    const { searchParams } = new URL(req.url)
+    const code = searchParams.get('code')
+    const id = searchParams.get('id')
 
-  if (!code && !id) {
-    return NextResponse.json({ error: 'Missing code or id search parameter' }, { status: 400 })
-  }
+    if (!code && !id) {
+      throw badRequest({ query: 'Missing code or id search parameter' })
+    }
 
-  const supabase = await createClient()
+    const supabase = await createClient()
 
-  // Verify Auth
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+    let query = supabase.from('students').select('id, student_id, grade_level, section')
+    if (id) {
+      query = query.eq('id', id)
+    } else if (code) {
+      query = query.eq('student_id', code)
+    }
 
-  let query = supabase.from('students').select('id, student_id, grade_level, section')
-  
-  if (id) {
-    query = query.eq('id', id)
-  } else if (code) {
-    query = query.eq('student_id', code)
-  }
+    const { data: student, error } = await query.maybeSingle()
 
-  const { data: student, error } = await query.maybeSingle()
+    if (error || !student) {
+      throw new ApiError('NOT_FOUND', 'Student not found')
+    }
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
+    await assertStudentInScope(user, student.id)
 
-  if (!student) {
-    return NextResponse.json({ error: 'Student not found' }, { status: 404 })
-  }
-
-  return NextResponse.json({ student })
-}
+    return ok({ student }, { requestId })
+  },
+  { roles: STAFF_ROLES }
+)

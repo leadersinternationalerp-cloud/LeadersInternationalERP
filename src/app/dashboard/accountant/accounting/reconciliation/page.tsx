@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
@@ -7,7 +8,7 @@ export default async function BankReconciliationPage() {
   // Verify Accountant/Admin access
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = await supabase.from('profiles').select('roles').eq('id', user?.id).single()
-  const userRoles = profile?.roles || []
+  const userRoles = normalizeRoles(profile)
 
   if (!userRoles.includes('Accountant') && !userRoles.includes('System Admin') && !userRoles.includes('Director')) {
     return <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}><h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2></div>

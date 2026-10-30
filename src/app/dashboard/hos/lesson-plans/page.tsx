@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { formatDate } from '@/utils/date'
@@ -15,11 +16,9 @@ export default async function HOSLessonPlansPage() {
     .eq('id', user?.id)
     .single()
 
-  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(profile)
 
-  const allowedRoles = ['Head of Section', 'HOS', 'Academic Dean', 'Dean', 'Principal', 'Director', 'System Admin']
+  const allowedRoles = ['Head of Section', 'Academic Dean', 'Dean', 'Principal', 'Director', 'System Admin']
   const isSupervisor = userRoles.some((r: string) => allowedRoles.includes(r))
 
   if (!isSupervisor) {

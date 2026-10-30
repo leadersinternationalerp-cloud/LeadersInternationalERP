@@ -16,7 +16,6 @@ export default async function StudentsPage({
     'Director',
     'Principal',
     'Dean',
-    'HOS',
     'Head of Section',
     'Teacher',
   ])
@@ -36,7 +35,7 @@ export default async function StudentsPage({
     !roles.includes('System Admin') &&
     !roles.includes('Director') &&
     !roles.includes('Principal') &&
-    !roles.includes('HOS') &&
+    !roles.includes('Head of Section') &&
     !roles.includes('Head of Section') &&
     !roles.includes('Dean')
 

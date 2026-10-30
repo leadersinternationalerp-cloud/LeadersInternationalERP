@@ -1,4 +1,5 @@
 'use server'
+import { normalizeRoles } from '@/lib/auth/roles'
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
@@ -28,9 +29,7 @@ export async function saveFeeStructureAction(formData: FormData) {
 
   // Check roles
   const { data: prof } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
-  const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
-    ? prof.roles
-    : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(prof)
 
   const isAllowed = userRoles.some(r => ['System Admin', 'Director', 'Principal'].includes(r))
   if (!isAllowed) {
@@ -64,9 +63,7 @@ export async function deleteFeeStructureAction(id: string) {
 
   // Check roles
   const { data: prof } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
-  const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
-    ? prof.roles
-    : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(prof)
 
   const isAllowed = userRoles.some(r => ['System Admin', 'Director', 'Principal'].includes(r))
   if (!isAllowed) {

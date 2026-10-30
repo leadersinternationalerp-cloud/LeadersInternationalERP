@@ -1,4 +1,5 @@
 'use server'
+import { normalizeRoles } from '@/lib/auth/roles'
 
 import crypto from 'crypto'
 import { createServiceClient } from '@/utils/supabase/service'
@@ -119,7 +120,7 @@ export async function resetPinAction(prevState: ForgotPinState, formData: FormDa
     return { error: 'Invalid verification attempt', email }
   }
 
-  const roles = profile.roles || (profile.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const roles = normalizeRoles(profile)
   const isSystemAdmin = roles.includes('System Admin')
 
   if (!isSystemAdmin) {

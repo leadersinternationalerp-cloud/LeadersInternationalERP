@@ -1,23 +1,38 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import { getBillingReport } from '@/lib/billing';
-import { withAuth } from '@/lib/api/guard';
+import { getBillingReport } from '@/lib/billing'
+import { route, ok } from '@/lib/api/handler'
+import { FINANCE_ROLES } from '@/lib/auth/roles'
 
-export const GET = withAuth(
-  async (request: NextRequest) => {
-    const url = new URL(request.url);
-    const startDate = url.searchParams.get('startDate') ?? undefined;
-    const endDate = url.searchParams.get('endDate') ?? undefined;
-    const studentId = url.searchParams.get('studentId') ?? undefined;
-    const status = url.searchParams.get('status') as 'paid' | 'unpaid' | 'overdue' | undefined;
+export const GET = route(
+  async ({ req, requestId }) => {
+    const url = new URL(req.url)
+    const startDate = url.searchParams.get('startDate') ?? undefined
+    const endDate = url.searchParams.get('endDate') ?? undefined
+    const studentId = url.searchParams.get('studentId') ?? undefined
+    const status = url.searchParams.get('status') as 'paid' | 'unpaid' | 'overdue' | undefined
 
-    const filters = { startDate, endDate, studentId, status };
-    try {
-      const data = await getBillingReport(filters);
-      return NextResponse.json(data);
-    } catch (error) {
-      console.error('Error generating billing report:', error);
-      return NextResponse.json({ error: 'Failed to generate report' }, { status: 500 });
+    const page = Math.max(1, Number(url.searchParams.get('page')) || 1)
+    const perPage = Math.min(100, Math.max(1, Number(url.searchParams.get('perPage')) || 25))
+
+    const filters = { startDate, endDate, studentId, status }
+    const report = await getBillingReport(filters)
+
+    // Paginate invoices in the response for efficient client loads
+    const allInvoices = report.invoices || []
+    const totalInvoices = allInvoices.length
+    const from = (page - 1) * perPage
+    const paginatedInvoices = allInvoices.slice(from, from + perPage)
+
+    const data = {
+      ...report,
+      invoices: paginatedInvoices,
     }
+
+    return ok(data, {
+      requestId,
+      page,
+      perPage,
+      total: totalInvoices,
+    })
   },
-  { roles: ['System Admin', 'Director', 'Principal', 'Accountant'] }
-);
+  { roles: FINANCE_ROLES }
+)

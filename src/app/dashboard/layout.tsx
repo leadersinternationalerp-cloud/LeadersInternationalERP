@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import InactivityTimeout from '@/components/InactivityTimeout'
@@ -42,11 +43,7 @@ export default async function DashboardLayout({
   }
 
   // Roles
-  const userRoles: string[] = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role 
-        ? profile.role.split(',').map((r: string) => r.trim()) 
-        : (user?.email === 'admin@leaders.ac.tz' ? ['System Admin'] : []))
+  const userRoles = normalizeRoles(profile).length > 0 ? normalizeRoles(profile) : (user?.email === 'admin@leaders.ac.tz' ? ['System Admin'] : [])
 
   // Fetch unread notifications count
   const { count: unreadCount } = await supabase

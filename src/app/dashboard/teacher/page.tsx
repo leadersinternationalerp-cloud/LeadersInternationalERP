@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import {
@@ -29,7 +30,7 @@ export default async function TeacherDashboard() {
     .eq('id', user?.id)
     .single()
     
-  const userRoles = profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : []
+  const userRoles = normalizeRoles(profile)
 
   if (!user || (!userRoles.includes('Teacher') && !userRoles.includes('System Admin'))) {
     return (

@@ -1,17 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { parseTimetableConfig } from '@/lib/timetableAiParser'
+import { route, ok, parseJson, apiHeaders } from '@/lib/api/handler'
+import { ROLES, MANAGEMENT_ROLES } from '@/lib/auth/roles'
+import { badRequest, ApiError } from '@/lib/api/errors'
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
+export const GET = route(
+  async ({ req, requestId }) => {
+    const { searchParams } = new URL(req.url)
     const class_id = searchParams.get('class_id')
 
     const supabase = await createClient()
 
-    // Retrieve slots
-    let query = supabase.from('timetable_slots').select('*').order('period_number', { ascending: true }).order('start_time', { ascending: true })
-    
+    let query = supabase
+      .from('timetable_slots')
+      .select('*')
+      .order('period_number', { ascending: true })
+      .order('start_time', { ascending: true })
+
     if (class_id) {
       query = query.eq('class_id', class_id)
     } else {
@@ -21,7 +27,7 @@ export async function GET(request: NextRequest) {
     const { data: slots, error } = await query
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      throw new ApiError('INTERNAL', 'Failed to fetch timetable slots')
     }
 
     let finalSlots = slots || []
@@ -42,69 +48,76 @@ export async function GET(request: NextRequest) {
           .select('*')
           .order('period_number', { ascending: true })
           .order('start_time', { ascending: true })
-        
+
         if (anySlots && anySlots.length > 0) {
           const firstClassId = anySlots[0].class_id
-          finalSlots = anySlots.filter(s => s.class_id === firstClassId)
+          finalSlots = anySlots.filter((s: { class_id?: string }) => s.class_id === firstClassId)
         }
       }
     }
 
-    return NextResponse.json({ slots: finalSlots })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
-  }
-}
+    return NextResponse.json(
+      {
+        data: finalSlots,
+        slots: finalSlots,
+        meta: { requestId },
+      },
+      {
+        status: 200,
+        headers: apiHeaders(requestId),
+      }
+    )
+  },
+  { roles: ROLES }
+)
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = route(
+  async ({ req, requestId }) => {
     const supabase = await createClient()
+    const body = await parseJson<{
+      class_id?: string
+      text?: string
+      slots?: Array<{
+        period_number: number
+        name: string
+        start_time: string
+        end_time: string
+        is_break?: boolean
+      }>
+      total_periods?: number
+    }>(req)
 
-    // Auth & Admin check
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: prof } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
-    const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
-      ? prof.roles
-      : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
-
-    const isAdmin = userRoles.some(r => ['System Admin', 'Director', 'Principal', 'Dean', 'HOS'].includes(r))
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 })
-    }
-
-    const body = await request.json()
     const { class_id, text, slots: manualSlots, total_periods } = body
 
-    let finalSlots = []
+    let finalSlots: Array<{
+      period_number: number
+      name: string
+      start_time: string
+      end_time: string
+      is_break?: boolean
+    }> = []
 
     if (text) {
-      // Natural language input
       finalSlots = parseTimetableConfig(text, total_periods || 8)
     } else if (manualSlots && Array.isArray(manualSlots)) {
       finalSlots = manualSlots
     } else {
-      return NextResponse.json({ error: 'Missing config text or slots array' }, { status: 400 })
+      throw badRequest({ fields: 'Missing config text or slots array' })
     }
 
-    // Clear existing slots for target configuration
     if (class_id) {
       await supabase.from('timetable_slots').delete().eq('class_id', class_id)
     } else {
       await supabase.from('timetable_slots').delete().is('class_id', null)
     }
 
-    // Insert new slots
-    const slotsToInsert = finalSlots.map(s => ({
+    const slotsToInsert = finalSlots.map((s) => ({
       class_id: class_id || null,
       period_number: s.period_number,
       name: s.name,
       start_time: s.start_time,
       end_time: s.end_time,
-      is_break: s.is_break
+      is_break: s.is_break,
     }))
 
     const { data: insertedSlots, error: insertError } = await supabase
@@ -113,11 +126,10 @@ export async function POST(request: NextRequest) {
       .select()
 
     if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 })
+      throw new ApiError('INTERNAL', 'Failed to save timetable slots')
     }
 
-    return NextResponse.json({ success: true, slots: insertedSlots })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
-  }
-}
+    return ok({ slots: insertedSlots }, { requestId }, 201)
+  },
+  { roles: MANAGEMENT_ROLES }
+)

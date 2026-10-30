@@ -3,18 +3,44 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { normalizeRoles, type Role, hasAnyRole } from './roles'
 
+export type ApiUser = { id: string; email: string | null; roles: Role[] }
+
+export const getApiUser = cache(async (): Promise<ApiUser | null> => {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, roles, is_active')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.is_active === false) return null // deactivated users lose access immediately
+  return { id: user.id, email: user.email ?? null, roles: normalizeRoles(profile) }
+})
+
 export const getSessionUser = cache(async () => {
   const supabase = await createClient()
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
   if (userError || !user) {
     return { user: null, profile: null, roles: [] as Role[], supabase }
   }
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, first_name, last_name, email, role, roles, force_pin_change')
+    .select('id, first_name, last_name, email, role, roles, force_pin_change, is_active')
     .eq('id', user.id)
     .single()
+
+  if (profile?.is_active === false) {
+    return { user: null, profile: null, roles: [] as Role[], supabase }
+  }
 
   const roles = normalizeRoles(profile)
   return { user, profile, roles, supabase }

@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import { reviewLeaveAction } from '../../staff/actions'
 
@@ -11,9 +12,7 @@ export default async function PrincipalLeaveRequestsPage() {
     .select('role, roles')
     .eq('id', user?.id)
     .single()
-  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(profile)
 
   if (!userRoles.includes('Principal') && !userRoles.includes('System Admin')) {
     return (

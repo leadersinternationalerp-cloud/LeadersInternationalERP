@@ -1,41 +1,48 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import { getBillingReport } from '@/lib/billing';
-import { generateCSV } from '@/lib/csvExport';
-import { generatePDF } from '@/lib/pdfExport';
-import { withAuth } from '@/lib/api/guard';
+import { getBillingReport } from '@/lib/billing'
+import { generateCSV } from '@/lib/csvExport'
+import { generatePDF } from '@/lib/pdfExport'
+import { route, ok } from '@/lib/api/handler'
+import { FINANCE_ROLES } from '@/lib/auth/roles'
 
-export const GET = withAuth(
-  async (request: NextRequest) => {
-    const url = new URL(request.url);
-    const format = url.searchParams.get('format');
-    const startDate = url.searchParams.get('startDate') ?? undefined;
-    const endDate = url.searchParams.get('endDate') ?? undefined;
-    const studentId = url.searchParams.get('studentId') ?? undefined;
-    const status = url.searchParams.get('status') as 'paid' | 'unpaid' | 'overdue' | undefined;
+export const GET = route(
+  async ({ req, requestId }) => {
+    const url = new URL(req.url)
+    const format = url.searchParams.get('format')
+    const startDate = url.searchParams.get('startDate') ?? undefined
+    const endDate = url.searchParams.get('endDate') ?? undefined
+    const studentId = url.searchParams.get('studentId') ?? undefined
+    const status = url.searchParams.get('status') as 'paid' | 'unpaid' | 'overdue' | undefined
 
-    const filters = { startDate, endDate, studentId, status };
-    try {
-      const report = await getBillingReport(filters);
-      if (format === 'csv') {
-        const csv = generateCSV(report);
-        return new NextResponse(csv, {
-          status: 200,
-          headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="billing_report.csv"' },
-        });
-      }
-      if (format === 'pdf') {
-        const pdfBuffer = await generatePDF(report);
-        return new NextResponse(pdfBuffer as any, {
-          status: 200,
-          headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="billing_report.pdf"' },
-        });
-      }
-      // Default JSON response
-      return NextResponse.json(report);
-    } catch (error) {
-      console.error('Export error:', error);
-      return NextResponse.json({ error: 'Failed to generate export' }, { status: 500 });
+    const filters = { startDate, endDate, studentId, status }
+    const report = await getBillingReport(filters)
+
+    if (format === 'csv') {
+      const csv = generateCSV(report)
+      return new Response(csv, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/csv',
+          'Content-Disposition': 'attachment; filename="billing_report.csv"',
+          'Cache-Control': 'private, no-store',
+          'X-Request-Id': requestId,
+        },
+      })
     }
+
+    if (format === 'pdf') {
+      const pdfBuffer = await generatePDF(report)
+      return new Response(new Uint8Array(pdfBuffer), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': 'attachment; filename="billing_report.pdf"',
+          'Cache-Control': 'private, no-store',
+          'X-Request-Id': requestId,
+        },
+      })
+    }
+
+    return ok(report, { requestId })
   },
-  { roles: ['System Admin', 'Director', 'Principal', 'Accountant'] }
-);
+  { roles: FINANCE_ROLES }
+)

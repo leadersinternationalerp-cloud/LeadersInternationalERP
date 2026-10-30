@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import EarlyYearsReportGenerator from '@/components/EarlyYearsReportGenerator'
@@ -13,14 +14,12 @@ export default async function TeacherEarlyYearsReportsPage() {
 
   // 2. Fetch profile and roles
   const { data: prof } = await supabase.from('profiles').select('roles, role').eq('id', user.id).single()
-  const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
-    ? prof.roles
-    : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(prof)
 
   const isStaff = userRoles.includes('System Admin') ||
                   userRoles.includes('Principal') ||
                   userRoles.includes('Dean') ||
-                  userRoles.includes('HOS') ||
+                  userRoles.includes('Head of Section') ||
                   userRoles.includes('Teacher') ||
                   userRoles.includes('Director')
 
@@ -31,7 +30,7 @@ export default async function TeacherEarlyYearsReportsPage() {
   const isManagement = userRoles.includes('System Admin') ||
                        userRoles.includes('Principal') ||
                        userRoles.includes('Dean') ||
-                       userRoles.includes('HOS') ||
+                       userRoles.includes('Head of Section') ||
                        userRoles.includes('Director')
 
   const isEarlyYearsClass = (c: any) => {

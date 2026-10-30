@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import PaymentsClient from './PaymentsClient'
 import { autoGenerateMissingInvoices } from '../actions'
@@ -16,9 +17,7 @@ export default async function PaymentsPage() {
   }
 
   const { data: prof } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
-  const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
-    ? prof.roles
-    : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(prof)
 
   const canRead = userRoles.some(r => ['System Admin', 'Director', 'Principal', 'Accountant'].includes(r))
   if (!canRead) {

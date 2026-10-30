@@ -1,4 +1,5 @@
 'use server'
+import { normalizeRoles } from '@/lib/auth/roles'
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
@@ -15,9 +16,7 @@ export async function saveAppraisalCycleAction(formData: FormData) {
     .select('role, roles')
     .eq('id', user.id)
     .single()
-  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(profile)
 
   if (!userRoles.includes('Director') && !userRoles.includes('System Admin')) {
     return { error: 'Unauthorized' }
@@ -131,9 +130,7 @@ export async function saveReviewerEvaluationAction(formData: FormData) {
     .select('role, roles')
     .eq('id', user.id)
     .single()
-  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(profile)
 
   if (!userRoles.includes('Director') && !userRoles.includes('System Admin') && !userRoles.includes('Principal')) {
     return { error: 'Unauthorized' }

@@ -1,36 +1,23 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { route, apiHeaders } from '@/lib/api/handler'
+import { FINANCE_ROLES } from '@/lib/auth/roles'
+import { badRequest, ApiError } from '@/lib/api/errors'
+import { assertParentOf } from '@/lib/api/scope'
 
-export async function GET(request: Request) {
-  try {
+export const GET = route(
+  async ({ user, req, requestId }) => {
     const supabase = await createClient()
 
-    // 1. Authenticate user & check permission
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('roles')
-      .eq('id', user.id)
-      .single()
-
-    const roles = profile?.roles || []
-    const allowedRoles = ['Accountant', 'System Admin', 'Director', 'Principal']
-    const isAllowed = roles.some((r: string) => allowedRoles.includes(r))
-
-    if (!isAllowed) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    // 2. Parse student ID
-    const url = new URL(request.url)
+    const url = new URL(req.url)
     const studentId = url.searchParams.get('student_id')
 
     if (!studentId) {
-      return NextResponse.json({ error: 'student_id is required' }, { status: 400 })
+      throw badRequest({ student_id: 'student_id is required' })
+    }
+
+    if (user.roles.includes('Parent')) {
+      await assertParentOf(user, studentId)
     }
 
     // A. Fetch selected student details
@@ -45,11 +32,13 @@ export async function GET(request: Request) {
       .single()
 
     if (studentErr || !student) {
-      return NextResponse.json({ error: 'Student not found' }, { status: 404 })
+      throw new ApiError('NOT_FOUND', 'Student not found')
     }
 
-    const studentProfile: any = Array.isArray(student.profiles) ? student.profiles[0] : student.profiles
-    const studentName = studentProfile ? `${studentProfile.first_name} ${studentProfile.last_name}`.trim() : ''
+    const studentProfile = Array.isArray(student.profiles) ? student.profiles[0] : student.profiles
+    const studentName = studentProfile
+      ? `${studentProfile.first_name || ''} ${studentProfile.last_name || ''}`.trim()
+      : ''
     const studentAdmNo = student.student_id || ''
 
     // B. Fetch parent details
@@ -61,19 +50,29 @@ export async function GET(request: Request) {
       `)
       .eq('student_id', studentId)
 
-    const parents = (parentLinks || []).map((link: any) => {
-      const p: any = Array.isArray(link.profiles) ? link.profiles[0] : link.profiles
-      return {
-        id: p?.id || '',
-        name: p ? `${p.first_name} ${p.last_name}`.trim() : '',
-        phone: p?.phone || '',
-        email: p?.email || ''
-      }
-    }).filter(p => p.id)
+    interface ParentProfile {
+      id: string
+      first_name?: string
+      last_name?: string
+      phone?: string
+      email?: string
+    }
 
-    // C. Fetch siblings (other students sharing any parent)
-    const parentIds = parents.map(p => p.id)
-    let siblings: any[] = []
+    const parents = (parentLinks || [])
+      .map((link: { profiles: ParentProfile | ParentProfile[] | null }) => {
+        const p = Array.isArray(link.profiles) ? link.profiles[0] : link.profiles
+        return {
+          id: p?.id || '',
+          name: p ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : '',
+          phone: p?.phone || '',
+          email: p?.email || '',
+        }
+      })
+      .filter((p) => p.id)
+
+    // C. Fetch siblings
+    const parentIds = parents.map((p) => p.id)
+    let siblings: Array<{ id: string; name: string; admission_number: string }> = []
 
     if (parentIds.length > 0) {
       const { data: siblingLinks } = await supabase
@@ -90,21 +89,29 @@ export async function GET(request: Request) {
         .neq('student_id', studentId)
 
       const seenSiblingIds = new Set<string>()
-      siblings = (siblingLinks || []).map((link: any) => {
-        const s: any = link.students
-        if (!s || seenSiblingIds.has(s.id)) return null
-        seenSiblingIds.add(s.id)
+      interface SiblingRecord {
+        id: string
+        student_id?: string
+        profiles?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[]
+      }
 
-        const sProf: any = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles
-        return {
-          id: s.id,
-          name: sProf ? `${sProf.first_name} ${sProf.last_name}`.trim() : '',
-          admission_number: s.student_id || ''
-        }
-      }).filter(Boolean)
+      siblings = (siblingLinks || [])
+        .map((link: { students: SiblingRecord | SiblingRecord[] | null }) => {
+          const s = Array.isArray(link.students) ? link.students[0] : link.students
+          if (!s || seenSiblingIds.has(s.id)) return null
+          seenSiblingIds.add(s.id)
+
+          const sProf = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles
+          return {
+            id: s.id,
+            name: sProf ? `${sProf.first_name || ''} ${sProf.last_name || ''}`.trim() : '',
+            admission_number: s.student_id || '',
+          }
+        })
+        .filter((sib): sib is { id: string; name: string; admission_number: string } => Boolean(sib))
     }
 
-    // D. Fetch all PENDING bank deposits
+    // D. Fetch pending bank deposits
     const { data: pendingDeposits } = await supabase
       .from('bank_deposits')
       .select('*')
@@ -112,13 +119,17 @@ export async function GET(request: Request) {
       .order('deposit_date', { ascending: false })
 
     // E. Perform matching
-    const deposits = (pendingDeposits || []).map((dep: any) => {
+    interface DepositRecord {
+      reference?: string
+      [key: string]: unknown
+    }
+
+    const deposits = (pendingDeposits || []).map((dep: DepositRecord) => {
       const ref = (dep.reference || '').toLowerCase()
-      
-      // Matching checks
+
       const studentMatch = studentName && ref.includes(studentName.toLowerCase())
       const studentIdMatch = studentAdmNo && ref.includes(studentAdmNo.toLowerCase())
-      
+
       let parentMatch = false
       let matchedParentName = ''
       for (const p of parents) {
@@ -169,26 +180,34 @@ export async function GET(request: Request) {
       return {
         ...dep,
         matched,
-        matchReason
+        matchReason,
       }
     })
 
-    // Sort to put matched deposits first
     deposits.sort((a, b) => (b.matched ? 1 : 0) - (a.matched ? 1 : 0))
 
-    return NextResponse.json({
+    const responsePayload = {
       student: {
         id: studentId,
         name: studentName,
-        admission_number: studentAdmNo
+        admission_number: studentAdmNo,
       },
       parents,
       siblings,
-      deposits
-    })
+      deposits,
+    }
 
-  } catch (error: any) {
-    console.error('[API Student Details ERROR]', error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
-  }
-}
+    return NextResponse.json(
+      {
+        data: responsePayload,
+        ...responsePayload,
+        meta: { requestId },
+      },
+      {
+        status: 200,
+        headers: apiHeaders(requestId),
+      }
+    )
+  },
+  { roles: [...FINANCE_ROLES, 'Parent'] }
+)

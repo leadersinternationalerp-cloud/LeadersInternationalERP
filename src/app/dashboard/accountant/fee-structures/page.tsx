@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import { deleteFeeStructureAction } from '../actions'
 import FeeStructuresClient from './FeeStructuresClient'
@@ -16,9 +17,7 @@ export default async function FeeStructuresPage() {
   }
 
   const { data: prof } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
-  const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
-    ? prof.roles
-    : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(prof)
 
   const canWrite = userRoles.some(r => ['System Admin', 'Director', 'Principal'].includes(r))
   const canRead = userRoles.some(r => ['System Admin', 'Director', 'Principal', 'Accountant'].includes(r))

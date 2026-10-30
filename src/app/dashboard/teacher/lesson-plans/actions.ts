@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { normalizeRoles } from '@/lib/auth/roles'
 import { revalidatePath } from 'next/cache'
 
 export async function submitLessonPlanAction(formData: FormData) {
@@ -93,12 +94,10 @@ export async function submitLessonPlanAction(formData: FormData) {
         .from('profiles')
         .select('id, role, roles')
 
-      const supervisorRoles = ['Head of Section', 'HOS', 'Dean', 'Principal', 'Vice Principal', 'Director', 'System Admin']
+      const supervisorRoles = ['Head of Section', 'Dean', 'Principal', 'Vice Principal', 'Director', 'System Admin']
 
       const targetSupervisors = (allProfiles || []).filter(p => {
-        const userRoles = p.roles && Array.isArray(p.roles) && p.roles.length > 0
-          ? p.roles
-          : (p.role ? p.role.split(',').map((r: string) => r.trim()) : [])
+        const userRoles = normalizeRoles(p)
         return userRoles.some((r: string) => supervisorRoles.includes(r))
       })
 

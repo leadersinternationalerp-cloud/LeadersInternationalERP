@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import TimetableClient from './TimetableClient'
@@ -12,11 +13,9 @@ export default async function TimetablePage() {
   }
 
   const { data: prof } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
-  const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
-    ? prof.roles
-    : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(prof)
 
-  const isAdmin = userRoles.some(r => ['System Admin', 'Director', 'Principal', 'Dean', 'HOS'].includes(r))
+  const isAdmin = userRoles.some(r => ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section'].includes(r))
   if (!isAdmin) {
     redirect('/dashboard')
   }

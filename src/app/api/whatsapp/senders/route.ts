@@ -1,28 +1,8 @@
-import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { route, ok, parseJson } from '@/lib/api/handler'
+import { ADMIN_ROLES } from '@/lib/auth/roles'
+import { badRequest, ApiError } from '@/lib/api/errors'
 
-// Verify that the user is an admin or director
-async function checkAuth(supabase: any) {
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return { authorized: false, errorResponse: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('roles')
-    .eq('id', user.id)
-    .single()
-
-  const roles = profile?.roles || []
-  if (!roles.includes('System Admin') && !roles.includes('Director')) {
-    return { authorized: false, errorResponse: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
-  }
-
-  return { authorized: true, user }
-}
-
-// Fetch active or first Twilio WhatsApp configuration
 async function getTwilioConfig(supabase: any) {
   const { data: config } = await supabase
     .from('integration_config')
@@ -41,79 +21,83 @@ async function getTwilioConfig(supabase: any) {
     id: config.id,
     accountSid: config.api_key,
     authToken: config.api_secret,
-    defaultSender: config.webhook_secret || ''
+    defaultSender: config.webhook_secret || '',
   }
 }
 
-// Helper to make Basic Auth headers
 function getAuthHeaders(accountSid: string, authToken: string) {
   const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64')
   return {
-    'Authorization': `Basic ${auth}`,
-    'Content-Type': 'application/json'
+    Authorization: `Basic ${auth}`,
+    'Content-Type': 'application/json',
   }
 }
 
-// GET: Retrieve the list of registered WhatsApp Senders from Twilio
-export async function GET() {
-  try {
+export const GET = route(
+  async ({ requestId }) => {
     const supabase = await createClient()
-    const { authorized, errorResponse } = await checkAuth(supabase)
-    if (!authorized) return errorResponse
-
     const twilioConfig = await getTwilioConfig(supabase)
     if (!twilioConfig) {
-      return NextResponse.json({ error: 'Twilio WhatsApp is not configured. Please add and configure Twilio in Integrations Settings first.' }, { status: 404 })
+      throw new ApiError('NOT_FOUND', 'Twilio WhatsApp is not configured')
     }
 
     const { accountSid, authToken, defaultSender } = twilioConfig
 
-    // Call Twilio Channels Senders API
     const response = await fetch(`https://messaging.twilio.com/v2/Channels/Senders?Channel=whatsapp`, {
       method: 'GET',
-      headers: getAuthHeaders(accountSid, authToken)
+      headers: getAuthHeaders(accountSid, authToken),
     })
 
     if (!response.ok) {
       const errorText = await response.text()
       console.error('[TWILIO API ERROR] Fetch senders failed:', errorText)
-      return NextResponse.json({ error: `Twilio API returned error: ${errorText}` }, { status: response.status })
+      throw new ApiError('PROVIDER_ERROR', 'Twilio rejected the request')
     }
 
     const data = await response.json()
-    return NextResponse.json({
-      senders: data.senders || [],
-      defaultSender,
-      accountSid: `${accountSid.slice(0, 4)}...${accountSid.slice(-4)}`
-    })
+    const maskedSid = `${accountSid.slice(0, 4)}...${accountSid.slice(-4)}`
 
-  } catch (error: any) {
-    console.error('[API Senders GET ERROR]', error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
-  }
-}
+    return ok(
+      {
+        senders: data.senders || [],
+        defaultSender,
+        accountSid: maskedSid,
+      },
+      { requestId }
+    )
+  },
+  { roles: ADMIN_ROLES }
+)
 
-// POST: Create/Register a new WhatsApp Sender on Twilio
-export async function POST(request: Request) {
-  try {
+export const POST = route(
+  async ({ req, requestId }) => {
     const supabase = await createClient()
-    const { authorized, errorResponse } = await checkAuth(supabase)
-    if (!authorized) return errorResponse
-
     const twilioConfig = await getTwilioConfig(supabase)
     if (!twilioConfig) {
-      return NextResponse.json({ error: 'Twilio WhatsApp is not configured.' }, { status: 404 })
+      throw new ApiError('NOT_FOUND', 'Twilio WhatsApp is not configured')
     }
 
     const { accountSid, authToken } = twilioConfig
-    const body = await request.json()
+    const body = await parseJson<{
+      senderId?: string
+      profile?: {
+        name?: string
+        vertical?: string
+        about?: string
+        address?: string
+        description?: string
+        logoUrl?: string
+        logo_url?: string
+        websites?: string[]
+        emails?: string[]
+      }
+    }>(req)
 
     const { senderId, profile } = body
     if (!senderId || !profile?.name) {
-      return NextResponse.json({ error: 'Sender ID (phone number) and Business Display Name are required.' }, { status: 400 })
+      throw badRequest({ fields: 'Sender ID (phone number) and Business Display Name are required.' })
     }
 
-    // Format payload matching Twilio API spec
     const payload = {
       senderId,
       profile: {
@@ -124,105 +108,87 @@ export async function POST(request: Request) {
         description: profile.description || '',
         logo_url: profile.logoUrl || profile.logo_url || null,
         websites: profile.websites || [],
-        emails: profile.emails || []
-      }
+        emails: profile.emails || [],
+      },
     }
 
     const response = await fetch('https://messaging.twilio.com/v2/Channels/Senders', {
       method: 'POST',
       headers: getAuthHeaders(accountSid, authToken),
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     })
 
     if (!response.ok) {
       const errorText = await response.text()
       console.error('[TWILIO API ERROR] Create sender failed:', errorText)
-      return NextResponse.json({ error: `Twilio API returned: ${errorText}` }, { status: response.status })
+      throw new ApiError('PROVIDER_ERROR', 'Twilio rejected the request')
     }
 
     const data = await response.json()
-    return NextResponse.json({ success: true, sender: data })
+    return ok({ sender: data }, { requestId }, 201)
+  },
+  { roles: ADMIN_ROLES }
+)
 
-  } catch (error: any) {
-    console.error('[API Senders POST ERROR]', error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
-  }
-}
-
-// PUT: Set a specific WhatsApp Sender as the Default Sender (stored in webhook_secret)
-export async function PUT(request: Request) {
-  try {
+export const PUT = route(
+  async ({ req, requestId }) => {
     const supabase = await createClient()
-    const { authorized, errorResponse } = await checkAuth(supabase)
-    if (!authorized) return errorResponse
-
     const twilioConfig = await getTwilioConfig(supabase)
     if (!twilioConfig) {
-      return NextResponse.json({ error: 'Twilio WhatsApp is not configured.' }, { status: 404 })
+      throw new ApiError('NOT_FOUND', 'Twilio WhatsApp is not configured')
     }
 
-    const body = await request.json()
+    const body = await parseJson<{
+      defaultSenderId?: string
+    }>(req)
+
     const { defaultSenderId } = body
-
     if (!defaultSenderId) {
-      return NextResponse.json({ error: 'Default Sender ID is required.' }, { status: 400 })
+      throw badRequest({ defaultSenderId: 'Default Sender ID is required.' })
     }
 
-    // Update webhook_secret to hold the default sender id
     const { error: updateError } = await supabase
       .from('integration_config')
       .update({ webhook_secret: defaultSenderId })
       .eq('id', twilioConfig.id)
 
     if (updateError) {
-      console.error('[DB UPDATE ERROR] Failed to update default sender:', updateError)
-      return NextResponse.json({ error: 'Failed to update database configuration.' }, { status: 500 })
+      throw new ApiError('INTERNAL', 'Failed to update database configuration')
     }
 
-    return NextResponse.json({ success: true, defaultSenderId })
+    return ok({ defaultSenderId }, { requestId })
+  },
+  { roles: ADMIN_ROLES }
+)
 
-  } catch (error: any) {
-    console.error('[API Senders PUT ERROR]', error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
-  }
-}
-
-// DELETE: Delete a WhatsApp Sender from Twilio
-export async function DELETE(request: Request) {
-  try {
+export const DELETE = route(
+  async ({ req, requestId }) => {
     const supabase = await createClient()
-    const { authorized, errorResponse } = await checkAuth(supabase)
-    if (!authorized) return errorResponse
-
     const twilioConfig = await getTwilioConfig(supabase)
     if (!twilioConfig) {
-      return NextResponse.json({ error: 'Twilio WhatsApp is not configured.' }, { status: 404 })
+      throw new ApiError('NOT_FOUND', 'Twilio WhatsApp is not configured')
     }
 
     const { accountSid, authToken } = twilioConfig
-    const { searchParams } = new URL(request.url)
+    const { searchParams } = new URL(req.url)
     const sid = searchParams.get('sid')
 
     if (!sid) {
-      return NextResponse.json({ error: 'Sender SID is required.' }, { status: 400 })
+      throw badRequest({ sid: 'Sender SID is required' })
     }
 
-    // DELETE request to Twilio Channels Senders API
     const response = await fetch(`https://messaging.twilio.com/v2/Channels/Senders/${sid}`, {
       method: 'DELETE',
-      headers: getAuthHeaders(accountSid, authToken)
+      headers: getAuthHeaders(accountSid, authToken),
     })
 
     if (!response.ok) {
       const errorText = await response.text()
       console.error('[TWILIO API ERROR] Delete sender failed:', errorText)
-      return NextResponse.json({ error: `Twilio API returned: ${errorText}` }, { status: response.status })
+      throw new ApiError('PROVIDER_ERROR', 'Twilio rejected the request')
     }
 
-    return NextResponse.json({ success: true })
-
-  } catch (error: any) {
-    console.error('[API Senders DELETE ERROR]', error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
-  }
-}
+    return ok({ success: true }, { requestId })
+  },
+  { roles: ADMIN_ROLES }
+)

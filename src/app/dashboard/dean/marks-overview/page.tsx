@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import DeanMarksClient from './DeanMarksClient'
 
@@ -12,7 +13,7 @@ export default async function DeanMarksOverviewPage() {
     .eq('id', user?.id)
     .single()
     
-  const userRoles = profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : []
+  const userRoles = normalizeRoles(profile)
 
   if (!user || (!userRoles.includes('Dean') && !userRoles.includes('System Admin'))) {
     return (

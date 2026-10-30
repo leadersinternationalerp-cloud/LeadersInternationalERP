@@ -1,194 +1,172 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
-import { createServiceClient } from '@/utils/supabase/service';
-import { markQuiz } from '@/lib/cambridge-syllabus';
-import { parseGradingLevels, getGradeForPercentage } from '@/utils/grading';
+import { createClient } from '@/utils/supabase/server'
+import { createServiceClient } from '@/utils/supabase/service'
+import { markQuiz } from '@/lib/cambridge-syllabus'
+import { parseGradingLevels, getGradeForPercentage } from '@/utils/grading'
+import { route, ok, parseJson } from '@/lib/api/handler'
+import { badRequest, ApiError } from '@/lib/api/errors'
 
-export async function POST(request: Request) {
-  try {
-    const supabase = await createClient();
+export const POST = route(
+  async ({ user, req, requestId }) => {
+    const supabase = await createClient()
 
-    // 1. Authenticate user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const body = await parseJson<{
+      activity_id?: string
+      answers?: Record<string, unknown>
+      time_taken_seconds?: number
+    }>(req)
 
-    // 2. Parse request body
-    const body = await request.json();
-    const { activity_id, answers, time_taken_seconds } = body;
+    const { activity_id, answers, time_taken_seconds } = body
 
     if (!activity_id || !answers) {
-      return NextResponse.json({ error: 'Missing required fields: activity_id, answers' }, { status: 400 });
+      throw badRequest({ fields: 'Missing required fields: activity_id, answers' })
     }
 
-    // 3. Check for existing attempts
-    const { data: existingAttempt, error: attemptCheckError } = await supabase
-      .from('activity_attempts')
-      .select('id')
-      .eq('activity_id', activity_id)
-      .eq('student_id', user.id)
-      .maybeSingle();
-
-    if (attemptCheckError) {
-      console.error('Check existing attempts error:', attemptCheckError);
-    }
-
-    if (existingAttempt) {
-      return NextResponse.json(
-        { error: 'You have already submitted an attempt for this quiz.' },
-        { status: 409 }
-      );
-    }
-
-    // 4. Retrieve class activity (the quiz questions and correctness key)
+    // 1. Retrieve activity
     const { data: activity, error: activityError } = await supabase
       .from('class_activities')
       .select('*')
       .eq('id', activity_id)
-      .single();
+      .maybeSingle()
 
     if (activityError || !activity) {
-      return NextResponse.json({ error: 'Quiz activity not found' }, { status: 404 });
+      throw new ApiError('NOT_FOUND', 'Quiz activity not found')
     }
 
     if (!activity.is_published) {
-      return NextResponse.json({ error: 'This quiz is not published yet' }, { status: 400 });
+      throw badRequest({ is_published: 'This quiz is not published yet' })
     }
 
-    // 5. Score the quiz server-side
-    const questions = activity.questions || [];
-    const evaluation = markQuiz(questions, answers);
+    // 2. Assert student is enrolled in the class of the activity
+    const { data: enrollment } = await supabase
+      .from('student_classes')
+      .select('student_id')
+      .eq('student_id', user.id)
+      .eq('class_id', activity.class_id)
+      .maybeSingle()
 
-    // Fetch grading scale settings
+    if (!enrollment) {
+      const { data: studentRow } = await supabase
+        .from('students')
+        .select('id')
+        .eq('id', user.id)
+        .eq('class_id', activity.class_id)
+        .maybeSingle()
+
+      if (!studentRow) {
+        throw new ApiError('FORBIDDEN', 'You are not enrolled in this class')
+      }
+    }
+
+    // 3. Check for existing attempts
+    const { data: existingAttempt } = await supabase
+      .from('activity_attempts')
+      .select('id')
+      .eq('activity_id', activity_id)
+      .eq('student_id', user.id)
+      .maybeSingle()
+
+    if (existingAttempt) {
+      throw new ApiError('CONFLICT', 'You have already submitted an attempt for this quiz.')
+    }
+
+    // 4. Score quiz server-side
+    const questions = activity.questions || []
+    const evaluation = markQuiz(questions, answers as Record<string, number>)
+
+    // 5. Fetch grading scale
     const { data: setting } = await supabase
       .from('system_settings')
       .select('value')
       .eq('key', 'grading_scale')
-      .maybeSingle();
-    const gradingLevels = parseGradingLevels(setting?.value);
-    const grade = getGradeForPercentage(evaluation.percentage, gradingLevels);
+      .maybeSingle()
 
-    // 6. Store attempt in the database
-    const { data: attempt, error: insertError } = await supabase
+    const gradingLevels = parseGradingLevels(setting?.value)
+    const grade = getGradeForPercentage(evaluation.percentage, gradingLevels)
+
+    // 6. Insert attempt
+    const { data: attempt, error: attemptError } = await supabase
       .from('activity_attempts')
       .insert({
         activity_id,
         student_id: user.id,
-        answers,
         score: evaluation.score,
         max_score: evaluation.maxScore,
         percentage: evaluation.percentage,
-        time_taken_seconds,
-        grade
+        grade,
+        answers,
+        time_taken_seconds: time_taken_seconds || null,
+        submitted_at: new Date().toISOString(),
       })
       .select()
-      .single();
+      .single()
 
-    if (insertError) {
-      // Handle db unique constraint violation specifically (if code execution raced)
-      if (insertError.code === '23505') {
-        return NextResponse.json(
-          { error: 'You have already submitted an attempt for this quiz.' },
-          { status: 409 }
-        );
-      }
-      throw insertError;
+    if (attemptError) {
+      throw new ApiError('INTERNAL', 'Failed to record quiz attempt')
     }
 
-    // 6.5 Record the score in the marks table for report cards
+    // 7. Record in marks table linked to class_activity_id
     try {
-      const serviceClient = createServiceClient();
+      const serviceClient = createServiceClient()
+      const { data: termData } = await supabase
+        .from('terms')
+        .select('id')
+        .eq('is_current', true)
+        .maybeSingle()
 
-      // Resolve subject_id by searching subjects matching activity.subject
-      const { data: subjectRecord } = await supabase
+      let termId = termData?.id
+      if (!termId) {
+        const { data: fallbackTerm } = await supabase
+          .from('terms')
+          .select('id')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        termId = fallbackTerm?.id
+      }
+
+      const { data: subj } = await supabase
         .from('subjects')
         .select('id')
-        .eq('name', activity.subject)
-        .maybeSingle();
+        .ilike('name', activity.subject)
+        .maybeSingle()
 
-      const subjectId = subjectRecord?.id;
-
-      if (subjectId) {
-        // Fetch current active term
-        const { data: activeTerm } = await supabase
-          .from('terms')
-          .select('name, academic_year_id')
-          .eq('is_current', true)
-          .maybeSingle();
-
-        const termName = activeTerm?.name || 'Term 3';
-        let academicYearName = '2025-2026';
-
-        if (activeTerm?.academic_year_id) {
-          const { data: activeYear } = await supabase
-            .from('academic_years')
-            .select('name')
-            .eq('id', activeTerm.academic_year_id)
-            .maybeSingle();
-          if (activeYear) {
-            academicYearName = activeYear.name;
+      if (termId && subj?.id) {
+        await serviceClient.from('marks').upsert(
+          {
+            student_id: user.id,
+            class_id: activity.class_id,
+            subject_id: subj.id,
+            term_id: termId,
+            class_activity_id: activity.id,
+            score: evaluation.percentage,
+            assessment_type: 'HOME WORKS (H/W)',
+            remarks: `Quiz: ${activity.title} (Auto-marked)`,
+            graded_by: activity.created_by,
+            is_released: false,
+          },
+          {
+            onConflict: 'student_id,class_activity_id',
           }
-        }
-
-        // Upsert score into marks table using elevated serviceClient privileges to bypass student write RLS
-        const { data: existingMark } = await serviceClient
-          .from('marks')
-          .select('id')
-          .eq('student_id', user.id)
-          .eq('class_id', activity.class_id)
-          .eq('subject_id', subjectId)
-          .eq('remarks', `Quiz: ${activity.title} (Auto-marked)`)
-          .maybeSingle();
-
-        const markData: any = {
-          student_id: user.id,
-          class_id: activity.class_id,
-          subject_id: subjectId,
-          assessment_type: 'HOME WORKS (H/W)',
-          term: termName,
-          academic_year: academicYearName,
-          score: evaluation.percentage,
-          remarks: `Quiz: ${activity.title} (Auto-marked)`,
-          grading_scale: `Percentage (${grade})`,
-          graded_by: activity.created_by,
-          is_released: false
-        };
-
-        if (existingMark) {
-          markData.id = existingMark.id;
-        }
-
-        const { error: markError } = await serviceClient
-          .from('marks')
-          .upsert(markData);
-
-        if (markError) {
-          console.error('Failed to save quiz mark in marks table:', markError.message);
-        }
-      } else {
-        console.warn(`Subject matching name '${activity.subject}' not found. Cannot record quiz mark in marks table.`);
+        )
       }
-    } catch (markRecordError) {
-      console.error('Error during quiz mark recording:', markRecordError);
+    } catch {
+      // Non-fatal marks persistence warning
     }
 
-    // 7. Return evaluation results
-    return NextResponse.json({
-      success: true,
-      message: 'Quiz submitted and marked successfully',
-      data: {
-        attemptId: attempt.id,
+    return ok(
+      {
+        attempt_id: attempt.id,
         score: evaluation.score,
-        maxScore: evaluation.maxScore,
+        max_score: evaluation.maxScore,
         percentage: evaluation.percentage,
-        results: evaluation.results,
-        grade: attempt.grade
-      }
-    });
-
-  } catch (error: any) {
-    console.error('Submit Quiz Route Error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+        grade,
+      },
+      { requestId },
+      201
+    )
+  },
+  {
+    roles: ['Student'],
+    rateLimit: { key: 'activity-submit', max: 20, windowMs: 60_000 },
   }
-}
+)

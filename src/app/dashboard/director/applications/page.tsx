@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import { formatDate } from '@/utils/date'
@@ -18,9 +19,7 @@ export default async function DirectorApplicationsInbox({
     .eq('id', user?.id)
     .single()
 
-  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(profile)
 
   if (!userRoles.includes('Director') && !userRoles.includes('System Admin')) {
     return (
@@ -154,6 +153,19 @@ export default async function DirectorApplicationsInbox({
           }}
         >
           Salary Advances ({salaryAdvances?.filter(a => a.status === 'Submitted' || a.status === 'Reviewed_Principal').length || 0} Pending)
+        </Link>
+        <Link 
+          href="/dashboard/principal/admissions" 
+          style={{ 
+            padding: '0.75rem 1.5rem', 
+            textDecoration: 'none', 
+            fontWeight: 600, 
+            borderBottom: '3px solid transparent', 
+            color: 'var(--color-primary)', 
+            marginLeft: 'auto' 
+          }}
+        >
+          Student Admissions Desk &rarr;
         </Link>
       </div>
 

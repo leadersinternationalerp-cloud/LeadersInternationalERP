@@ -1,6 +1,9 @@
+import { route } from '@/lib/api/handler'
+import { MANAGEMENT_ROLES, hasAny } from '@/lib/auth/roles'
+import { assertStudentInScope } from '@/lib/api/scope'
+import { badRequest, ApiError } from '@/lib/api/errors'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
 import { parseGradingLevels, getGradeForPercentage } from '@/utils/grading'
 import { generateSmartkidzReportPdf, ReportCardOptions, ReportSubjectMark, computeWeightedOverall } from '@/lib/reportCardPdf'
 
@@ -116,43 +119,29 @@ async function computeClassStudentRanks(
   return ranks
 }
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const student_id = searchParams.get('student_id')
-  const term_id = searchParams.get('term_id')
-  const showRank = searchParams.get('show_rank') === 'true'
+export const GET = route(
+  async ({ user, req: request, requestId: _requestId }) => {
+    const { searchParams } = new URL(request.url)
+    const student_id = searchParams.get('student_id')
+    const term_id = searchParams.get('term_id')
+    const showRank = searchParams.get('show_rank') === 'true'
 
-  if (!student_id || !term_id) {
-    return NextResponse.json({ error: 'Missing student_id or term_id' }, { status: 400 })
-  }
+  if (!student_id || !term_id) throw badRequest('Missing student_id or term_id')
 
   const studentIds = student_id.split(',').map(s => s.trim()).filter(Boolean)
+    if (studentIds.length > 40) throw badRequest({ student_id: 'Cannot request more than 40 student reports at once' })
+    for (const sId of studentIds) { await assertStudentInScope(user, sId) }
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
   if (!uuidRegex.test(term_id) || studentIds.some(id => !uuidRegex.test(id))) {
-    return NextResponse.json({ error: 'Invalid UUID format for student_id or term_id' }, { status: 400 })
+    throw badRequest('Invalid UUID format for student_id or term_id')
   }
 
   try {
     const supabase = await createClient()
 
-    // 1. Verify Authentication & Role Access
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: prof } = await supabase.from('profiles').select('roles, role').eq('id', user.id).single()
-    const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
-      ? prof.roles
-      : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
-
-    const isGlobalStaff = userRoles.includes('System Admin') ||
-                          userRoles.includes('Principal') ||
-                          userRoles.includes('Dean') ||
-                          userRoles.includes('HOS') ||
-                          userRoles.includes('Head of Section') ||
-                          userRoles.includes('Director')
+    const userRoles = user.roles
+    const isGlobalStaff = hasAny(user.roles, MANAGEMENT_ROLES)
 
     // 2. Load Term details (global across all students in request)
     const { data: term } = await supabase
@@ -615,8 +604,14 @@ export async function GET(request: Request) {
         'Content-Disposition': `${disposition}; filename="ReportCard_${cleanFirstName}_${cleanTerm}.pdf"`
       }
     })
-  } catch (error: any) {
-    console.error('Download Route Error:', error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+    } catch (err) {
+      if (err && typeof err === 'object' && 'code' in err) throw err
+      console.error('Download Route Error:', err)
+      throw ApiError.internal('Failed to generate report card')
+    }
+  },
+  {
+    roles: ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section', 'Teacher', 'Student', 'Parent'],
+    rateLimit: { key: 'report-cards-download', max: 20, windowMs: 60_000 }
   }
-}
+)

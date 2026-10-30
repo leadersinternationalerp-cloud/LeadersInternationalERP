@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { revalidatePath } from 'next/cache'
@@ -31,9 +32,7 @@ export default async function ProfilePage() {
 
   const uniqueId = student?.student_id || staff?.employee_id || 'N/A'
 
-  const userRoles: string[] = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(profile)
 
   // Server Action to update profile information
   async function handleUpdateProfile(formData: FormData) {
@@ -90,7 +89,7 @@ export default async function ProfilePage() {
         .eq('id', user.id)
         .single()
 
-      const roles = profile?.roles || (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+      const roles = normalizeRoles(profile)
       const isSystemAdmin = roles.includes('System Admin')
 
       if (!isSystemAdmin) {

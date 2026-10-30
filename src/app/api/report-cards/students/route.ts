@@ -1,120 +1,88 @@
-import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { route, ok } from '@/lib/api/handler'
+import { MANAGEMENT_ROLES } from '@/lib/auth/roles'
+import { assertClassInScope } from '@/lib/api/scope'
+import { badRequest, ApiError } from '@/lib/api/errors'
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const class_id = searchParams.get('class_id')
+export const GET = route(
+  async ({ user, req, requestId }) => {
+    const { searchParams } = new URL(req.url)
+    const class_id = searchParams.get('class_id')
 
-  if (!class_id) {
-    return NextResponse.json({ error: 'Missing class_id' }, { status: 400 })
-  }
-
-  const supabase = await createClient()
-
-  // 1. Verify Auth
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const { data: prof } = await supabase.from('profiles').select('roles, role').eq('id', user.id).single()
-  const userRoles: string[] = prof?.roles && Array.isArray(prof.roles) && prof.roles.length > 0
-    ? prof.roles
-    : (prof?.role ? prof.role.split(',').map((r: string) => r.trim()) : [])
-
-  const isStaff = userRoles.includes('System Admin') ||
-                  userRoles.includes('Principal') ||
-                  userRoles.includes('Dean') ||
-                  userRoles.includes('HOS') ||
-                  userRoles.includes('Teacher')
-
-  if (!isStaff) {
-    return NextResponse.json({ error: 'Unauthorized Access' }, { status: 403 })
-  }
-
-  // 2. If Teacher alone, verify assignment
-  if (userRoles.includes('Teacher') && !userRoles.includes('System Admin') && !userRoles.includes('Principal') && !userRoles.includes('Dean') && !userRoles.includes('HOS')) {
-    const { data: assignment } = await supabase
-      .from('class_subjects')
-      .select('id')
-      .eq('class_id', class_id)
-      .eq('teacher_id', user.id)
-      .limit(1)
-      .maybeSingle()
-
-    if (!assignment) {
-      return NextResponse.json({ error: 'Forbidden: You are not assigned to this class' }, { status: 403 })
+    if (!class_id) {
+      throw badRequest({ class_id: 'Missing class_id' })
     }
-  }
 
-  // 3. Fetch Class Info
-  const { data: classInfo } = await supabase
-    .from('classes')
-    .select('*')
-    .eq('id', class_id)
-    .single()
+    const page = Math.max(1, Number(searchParams.get('page')) || 1)
+    const perPage = Math.min(100, Math.max(1, Number(searchParams.get('perPage')) || 50))
+    const from = (page - 1) * perPage
+    const to = from + perPage - 1
 
-  if (!classInfo) {
-    return NextResponse.json({ error: 'Class not found' }, { status: 404 })
-  }
+    const supabase = await createClient()
 
-  // 4. Fetch Students in Class (using class_id first, fallback to name+section if class_id mismatch)
-  let students = []
-  const { data: directStudents } = await supabase
-    .from('students')
-    .select(`
-      id,
-      student_id,
-      grade_level,
-      section,
-      class_id,
-      profiles (first_name, last_name, email)
-    `)
-    .eq('class_id', class_id)
+    // 1. Verify Scope & Class existence
+    const { data: classInfo } = await supabase.from('classes').select('*').eq('id', class_id).maybeSingle()
 
-  students = directStudents || []
+    if (!classInfo) {
+      throw new ApiError('NOT_FOUND', 'Class not found')
+    }
 
-  if (students.length === 0) {
-    // Try fallback
-    const { data: fallbackStudents } = await supabase
+    await assertClassInScope(user, class_id)
+
+    // 2. Query students by class_id
+    const { data: students, count, error } = await supabase
       .from('students')
-      .select(`
+      .select(
+        `
         id,
         student_id,
-        grade_level,
-        section,
         class_id,
-        profiles (first_name, last_name, email)
-      `)
-      .eq('grade_level', classInfo.name)
-      .eq('section', classInfo.section || null)
+        grade_level,
+        status,
+        profiles:id (
+          first_name,
+          last_name
+        )
+      `,
+        { count: 'exact' }
+      )
+      .eq('class_id', class_id)
+      .eq('status', 'Active')
+      .order('student_id', { ascending: true })
+      .range(from, to)
 
-    students = fallbackStudents || []
-  }
-
-  const mappedStudents = students.map((s: any) => {
-    const profs = s.profiles
-    const singleProfile = Array.isArray(profs) ? profs[0] : profs
-    return {
-      id: s.id,
-      student_id: s.student_id,
-      grade_level: s.grade_level,
-      section: s.section,
-      photo_url: `/api/students/photo?student_id=${s.id}`,
-      class_id: s.class_id,
-      profiles: singleProfile ? {
-        first_name: singleProfile.first_name,
-        last_name: singleProfile.last_name,
-        email: singleProfile.email
-      } : undefined
+    if (error) {
+      throw new ApiError('INTERNAL', 'Failed to fetch class students')
     }
-  })
 
-  return NextResponse.json({
-    classInfo: classInfo ? {
-      ...classInfo,
-      class_name: classInfo.class_name || classInfo.name
-    } : null,
-    students: mappedStudents
-  })
-}
+    interface StudentRecord {
+      id: string
+      student_id?: string
+      class_id?: string
+      grade_level?: string
+      status?: string
+      profiles?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[]
+    }
+
+    const formattedStudents = (students || []).map((s: StudentRecord) => {
+      const p = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles
+      return {
+        id: s.id,
+        student_id: s.student_id || '',
+        class_id: s.class_id,
+        grade_level: s.grade_level,
+        status: s.status,
+        first_name: p?.first_name || '',
+        last_name: p?.last_name || '',
+      }
+    })
+
+    return ok(formattedStudents, {
+      requestId,
+      total: count || 0,
+      page,
+      perPage,
+    })
+  },
+  { roles: [...MANAGEMENT_ROLES, 'Teacher'] }
+)

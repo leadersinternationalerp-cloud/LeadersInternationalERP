@@ -1,4 +1,5 @@
 'use server'
+import { normalizeRoles } from '@/lib/auth/roles'
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
@@ -25,9 +26,7 @@ export async function saveWeightsAction(weights: {
     .eq('id', user.id)
     .single()
 
-  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(profile)
 
   const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal')
   if (!isAdmin) {

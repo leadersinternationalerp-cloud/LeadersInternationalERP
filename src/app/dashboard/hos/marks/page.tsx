@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import HOSMarksClient from './HOSMarksClient'
 
@@ -12,9 +13,9 @@ export default async function HOSMarksPage() {
     .eq('id', user?.id)
     .single()
     
-  const userRoles = profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : []
+  const userRoles = normalizeRoles(profile)
 
-  if (!user || (!userRoles.includes('HOS') && !userRoles.includes('System Admin'))) {
+  if (!user || (!userRoles.includes('Head of Section') && !userRoles.includes('System Admin'))) {
     return (
       <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
         <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>

@@ -182,7 +182,7 @@ export default function DashboardLayoutClient({
         userRoles.includes('Director') || 
         userRoles.includes('Principal') || 
         userRoles.includes('Dean') || 
-        userRoles.includes('HOS') || 
+        userRoles.includes('Head of Section') || 
         userRoles.includes('Accountant') || 
         userRoles.includes('Teacher')) && (
         <>
@@ -193,7 +193,7 @@ export default function DashboardLayoutClient({
                 userRoles.includes('Director') || 
                 userRoles.includes('Principal') || 
                 userRoles.includes('Dean') || 
-                userRoles.includes('HOS') || 
+                userRoles.includes('Head of Section') || 
                 userRoles.includes('Accountant')) && (
                 <NavLink href="/dashboard" icon={LayoutDashboard}>
                   Dashboard Overview
@@ -239,7 +239,7 @@ export default function DashboardLayoutClient({
               {(userRoles.includes('System Admin') || 
                 userRoles.includes('Principal') || 
                 userRoles.includes('Dean') || 
-                userRoles.includes('HOS')) && (
+                userRoles.includes('Head of Section')) && (
                 <NavLink href="/dashboard/admin/timetable" icon={CalendarDays}>
                   School Timetable
                 </NavLink>
@@ -359,7 +359,7 @@ export default function DashboardLayoutClient({
         userRoles.includes('Director') || 
         userRoles.includes('Principal') || 
         userRoles.includes('Dean') || 
-        userRoles.includes('HOS') || 
+        userRoles.includes('Head of Section') || 
         userRoles.includes('Teacher') || 
         userRoles.includes('Student') || 
         userRoles.includes('Parent')) && (
@@ -419,7 +419,7 @@ export default function DashboardLayoutClient({
                 </>
               )}
 
-              {(userRoles.includes('System Admin') || userRoles.includes('HOS')) && (
+              {(userRoles.includes('System Admin') || userRoles.includes('Head of Section')) && (
                 <>
                   <NavLink href="/dashboard/hos/marks" icon={PenLine}>
                     Section Marks Overview
@@ -539,7 +539,7 @@ export default function DashboardLayoutClient({
         userRoles.includes('Principal') || 
         userRoles.includes('Accountant') || 
         userRoles.includes('Teacher') || 
-        userRoles.includes('HOS') || 
+        userRoles.includes('Head of Section') || 
         userRoles.includes('Dean')) && (
         <>
           <SectionHeader sectionKey="hr" label="HR" />
@@ -580,7 +580,7 @@ export default function DashboardLayoutClient({
 
               {(userRoles.includes('Teacher') || 
                 userRoles.includes('Accountant') || 
-                userRoles.includes('HOS') || 
+                userRoles.includes('Head of Section') || 
                 userRoles.includes('Dean') || 
                 userRoles.includes('Principal') || 
                 userRoles.includes('Director') || 

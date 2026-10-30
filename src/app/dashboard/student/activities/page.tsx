@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import ActivitiesClient from './ActivitiesClient';
@@ -19,9 +20,7 @@ export default async function StudentActivitiesPage() {
     .eq('id', user.id)
     .single();
     
-  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : []);
+  const userRoles = normalizeRoles(profile)
 
   const isStudent = userRoles.includes('Student') || userRoles.includes('System Admin');
 

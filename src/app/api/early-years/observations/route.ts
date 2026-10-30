@@ -1,24 +1,29 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { route, ok, parseJson } from '@/lib/api/handler'
+import { MANAGEMENT_ROLES, hasAny } from '@/lib/auth/roles'
+import { assertStudentInScope, teacherClassIds } from '@/lib/api/scope'
+import { badRequest, ApiError } from '@/lib/api/errors'
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
+export const GET = route(
+  async ({ user, req, requestId }) => {
+    const { searchParams } = new URL(req.url)
     const student_id = searchParams.get('student_id')
     const term_id = searchParams.get('term_id')
     const class_id = searchParams.get('class_id')
 
+    const page = Math.max(1, Number(searchParams.get('page')) || 1)
+    const perPage = Math.min(100, Math.max(1, Number(searchParams.get('perPage')) || 50))
+    const from = (page - 1) * perPage
+    const to = from + perPage - 1
+
     const supabase = await createClient()
 
-    // Auth verification
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (student_id) {
+      await assertStudentInScope(user, student_id)
     }
 
-    let query = supabase
-      .from('learning_area_progress')
-      .select(`
+    let query = supabase.from('learning_area_progress').select(
+      `
         id,
         student_id,
         term_id,
@@ -32,11 +37,26 @@ export async function GET(request: NextRequest) {
         evidence_url,
         is_final,
         created_at
-      `)
+      `,
+      { count: 'exact' }
+    )
 
     if (student_id) {
       query = query.eq('student_id', student_id)
+    } else if (user.roles.includes('Student')) {
+      query = query.eq('student_id', user.id)
+    } else if (user.roles.includes('Parent')) {
+      const { data: parentLinks } = await supabase
+        .from('student_parents')
+        .select('student_id')
+        .eq('parent_id', user.id)
+      const childIds = (parentLinks || []).map((l: { student_id: string }) => l.student_id)
+      query = query.in('student_id', childIds.length > 0 ? childIds : ['00000000-0000-0000-0000-000000000000'])
+    } else if (user.roles.includes('Teacher') && !hasAny(user.roles, MANAGEMENT_ROLES)) {
+      const classIds = await teacherClassIds(user.id)
+      query = query.in('class_id', classIds.length > 0 ? classIds : ['00000000-0000-0000-0000-000000000000'])
     }
+
     if (term_id) {
       query = query.eq('term_id', term_id)
     }
@@ -44,40 +64,43 @@ export async function GET(request: NextRequest) {
       query = query.eq('class_id', class_id)
     }
 
-    const { data, error } = await query.order('created_at', { ascending: false }).limit(200)
+    const { data, count, error } = await query
+      .order('created_at', { ascending: false })
+      .range(from, to)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      throw new ApiError('INTERNAL', 'Failed to fetch observations')
     }
 
-    return NextResponse.json({ data })
-  } catch (error: any) {
-    console.error('Fetch observations error:', error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
-  }
-}
+    return ok(data || [], {
+      requestId,
+      total: count || 0,
+      page,
+      perPage,
+    })
+  },
+  { roles: [...MANAGEMENT_ROLES, 'Teacher', 'Student', 'Parent'] }
+)
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = route(
+  async ({ user, req, requestId }) => {
     const supabase = await createClient()
 
-    // 1. Verify Auth
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const body = await parseJson<{
+      id?: string
+      student_id?: string
+      term_id?: string
+      class_id?: string
+      learning_area?: string
+      achievement_level?: string
+      teacher_observation?: string
+      next_steps?: string
+      age_band?: string
+      characteristics?: unknown[]
+      evidence_url?: string | null
+      is_final?: boolean
+    }>(req)
 
-    // 2. Role verification
-    const { data: roleData } = await supabase.rpc('get_user_role', { user_id: user.id })
-    const userRole = (roleData || '').toString()
-
-    const ALLOWED_ROLES = ['Teacher', 'Principal', 'Dean', 'HOS', 'System Admin', 'Director']
-    if (!ALLOWED_ROLES.includes(userRole)) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 })
-    }
-
-    // 3. Parse Request Body
-    const body = await request.json()
     const {
       id,
       student_id,
@@ -90,14 +113,15 @@ export async function POST(request: NextRequest) {
       age_band,
       characteristics,
       evidence_url,
-      is_final
+      is_final,
     } = body
 
     if (!student_id || !term_id || !learning_area || !achievement_level || !teacher_observation) {
-      return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 })
+      throw badRequest({ fields: 'Missing required parameters' })
     }
 
-    // 4. Direct update if id is provided
+    await assertStudentInScope(user, student_id)
+
     if (id) {
       const { error: updateErr } = await supabase
         .from('learning_area_progress')
@@ -111,15 +135,14 @@ export async function POST(request: NextRequest) {
           characteristics: characteristics || [],
           evidence_url: evidence_url || null,
           is_final: Boolean(is_final),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', id)
 
-      if (updateErr) throw updateErr
-      return NextResponse.json({ success: true })
+      if (updateErr) throw new ApiError('INTERNAL', 'Failed to update observation')
+      return ok({ success: true }, { requestId })
     }
 
-    // 4. Upsert/Insert logic to prevent duplicate final observations per student/term/area
     if (is_final) {
       const { data: existing } = await supabase
         .from('learning_area_progress')
@@ -141,34 +164,13 @@ export async function POST(request: NextRequest) {
             age_band: age_band || '',
             characteristics: characteristics || [],
             evidence_url: evidence_url || null,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('id', existing.id)
 
-        if (updateErr) throw updateErr
+        if (updateErr) throw new ApiError('INTERNAL', 'Failed to update final observation')
       } else {
-        const { error: insertErr } = await supabase
-          .from('learning_area_progress')
-          .insert({
-            student_id,
-            term_id,
-            class_id: class_id || null,
-            learning_area,
-            achievement_level,
-            teacher_observation,
-            next_steps: next_steps || '',
-            age_band: age_band || '',
-            characteristics: characteristics || [],
-            evidence_url: evidence_url || null,
-            is_final: true
-          })
-
-        if (insertErr) throw insertErr
-      }
-    } else {
-      const { error: insertErr } = await supabase
-        .from('learning_area_progress')
-        .insert({
+        const { error: insertErr } = await supabase.from('learning_area_progress').insert({
           student_id,
           term_id,
           class_id: class_id || null,
@@ -179,58 +181,60 @@ export async function POST(request: NextRequest) {
           age_band: age_band || '',
           characteristics: characteristics || [],
           evidence_url: evidence_url || null,
-          is_final: false
+          is_final: true,
         })
 
-      if (insertErr) throw insertErr
+        if (insertErr) throw new ApiError('INTERNAL', 'Failed to create final observation')
+      }
+    } else {
+      const { error: insertErr } = await supabase.from('learning_area_progress').insert({
+        student_id,
+        term_id,
+        class_id: class_id || null,
+        learning_area,
+        achievement_level,
+        teacher_observation,
+        next_steps: next_steps || '',
+        age_band: age_band || '',
+        characteristics: characteristics || [],
+        evidence_url: evidence_url || null,
+        is_final: false,
+      })
+
+      if (insertErr) throw new ApiError('INTERNAL', 'Failed to create draft observation')
     }
 
-    return NextResponse.json({ success: true })
-  } catch (error: any) {
-    console.error('Save observation error:', error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
-  }
-}
+    return ok({ success: true }, { requestId }, 201)
+  },
+  { roles: [...MANAGEMENT_ROLES, 'Teacher'] }
+)
 
-export async function DELETE(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
+export const DELETE = route(
+  async ({ user, req, requestId }) => {
+    const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
-
-    if (!id) {
-      return NextResponse.json({ error: 'Missing observation id' }, { status: 400 })
-    }
+    if (!id) throw badRequest({ id: 'Missing observation id' })
 
     const supabase = await createClient()
 
-    // 1. Verify Auth
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // 2. Role verification
-    const { data: roleData } = await supabase.rpc('get_user_role', { user_id: user.id })
-    const userRole = (roleData || '').toString()
-
-    const ALLOWED_ROLES = ['Teacher', 'Principal', 'Dean', 'HOS', 'System Admin', 'Director']
-    if (!ALLOWED_ROLES.includes(userRole)) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 })
-    }
-
-    // 3. Perform delete
-    const { error } = await supabase
+    const { data: obs, error: fetchErr } = await supabase
       .from('learning_area_progress')
-      .delete()
+      .select('student_id')
       .eq('id', id)
+      .maybeSingle()
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (fetchErr || !obs) {
+      throw new ApiError('NOT_FOUND', 'Observation not found')
     }
 
-    return NextResponse.json({ success: true })
-  } catch (error: any) {
-    console.error('Delete observation error:', error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
-  }
-}
+    await assertStudentInScope(user, obs.student_id)
+
+    const { error } = await supabase.from('learning_area_progress').delete().eq('id', id)
+    if (error) {
+      throw new ApiError('INTERNAL', 'Failed to delete observation')
+    }
+
+    return ok({ success: true }, { requestId })
+  },
+  { roles: [...MANAGEMENT_ROLES, 'Teacher'] }
+)

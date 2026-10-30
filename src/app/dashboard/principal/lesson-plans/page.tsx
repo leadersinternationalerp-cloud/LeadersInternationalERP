@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
@@ -18,11 +19,9 @@ export default async function LessonPlanReportPage({
     .eq('id', user?.id)
     .single()
 
-  const userRoles = profile?.roles && Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile?.role ? profile.role.split(',').map((r: string) => r.trim()) : [])
+  const userRoles = normalizeRoles(profile)
 
-  const allowedRoles = ['Principal', 'Vice Principal', 'Director', 'Dean', 'Head of Section', 'HOS', 'System Admin']
+  const allowedRoles = ['Principal', 'Vice Principal', 'Director', 'Dean', 'Head of Section', 'System Admin']
   if (!userRoles.some((r: string) => allowedRoles.includes(r))) {
     return (
       <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
@@ -41,9 +40,7 @@ export default async function LessonPlanReportPage({
     .select('id, first_name, last_name, role, roles')
 
   const teachers = (profiles || []).filter(p => {
-    const roles = p.roles && Array.isArray(p.roles) && p.roles.length > 0
-      ? p.roles
-      : (p.role ? p.role.split(',').map((r: string) => r.trim()) : [])
+    const roles = normalizeRoles(p)
     return roles.includes('Teacher')
   })
 

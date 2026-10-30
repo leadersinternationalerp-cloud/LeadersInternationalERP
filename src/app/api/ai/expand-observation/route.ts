@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
+import { route, ok, parseJson } from '@/lib/api/handler'
+import { MANAGEMENT_ROLES } from '@/lib/auth/roles'
+import { badRequest } from '@/lib/api/errors'
 
 export const maxDuration = 30
 
@@ -9,7 +10,7 @@ const ACTIVE_FREE_TIER_MODELS = [
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
   'gemini-3.1-flash-lite-preview',
-  'gemini-2.5-pro'
+  'gemini-2.5-pro',
 ] as const
 
 async function resolveGeminiApiKey(): Promise<{ apiKey: string | null; source: string | null }> {
@@ -18,7 +19,7 @@ async function resolveGeminiApiKey(): Promise<{ apiKey: string | null; source: s
     { name: 'GOOGLE_API_KEY', value: process.env.GOOGLE_API_KEY },
     { name: 'GOOGLE_GENERATIVE_AI_API_KEY', value: process.env.GOOGLE_GENERATIVE_AI_API_KEY },
     { name: 'GOOGLE_GEMINI_API_KEY', value: process.env.GOOGLE_GEMINI_API_KEY },
-    { name: 'GENERATIVE_LANGUAGE_API_KEY', value: process.env.GENERATIVE_LANGUAGE_API_KEY }
+    { name: 'GENERATIVE_LANGUAGE_API_KEY', value: process.env.GENERATIVE_LANGUAGE_API_KEY },
   ]
 
   for (const candidate of envCandidates) {
@@ -52,41 +53,45 @@ async function resolveGeminiApiKey(): Promise<{ apiKey: string | null; source: s
 
 function getFallbackExpandedComment(note: string, childName?: string, learningArea?: string): string {
   const name = childName || 'The child'
-  const area = learningArea || 'this learning area'
+  const area = learningArea || 'this area'
   const trimmed = note.trim().replace(/\.+$/, '')
 
   return `${name} displays steady developmental milestone progress in ${area}. Specifically, ${trimmed.toLowerCase()}. Through structured classroom activities and peer engagement, ${name} demonstrates consistent application and enthusiasm.`
 }
 
-export async function POST(request: Request) {
-  try {
-    // 1. Authenticate user
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+export const POST = route(
+  async ({ req, requestId }) => {
+    const body = await parseJson<{
+      note?: string
+      childName?: string
+      learningArea?: string
+      achievementLevel?: string
+    }>(req)
 
-    const body = await request.json()
-    const { note, childName = 'The child', learningArea = 'this area', achievementLevel = 'Developed' } = body
+    const {
+      note,
+      childName = 'The child',
+      learningArea = 'this area',
+      achievementLevel = 'Developed',
+    } = body
 
     if (!note || typeof note !== 'string' || !note.trim()) {
-      return NextResponse.json({ error: 'Please enter a draft note to expand.' }, { status: 400 })
+      throw badRequest({ note: 'Please enter a draft note to expand.' })
     }
 
     const { apiKey, source: keySource } = await resolveGeminiApiKey()
 
-    // Fallback if no key configured
     if (!apiKey) {
       const fallbackText = getFallbackExpandedComment(note, childName, learningArea)
-      return NextResponse.json({
-        success: true,
-        source: 'local-fallback',
-        expandedText: fallbackText
-      })
+      return ok(
+        {
+          source: 'local-fallback',
+          expandedText: fallbackText,
+        },
+        { requestId }
+      )
     }
 
-    // Initialize Gemini AI
     const genAI = new GoogleGenerativeAI(apiKey)
     const prompt = `You are an Early Years Foundation Stage (EYFS) educational specialist.
 Your task is to take the following brief teacher note for a child named "${childName}" in the learning area "${learningArea}" (Achievement Level: "${achievementLevel}") and expand it into a professional 3 to 4 sentence developmental observation narrative.
@@ -110,8 +115,8 @@ Teacher's Note: "${note.trim()}"`
           expandedText = text.trim().replace(/^["']|["']$/g, '')
           break
         }
-      } catch (e: any) {
-        console.warn(`Gemini model ${modelName} attempt error:`, e?.message || e)
+      } catch (e: unknown) {
+        console.warn(`Gemini model ${modelName} attempt error:`, e)
       }
     }
 
@@ -119,14 +124,16 @@ Teacher's Note: "${note.trim()}"`
       expandedText = getFallbackExpandedComment(note, childName, learningArea)
     }
 
-    return NextResponse.json({
-      success: true,
-      source: keySource ? 'gemini-api' : 'local-fallback',
-      expandedText
-    })
-
-  } catch (error: any) {
-    console.error('AI expand-observation endpoint error:', error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+    return ok(
+      {
+        source: keySource ? 'gemini-api' : 'local-fallback',
+        expandedText,
+      },
+      { requestId }
+    )
+  },
+  {
+    roles: [...MANAGEMENT_ROLES, 'Teacher'],
+    rateLimit: { key: 'ai-expand', max: 20, windowMs: 3600_000 },
   }
-}
+)
