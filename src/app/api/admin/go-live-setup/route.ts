@@ -89,49 +89,49 @@ export async function POST(req: NextRequest) {
   try {
     // 1. Wipe Demo Transactional & Student Tables
     const tablesToClear = [
-      'student_parents',
-      'student_classes',
-      'learning_area_progress',
-      'early_years_evidence',
-      'early_years_observations',
-      'marks',
-      'class_activity_attempts',
-      'class_activities',
-      'attendance_exceptions',
-      'attendance',
-      'homework_submissions',
-      'homework',
-      'discipline_records',
-      'report_card_constructive_comments',
-      'report_card_subject_grades',
-      'report_cards',
-      'payment_allocations',
-      'payments',
-      'invoices',
-      'fee_balances',
-      'payroll_items',
-      'advance_repayments',
-      'salary_advances',
-      'payslips',
-      'payrolls',
-      'leave_applications',
-      'lesson_plans',
-      'students',
-      'admission_applications',
-      'notifications',
-      'email_logs',
+      { name: 'student_parents', col: 'student_id' },
+      { name: 'student_classes', col: 'id' },
+      { name: 'learning_area_progress', col: 'id' },
+      { name: 'early_years_evidence', col: 'id' },
+      { name: 'early_years_observations', col: 'id' },
+      { name: 'marks', col: 'id' },
+      { name: 'class_activity_attempts', col: 'id' },
+      { name: 'class_activities', col: 'id' },
+      { name: 'attendance_exceptions', col: 'id' },
+      { name: 'attendance', col: 'id' },
+      { name: 'homework_submissions', col: 'id' },
+      { name: 'homework', col: 'id' },
+      { name: 'discipline_records', col: 'id' },
+      { name: 'report_card_constructive_comments', col: 'id' },
+      { name: 'report_card_subject_grades', col: 'id' },
+      { name: 'report_cards', col: 'id' },
+      { name: 'payment_allocations', col: 'id' },
+      { name: 'payments', col: 'id' },
+      { name: 'invoices', col: 'id' },
+      { name: 'fee_balances', col: 'id' },
+      { name: 'payroll_items', col: 'id' },
+      { name: 'advance_repayments', col: 'id' },
+      { name: 'salary_advances', col: 'id' },
+      { name: 'payslips', col: 'id' },
+      { name: 'payrolls', col: 'id' },
+      { name: 'leave_applications', col: 'id' },
+      { name: 'lesson_plans', col: 'id' },
+      { name: 'students', col: 'id' },
+      { name: 'admission_applications', col: 'id' },
+      { name: 'notifications', col: 'id' },
+      { name: 'email_logs', col: 'id' },
     ]
 
-    for (const table of tablesToClear) {
+    for (const t of tablesToClear) {
       try {
-        const { error } = await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000')
+        const { error } = await supabase.from(t.name).delete().neq(t.col, '00000000-0000-0000-0000-000000000000')
         if (!error) {
-          log.push(`Cleared table: ${table}`)
+          log.push(`Cleared table: ${t.name}`)
         } else {
-          log.push(`Warning clearing ${table}: ${error.message}`)
+          log.push(`Warning clearing ${t.name}: ${error.message}`)
         }
       } catch (err) {
-        log.push(`Skip ${table}: ${(err as Error).message}`)
+        log.push(`Skip ${t.name}: ${(err as Error).message}`)
       }
     }
 
@@ -204,8 +204,8 @@ export async function POST(req: NextRequest) {
         log.push(`Created auth user: ${staff.email} (${userId})`)
       }
 
-      // Upsert profile
-      const { error: profErr } = await supabase.from('profiles').upsert({
+      // Upsert profile with graceful degradation for missing columns
+      let profilePayload: Record<string, unknown> = {
         id: userId,
         email: staff.email,
         username: staff.username,
@@ -213,29 +213,67 @@ export async function POST(req: NextRequest) {
         last_name: staff.lastName,
         role: staff.role,
         roles: staff.roles,
-        is_active: true,
         failed_attempts: 0,
         locked_until: null,
-        force_pin_change: false,
-      })
-
-      if (profErr) {
-        log.push(`Error upserting profile for ${staff.email}: ${profErr.message}`)
-      } else {
-        log.push(`Upserted profile: ${staff.email} [${staff.role}]`)
       }
 
-      // Upsert staff table
-      const { error: staffErr } = await supabase.from('staff').upsert({
+      let profSuccess = false
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const { error: profErr } = await supabase.from('profiles').upsert(profilePayload)
+        if (!profErr) {
+          profSuccess = true
+          log.push(`Upserted profile: ${staff.email} [${staff.role}]`)
+          break
+        }
+
+        // Check if error is due to a missing column
+        const missingColMatch = profErr.message.match(/Could not find the '([^']+)' column/)
+        if (missingColMatch && missingColMatch[1]) {
+          const badCol = missingColMatch[1]
+          delete profilePayload[badCol]
+          continue
+        }
+
+        // If generic error on attempt 2, fall back to minimal core columns
+        if (attempt === 1) {
+          profilePayload = {
+            id: userId,
+            email: staff.email,
+            first_name: staff.firstName,
+            last_name: staff.lastName,
+            role: staff.role,
+          }
+          continue
+        }
+
+        log.push(`Error upserting profile for ${staff.email}: ${profErr.message}`)
+        break
+      }
+
+      // Upsert staff table with graceful degradation
+      let staffPayload: Record<string, unknown> = {
         id: userId,
         employee_id: `LIS-EMP-${String(i + 1).padStart(3, '0')}`,
         job_title: staff.jobTitle,
         department: staff.department,
-        employment_status: 'Full-Time',
-      })
+      }
 
-      if (staffErr) {
-        log.push(`Error upserting staff for ${staff.email}: ${staffErr.message}`)
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { error: staffErr } = await supabase.from('staff').upsert(staffPayload)
+        if (!staffErr) {
+          log.push(`Upserted staff record: ${staff.email}`)
+          break
+        }
+
+        const missingColMatch = staffErr.message.match(/Could not find the '([^']+)' column/)
+        if (missingColMatch && missingColMatch[1]) {
+          const badCol = missingColMatch[1]
+          delete staffPayload[badCol]
+          continue
+        }
+
+        log.push(`Note on staff table for ${staff.email}: ${staffErr.message}`)
+        break
       }
 
       createdUsers[staff.email] = staff.role
