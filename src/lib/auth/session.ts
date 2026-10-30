@@ -14,7 +14,7 @@ export const getApiUser = cache(async (): Promise<ApiUser | null> => {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, roles, is_active')
+    .select('*')
     .eq('id', user.id)
     .single()
 
@@ -34,7 +34,7 @@ export const getSessionUser = cache(async () => {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, first_name, last_name, email, role, roles, force_pin_change, is_active')
+    .select('*')
     .eq('id', user.id)
     .single()
 

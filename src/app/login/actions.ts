@@ -25,14 +25,16 @@ export async function loginAction(prevState: FormState, formData: FormData): Pro
     return { error: 'Invalid username/email or password/PIN' }
   }
 
-  // 1. Resolve email and fetch profile by username or email
+  // 1. Resolve email and fetch profile by username or email (case-insensitive & safe against schema drift)
+  const termLower = term.toLowerCase()
   const { data: profile, error: profileError } = await serviceClient
     .from('profiles')
-    .select('id, email, role, roles, failed_attempts, locked_until, force_pin_change')
-    .or([`username.eq.${term}`, `email.eq.${term}`].join(','))
+    .select('*')
+    .or([`username.ilike.${termLower}`, `email.ilike.${termLower}`].join(','))
     .maybeSingle()
 
   if (profileError || !profile) {
+    console.error('[loginAction] Profile resolution failed for:', term, profileError)
     return { error: 'Invalid username/email or password/PIN' }
   }
 

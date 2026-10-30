@@ -3,6 +3,60 @@ import { createServiceClient } from '@/utils/supabase/service'
 
 export const runtime = 'nodejs'
 
+export async function GET(req: NextRequest) {
+  const setupKey = req.headers.get('x-setup-key') || req.nextUrl.searchParams.get('key')
+  if (setupKey !== '20271234') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const email = req.nextUrl.searchParams.get('email') || 'admissions@leaderinternationalschool.ac.tz'
+  const password = req.nextUrl.searchParams.get('password') || '20271234'
+
+  const supabase = createServiceClient()
+
+  // Diagnostic 1: Query profiles with *
+  const { data: profStar, error: errStar } = await supabase
+    .from('profiles')
+    .select('*')
+    .or(`username.eq.${email},email.eq.${email}`)
+    .maybeSingle()
+
+  // Diagnostic 2: Query profiles with exact loginAction query
+  const { data: profExact, error: errExact } = await supabase
+    .from('profiles')
+    .select('id, email, role, roles, failed_attempts, locked_until, force_pin_change')
+    .or(`username.eq.${email},email.eq.${email}`)
+    .maybeSingle()
+
+  // Diagnostic 3: Supabase Auth direct sign in
+  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
+
+  // Diagnostic 4: List auth user details
+  const { data: authUser, error: authUserErr } = await supabase.auth.admin.getUserById(profStar?.id || '')
+
+  return NextResponse.json({
+    email,
+    profStar,
+    errStar: errStar ? { message: errStar.message, code: errStar.code } : null,
+    profExact,
+    errExact: errExact ? { message: errExact.message, code: errExact.code } : null,
+    authSuccess: !!authData?.user,
+    authError: authError ? { message: authError.message, status: authError.status } : null,
+    authUser: authUser?.user ? {
+      id: authUser.user.id,
+      email: authUser.user.email,
+      confirmed_at: authUser.user.confirmed_at,
+      email_confirmed_at: authUser.user.email_confirmed_at,
+      banned_until: authUser.user.banned_until,
+      user_metadata: authUser.user.user_metadata,
+    } : null,
+    authUserErr: authUserErr ? authUserErr.message : null,
+  })
+}
+
 const OFFICIAL_STAFF = [
   {
     email: 'admissions@leaderinternationalschool.ac.tz',
