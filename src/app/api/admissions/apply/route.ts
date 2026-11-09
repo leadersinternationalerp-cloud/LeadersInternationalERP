@@ -69,6 +69,8 @@ interface ApplyPayload {
   additional?: string
   additionalNotes?: string
   source?: string
+  registeredBy?: string
+  salesAgentName?: string
 }
 
 function cleanStr(val: unknown): string {
@@ -231,6 +233,8 @@ export const POST = route(
       special_talents_interests: clubs.join(', ') || null,
       additional_notes: additional || null,
       source: cleanStr(body.source) || 'website',
+      registered_by: cleanStr(body.registeredBy) || null,
+      sales_agent_name: cleanStr(body.salesAgentName) || null,
       pdf_sent_to_school: false,
       pdf_sent_to_parent: false,
     })

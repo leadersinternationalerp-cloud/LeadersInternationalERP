@@ -185,7 +185,8 @@ export default function DashboardLayoutClient({
         userRoles.includes('Dean') || 
         userRoles.includes('Head of Section') || 
         userRoles.includes('Accountant') || 
-        userRoles.includes('Teacher')) && (
+        userRoles.includes('Teacher') ||
+        userRoles.includes('Sales')) && (
         <>
           <SectionHeader sectionKey="management" label="Management" />
           {expandedSections.management && (
@@ -195,7 +196,8 @@ export default function DashboardLayoutClient({
                 userRoles.includes('Principal') || 
                 userRoles.includes('Dean') || 
                 userRoles.includes('Head of Section') || 
-                userRoles.includes('Accountant')) && (
+                userRoles.includes('Accountant') ||
+                userRoles.includes('Sales')) && (
                 <NavLink href="/dashboard" icon={LayoutDashboard}>
                   Dashboard Overview
                 </NavLink>
@@ -211,7 +213,8 @@ export default function DashboardLayoutClient({
                 userRoles.includes('Director') ||
                 userRoles.includes('Principal') ||
                 userRoles.includes('Head of Section') ||
-                userRoles.includes('Dean')) && (
+                userRoles.includes('Dean') ||
+                userRoles.includes('Sales')) && (
                 <NavLink href="/dashboard/principal/admissions" icon={FileSpreadsheet}>
                   Admissions Desk
                 </NavLink>
@@ -373,7 +376,8 @@ export default function DashboardLayoutClient({
         userRoles.includes('Head of Section') || 
         userRoles.includes('Teacher') || 
         userRoles.includes('Student') || 
-        userRoles.includes('Parent')) && (
+        userRoles.includes('Parent') ||
+        userRoles.includes('Sales')) && (
         <>
           <SectionHeader sectionKey="academics" label="Academics" />
           {expandedSections.academics && (
@@ -385,7 +389,8 @@ export default function DashboardLayoutClient({
               {(userRoles.includes('System Admin') || 
                 userRoles.includes('Director') || 
                 userRoles.includes('Principal') || 
-                userRoles.includes('Teacher')) && (
+                userRoles.includes('Teacher') ||
+                userRoles.includes('Sales')) && (
                 <NavLink href="/dashboard/students" icon={Users}>
                   Students List
                 </NavLink>

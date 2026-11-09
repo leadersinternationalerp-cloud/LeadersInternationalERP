@@ -18,6 +18,7 @@ export default async function StudentsPage({
     'Dean',
     'Head of Section',
     'Teacher',
+    'Sales',
   ])
   const { user, roles, supabase } = session
 
@@ -35,7 +36,6 @@ export default async function StudentsPage({
     !roles.includes('System Admin') &&
     !roles.includes('Director') &&
     !roles.includes('Principal') &&
-    !roles.includes('Head of Section') &&
     !roles.includes('Head of Section') &&
     !roles.includes('Dean')
 
@@ -58,6 +58,9 @@ export default async function StudentsPage({
       grade_level,
       section,
       class_id,
+      source,
+      sales_agent_name,
+      is_active,
       created_at,
       profiles (first_name, last_name, email, phone)
     `,
@@ -97,6 +100,9 @@ export default async function StudentsPage({
       photo_url: `/api/students/photo?student_id=${s.id}`,
       parent_contact: singleProfile?.phone || 'No phone',
       class_id: s.class_id,
+      source: s.source || 'website',
+      sales_agent_name: s.sales_agent_name,
+      is_active: s.is_active,
       profiles: singleProfile
         ? {
             first_name: singleProfile.first_name,

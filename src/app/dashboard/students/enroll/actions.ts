@@ -9,7 +9,7 @@ import { getSessionUser } from '@/lib/auth/session'
 import { hasAnyRole } from '@/lib/auth/roles'
 import { sanitizePostgrestValue, escapeLike } from '@/lib/sanitize'
 
-const ALLOWED_STAFF_ROLES = ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section'] as const
+const ALLOWED_STAFF_ROLES = ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section', 'Sales'] as const
 
 export async function searchParentsAction(query: string) {
   const session = await getSessionUser()
@@ -212,13 +212,19 @@ export async function updateStudentAction(studentId: string, formData: any) {
     return { error: `Failed to update profile: ${profileError.message}` }
   }
 
-  // 2. Resolve Class ID based on grade level and section
-  let classId = null
+  // 2. Resolve Class ID based on direct selection or grade level and section
+  let classId = formData.class_id || null
   const { data: classList } = await supabaseService
     .from('classes')
-    .select('id, name, section')
+    .select('id, name, section, grade_level')
 
-  if (classList && classList.length > 0) {
+  if (classId && classList) {
+    const matched = classList.find(c => c.id === classId)
+    if (matched) {
+      if (!formData.grade_level) formData.grade_level = matched.grade_level || matched.name
+      if (!formData.section && matched.section) formData.section = matched.section
+    }
+  } else if (classList && classList.length > 0) {
     const searchName = `${formData.grade_level} ${formData.section || ''}`.trim().toLowerCase()
     const exactNameMatch = classList.find(c => (c.name || '').toLowerCase() === searchName)
     if (exactNameMatch) {
@@ -384,3 +390,102 @@ export async function cleanupOldInactiveStudents(dryRun: boolean = true) {
 
   return { success: true, count: deleteCount, dryRun: false }
 }
+
+export async function generateSingleStudentInvoiceAction(
+  studentId: string,
+  term: string = 'Term 1',
+  academicYear: string = '2026/2027',
+  dueDate?: string
+) {
+  const session = await getSessionUser()
+  if (!session.user || !hasAnyRole(session.roles, ALLOWED_STAFF_ROLES)) {
+    return { error: 'Unauthorized to generate student invoices' }
+  }
+
+  const supabase = createServiceClient()
+
+  // 1. Fetch student details
+  const { data: student, error: stError } = await supabase
+    .from('students')
+    .select('id, student_id, grade_level, section')
+    .eq('id', studentId)
+    .single()
+
+  if (stError || !student) {
+    return { error: `Student not found: ${stError?.message || ''}` }
+  }
+
+  // 2. Fetch fee structures for this grade level
+  const { data: feeStructures, error: feeError } = await supabase
+    .from('fee_structures')
+    .select('*')
+    .ilike('grade_level', `%${student.grade_level}%`)
+
+  if (feeError || !feeStructures || feeStructures.length === 0) {
+    return {
+      error: `No fee structures configured for grade level "${student.grade_level}". Please add fee structures under Finance -> Fee Structures first.`,
+    }
+  }
+
+  // 3. Check for existing invoice in this term to avoid duplicate billing
+  const { data: existingInv } = await supabase
+    .from('invoices')
+    .select('id')
+    .eq('student_id', studentId)
+    .eq('term', term)
+    .eq('academic_year', academicYear)
+    .maybeSingle()
+
+  if (existingInv) {
+    return {
+      error: `An invoice for ${term} (${academicYear}) already exists for this student.`,
+      invoice_id: existingInv.id,
+    }
+  }
+
+  const totalAmount = feeStructures.reduce((sum, f) => sum + Number(f.amount), 0)
+
+  // 4. Create new invoice
+  const { data: newInvoice, error: invError } = await supabase
+    .from('invoices')
+    .insert({
+      student_id: studentId,
+      academic_year: academicYear,
+      term: term,
+      total_amount: totalAmount,
+      discount_amount: 0.0,
+      status: 'Pending',
+      due_date: dueDate || null,
+      generated_by: session.user.id,
+    })
+    .select('id')
+    .single()
+
+  if (invError || !newInvoice) {
+    return { error: `Failed to create invoice: ${invError?.message || ''}` }
+  }
+
+  // 5. Insert invoice items
+  const items = feeStructures.map((f) => ({
+    invoice_id: newInvoice.id,
+    fee_structure_id: f.id,
+    amount: f.amount,
+    description: f.fee_type || 'Tuition Fee',
+  }))
+
+  const { error: itemsError } = await supabase.from('invoice_items').insert(items)
+  if (itemsError) {
+    console.warn('Failed to insert invoice items:', itemsError.message)
+  }
+
+  revalidatePath('/dashboard/accountant/invoices')
+  revalidatePath('/dashboard/accountant/fee-balances')
+  revalidatePath('/dashboard/students')
+
+  return {
+    success: true,
+    invoice_id: newInvoice.id,
+    total_amount: totalAmount,
+  }
+}
+
