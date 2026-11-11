@@ -32,25 +32,37 @@ CREATE INDEX IF NOT EXISTS idx_students_source ON public.students(source);
 CREATE INDEX IF NOT EXISTS idx_students_registered_by ON public.students(registered_by);
 CREATE INDEX IF NOT EXISTS idx_students_admission_id ON public.students(admission_id);
 
--- 4. Update public.is_staff() to include 'Sales'
+-- 4. Ensure 'Sales' (and all canonical roles) exist on public.user_role enum if it exists
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+    ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'Sales';
+    ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'Head of Section';
+    ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'HOS';
+    ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'Dean';
+  END IF;
+END $$;
+
+-- 5. Update public.is_staff() to include 'Sales' (using role::text to safely handle enum or text)
 CREATE OR REPLACE FUNCTION public.is_staff()
 RETURNS boolean LANGUAGE sql SECURITY DEFINER AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.profiles
     WHERE id = auth.uid()
     AND (
-      role IN ('System Admin', 'Director', 'Principal', 'Dean', 'HOS', 'Head of Section', 'Accountant', 'Teacher', 'Sales')
+      role::text IN ('System Admin', 'Director', 'Principal', 'Dean', 'HOS', 'Head of Section', 'Accountant', 'Teacher', 'Sales')
       OR roles && ARRAY['System Admin', 'Director', 'Principal', 'Dean', 'HOS', 'Head of Section', 'Accountant', 'Teacher', 'Sales']
     )
   );
 $$;
 
--- 5. Extend RLS on admission_applications for Sales
+-- 6. Extend RLS on admission_applications for Sales
 DROP POLICY IF EXISTS "Staff can view admission applications" ON public.admission_applications;
 CREATE POLICY "Staff can view admission applications" ON public.admission_applications
 FOR SELECT TO authenticated
 USING (
-  public.has_any_role(ARRAY['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section', 'HOS', 'Accountant', 'Sales'])
+  public.has_any_role(ARRAY['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section', 'HOS', 'Accountant'])
+  OR (public.has_role('Sales') AND registered_by = auth.uid())
 );
 
 DROP POLICY IF EXISTS "Staff can insert admission applications" ON public.admission_applications;

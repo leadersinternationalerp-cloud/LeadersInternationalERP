@@ -37,11 +37,23 @@ export default async function PrincipalAdmissionsPage() {
     console.warn('[admissions/page] auto-purge notice:', purgeErr)
   }
 
-  // 2. Fetch all admission applications
-  const { data, error } = await supabase
+  const isSalesOnly = session.roles.includes('Sales') && !session.roles.some((r) =>
+    ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section', 'Accountant'].includes(r)
+  )
+
+  const agentFullName = `${session.profile?.first_name || ''} ${session.profile?.last_name || ''}`.trim()
+
+  // 2. Fetch admission applications (Sales users only see learners attributed to them)
+  let appsQuery = supabase
     .from('admission_applications')
     .select('*')
     .order('created_at', { ascending: false })
+
+  if (isSalesOnly) {
+    appsQuery = appsQuery.eq('registered_by', session.user.id)
+  }
+
+  const { data, error } = await appsQuery
 
   if (error) {
     console.error('[admissions/page] failed to fetch applications:', error)
@@ -53,15 +65,20 @@ export default async function PrincipalAdmissionsPage() {
     .select('id, name, class_name, section, grade_level')
     .order('name', { ascending: true })
 
-  // 4. Defensively filter out purged records
+  // 4. Defensively filter out purged records and enforce Sales attribution scope
   const applications: AdmissionApplication[] = ((data || []) as AdmissionApplication[]).filter(
-    (app) =>
-      !PURGED_APPLICATION_NOS.includes(app.application_no) &&
-      !PURGED_EMAILS.includes(app.parent_email?.toLowerCase())
-  )
-
-  const isSalesOnly = session.roles.includes('Sales') && !session.roles.some((r) =>
-    ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section'].includes(r)
+    (app) => {
+      if (
+        PURGED_APPLICATION_NOS.includes(app.application_no) ||
+        PURGED_EMAILS.includes(app.parent_email?.toLowerCase())
+      ) {
+        return false
+      }
+      if (isSalesOnly) {
+        return app.registered_by === session.user.id
+      }
+      return true
+    }
   )
 
   return (

@@ -39,7 +39,7 @@ export default async function UsersPage() {
     last_name: u.last_name || '',
     email: u.email || '',
     username: u.username || '',
-    role: u.role || '',
+    role: normalizeRoles(u)[0] || u.role || '',
     is_active: u.is_active ?? true,
     created_at: u.created_at
   }))

@@ -99,7 +99,7 @@ export async function updateSession(request: NextRequest) {
   // If user is authenticated and navigating to a role-scoped dashboard path, enforce ACL
   if (user && pathname.startsWith('/dashboard')) {
     const allowedRoles = getAllowedRolesForPath(pathname)
-    if (allowedRoles) {
+    if (allowedRoles || pathname === '/dashboard') {
       const { data: profile } = await supabase
         .from('profiles')
         .select('role, roles')
@@ -107,10 +107,18 @@ export async function updateSession(request: NextRequest) {
         .single()
 
       const roles = normalizeRoles(profile)
-      if (!hasAnyRole(roles, allowedRoles)) {
+      const isSalesOnly = roles.length === 1 && roles[0] === 'Sales'
+
+      if (isSalesOnly && !pathname.startsWith('/dashboard/principal/admissions') && !pathname.startsWith('/dashboard/profile') && !pathname.startsWith('/dashboard/notifications')) {
         const url = request.nextUrl.clone()
-        url.pathname = '/dashboard'
-        url.searchParams.set('denied', '1')
+        url.pathname = '/dashboard/principal/admissions'
+        return NextResponse.redirect(url)
+      }
+
+      if (allowedRoles && !hasAnyRole(roles, allowedRoles)) {
+        const url = request.nextUrl.clone()
+        url.pathname = isSalesOnly ? '/dashboard/principal/admissions' : '/dashboard'
+        if (!isSalesOnly) url.searchParams.set('denied', '1')
         return NextResponse.redirect(url)
       }
     }

@@ -47,6 +47,16 @@ export async function updateApplicationStatusAction(
   }
 
   const supabase = createServiceClient()
+
+  // Sales users can only update applications attributed to them
+  const isManagement = hasAnyRole(session.roles, [
+    'System Admin',
+    'Director',
+    'Principal',
+    'Dean',
+    'Head of Section',
+  ])
+
   const updateData: Record<string, unknown> = {
     status: newStatus,
     updated_at: new Date().toISOString(),
@@ -57,10 +67,16 @@ export async function updateApplicationStatusAction(
     updateData.notes = notes
   }
 
-  const { error } = await supabase
+  let query = supabase
     .from('admission_applications')
     .update(updateData)
     .eq('id', id)
+
+  if (!isManagement) {
+    query = query.eq('registered_by', session.user.id)
+  }
+
+  const { error } = await query
 
   if (error) {
     console.error('[admissions/actions] update failed:', error)
@@ -93,6 +109,18 @@ export async function enrollLearnerAction(
 
   if (appError || !app) {
     return { error: `Application not found: ${appError?.message || ''}` }
+  }
+
+  const isManagement = hasAnyRole(session.roles, [
+    'System Admin',
+    'Director',
+    'Principal',
+    'Dean',
+    'Head of Section',
+  ])
+
+  if (!isManagement && app.registered_by !== session.user.id) {
+    return { error: 'Unauthorized: You can only manage learners attributed to you' }
   }
 
   // If already enrolled and has student record, check if student exists

@@ -421,7 +421,9 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
             )}
           </div>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginTop: '0.25rem', margin: 0 }}>
-            Online submissions from website, sales agent registrations, 1-click student enrollment, and official 2027 PDF forms.
+            {currentUser?.isSales
+              ? `Register new learner applications and track learners attributed to ${currentUser.name}.`
+              : 'Online submissions from website, sales agent registrations, 1-click student enrollment, and official 2027 PDF forms.'}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -434,13 +436,15 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
             <span>+ Register Learner</span>
           </button>
 
-          <Link
-            href="/dashboard/students"
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
-          >
-            <GraduationCap size={16} className="text-slate-500" />
-            <span>Students List</span>
-          </Link>
+          {!currentUser?.isSales && (
+            <Link
+              href="/dashboard/students"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+            >
+              <GraduationCap size={16} className="text-slate-500" />
+              <span>Students List</span>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -474,10 +478,12 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
       )}
 
       {/* 2. Stat Cards / KPI Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${currentUser?.isSales ? 'lg:grid-cols-3' : 'lg:grid-cols-5'} gap-3.5`}>
         <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Applications</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              {currentUser?.isSales ? 'My Registered Learners' : 'Total Applications'}
+            </span>
             <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-slate-200/80 transition-colors">
               <FileText size={18} />
             </div>
@@ -485,7 +491,9 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
           <div className="text-2xl font-extrabold text-slate-900 font-[Outfit]">
             {metrics.total}
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">All registered learners</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">
+            {currentUser?.isSales ? `Attributed to ${currentUser.name}` : 'All registered learners'}
+          </div>
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-slate-400 to-slate-600 opacity-60 group-hover:opacity-100 transition-opacity" />
         </div>
 
@@ -513,37 +521,41 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
           <div className="text-2xl font-extrabold text-slate-900 font-[Outfit]">
             {metrics.enrolled}
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Placed in students list</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Placed in school classes</div>
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 to-teal-600 opacity-60 group-hover:opacity-100 transition-opacity" />
         </div>
 
-        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">Sales Attribution</span>
-            <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100 transition-colors">
-              <User size={18} />
+        {!currentUser?.isSales && (
+          <>
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">Sales Attribution</span>
+                <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100 transition-colors">
+                  <User size={18} />
+                </div>
+              </div>
+              <div className="text-2xl font-extrabold text-slate-900 font-[Outfit]">
+                {metrics.salesCount}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Registered by sales agents</div>
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-400 to-indigo-600 opacity-60 group-hover:opacity-100 transition-opacity" />
             </div>
-          </div>
-          <div className="text-2xl font-extrabold text-slate-900 font-[Outfit]">
-            {metrics.salesCount}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Registered by sales agents</div>
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-400 to-indigo-600 opacity-60 group-hover:opacity-100 transition-opacity" />
-        </div>
 
-        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">Website Direct</span>
-            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100 transition-colors">
-              <Sparkles size={18} />
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">Website Direct</span>
+                <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100 transition-colors">
+                  <Sparkles size={18} />
+                </div>
+              </div>
+              <div className="text-2xl font-extrabold text-slate-900 font-[Outfit]">
+                {metrics.websiteCount}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Attributed to (website)</div>
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-emerald-600 opacity-60 group-hover:opacity-100 transition-opacity" />
             </div>
-          </div>
-          <div className="text-2xl font-extrabold text-slate-900 font-[Outfit]">
-            {metrics.websiteCount}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Attributed to (website)</div>
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-emerald-600 opacity-60 group-hover:opacity-100 transition-opacity" />
-        </div>
+          </>
+        )}
       </div>
 
       {/* 3. Search and Filters Toolbar */}
@@ -575,16 +587,18 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
             <option value="rejected">Declined</option>
           </select>
 
-          {/* Attribution Filter */}
-          <select
-            value={attributionFilter}
-            onChange={(e) => setAttributionFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl text-sm border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
-          >
-            <option value="all">All Attributions</option>
-            <option value="website">Attributed to: (website)</option>
-            <option value="sales">Attributed to: Sales Agents</option>
-          </select>
+          {/* Attribution Filter (Management only) */}
+          {!currentUser?.isSales && (
+            <select
+              value={attributionFilter}
+              onChange={(e) => setAttributionFilter(e.target.value)}
+              className="px-3 py-2 rounded-xl text-sm border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+            >
+              <option value="all">All Attributions</option>
+              <option value="website">Attributed to: (website)</option>
+              <option value="sales">Attributed to: Sales Agents</option>
+            </select>
+          )}
 
           {/* Curriculum Filter */}
           <select
@@ -785,27 +799,29 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                             <span>Review</span>
                           </button>
 
-                          {/* 1-Click Enroll Button (if not already enrolled) */}
-                          {!isEnrolled ? (
-                            <button
-                              type="button"
-                              onClick={() => handleEnrollLearner(app.id)}
-                              disabled={isPending}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-2xs transition-all active:scale-95"
-                              title="Enroll Student in Classes & Students List"
-                            >
-                              <GraduationCap size={13} />
-                              <span>Enroll</span>
-                            </button>
-                          ) : (
-                            <Link
-                              href="/dashboard/students"
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 transition-colors"
-                              title="View Enrolled Student in Students List"
-                            >
-                              <Check size={13} />
-                              <span>Enrolled</span>
-                            </Link>
+                          {/* 1-Click Enroll Button (Management only) */}
+                          {!currentUser?.isSales && (
+                            !isEnrolled ? (
+                              <button
+                                type="button"
+                                onClick={() => handleEnrollLearner(app.id)}
+                                disabled={isPending}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-2xs transition-all active:scale-95"
+                                title="Enroll Student in Classes & Students List"
+                              >
+                                <GraduationCap size={13} />
+                                <span>Enroll</span>
+                              </button>
+                            ) : (
+                              <Link
+                                href="/dashboard/students"
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 transition-colors"
+                                title="View Enrolled Student in Students List"
+                              >
+                                <Check size={13} />
+                                <span>Enrolled</span>
+                              </Link>
+                            )
                           )}
 
                           {/* Delete Application Button */}
@@ -912,83 +928,85 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
               </div>
             </div>
 
-            {/* Enrollment Action Box (Requirement 3) */}
-            <div className="p-4 rounded-2xl bg-teal-50/70 border border-teal-200/90 shadow-xs">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <GraduationCap size={18} className="text-teal-700" />
-                  <span className="text-sm font-bold text-teal-900">School Enrollment & Class Placement</span>
+            {/* Enrollment Action Box (Management only) */}
+            {!currentUser?.isSales && (
+              <div className="p-4 rounded-2xl bg-teal-50/70 border border-teal-200/90 shadow-xs">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <GraduationCap size={18} className="text-teal-700" />
+                    <span className="text-sm font-bold text-teal-900">School Enrollment & Class Placement</span>
+                  </div>
+                  {selectedApp.status === 'enrolled' ? (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-teal-600 text-white shadow-2xs">
+                      <Check size={13} /> Active Student
+                    </span>
+                  ) : (
+                    <span className="text-xs font-semibold text-teal-700 bg-teal-100/60 px-2.5 py-0.5 rounded-md">
+                      Not Yet Enrolled
+                    </span>
+                  )}
                 </div>
+
                 {selectedApp.status === 'enrolled' ? (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-teal-600 text-white shadow-2xs">
-                    <Check size={13} /> Active Student
-                  </span>
+                  <div className="flex flex-col gap-2">
+                    <p className="text-xs text-teal-800 m-0">
+                      This learner is enrolled in the school student database! They appear in the active student directory, are placed in class, and invoices can be generated.
+                    </p>
+                    <div className="flex items-center gap-2.5 mt-2 flex-wrap">
+                      <Link
+                        href="/dashboard/students"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-teal-700 hover:bg-teal-800 text-white transition-colors"
+                      >
+                        <span>View in Students List</span>
+                        <ArrowRight size={13} />
+                      </Link>
+                      <Link
+                        href="/dashboard/accountant/invoices"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-teal-300 text-teal-800 hover:bg-teal-50 transition-colors"
+                      >
+                        <Receipt size={13} />
+                        <span>Invoices & Fee Statements</span>
+                      </Link>
+                    </div>
+                  </div>
                 ) : (
-                  <span className="text-xs font-semibold text-teal-700 bg-teal-100/60 px-2.5 py-0.5 rounded-md">
-                    Not Yet Enrolled
-                  </span>
+                  <div className="flex flex-col gap-3">
+                    <p className="text-xs text-teal-800 m-0">
+                      Marking as enrolled will create the student's official account, student ID, assign them to a class, link parents, and make them available for invoicing.
+                    </p>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex-1 min-w-[220px]">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-teal-900 block mb-1">
+                          Select Class for Placement
+                        </label>
+                        <select
+                          value={targetClassId}
+                          onChange={(e) => setTargetClassId(e.target.value)}
+                          className="w-full text-xs px-3 py-2 rounded-xl border border-teal-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        >
+                          <option value="">Auto-match class ({selectedApp.class_applied_for})</option>
+                          {classes.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name || c.class_name} {c.section ? `(${c.section})` : ''} - {c.grade_level || ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => handleEnrollLearner(selectedApp.id, targetClassId || undefined)}
+                        className="mt-4 px-4 py-2 rounded-xl text-xs font-bold bg-teal-700 hover:bg-teal-800 text-white shadow-md hover:shadow-lg active:scale-95 transition-all inline-flex items-center gap-2 cursor-pointer"
+                      >
+                        <GraduationCap size={15} />
+                        <span>Enroll Learner Now</span>
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
-
-              {selectedApp.status === 'enrolled' ? (
-                <div className="flex flex-col gap-2">
-                  <p className="text-xs text-teal-800 m-0">
-                    This learner is enrolled in the school student database! They appear in the active student directory, are placed in class, and invoices can be generated.
-                  </p>
-                  <div className="flex items-center gap-2.5 mt-2 flex-wrap">
-                    <Link
-                      href="/dashboard/students"
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-teal-700 hover:bg-teal-800 text-white transition-colors"
-                    >
-                      <span>View in Students List</span>
-                      <ArrowRight size={13} />
-                    </Link>
-                    <Link
-                      href="/dashboard/accountant/invoices"
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-teal-300 text-teal-800 hover:bg-teal-50 transition-colors"
-                    >
-                      <Receipt size={13} />
-                      <span>Invoices & Fee Statements</span>
-                    </Link>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  <p className="text-xs text-teal-800 m-0">
-                    Marking as enrolled will create the student's official account, student ID, assign them to a class, link parents, and make them available for invoicing.
-                  </p>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div className="flex-1 min-w-[220px]">
-                      <label className="text-[11px] font-bold uppercase tracking-wider text-teal-900 block mb-1">
-                        Select Class for Placement
-                      </label>
-                      <select
-                        value={targetClassId}
-                        onChange={(e) => setTargetClassId(e.target.value)}
-                        className="w-full text-xs px-3 py-2 rounded-xl border border-teal-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                      >
-                        <option value="">Auto-match class ({selectedApp.class_applied_for})</option>
-                        {classes.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name || c.class_name} {c.section ? `(${c.section})` : ''} - {c.grade_level || ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={() => handleEnrollLearner(selectedApp.id, targetClassId || undefined)}
-                      className="mt-4 px-4 py-2 rounded-xl text-xs font-bold bg-teal-700 hover:bg-teal-800 text-white shadow-md hover:shadow-lg active:scale-95 transition-all inline-flex items-center gap-2 cursor-pointer"
-                    >
-                      <GraduationCap size={15} />
-                      <span>Enroll Learner Now</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            )}
 
             {/* Candidate & Parent Information Details */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
@@ -1031,29 +1049,31 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
             {/* Status & Staff Notes */}
             <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600 }}>
-                    Change Status
-                  </label>
-                  <select
-                    className="input-field"
-                    value={selectedApp.status}
-                    disabled={isPending}
-                    onChange={(e) => handleUpdateStatus(selectedApp.id, e.target.value)}
-                  >
-                    <option value="submitted">New / Received</option>
-                    <option value="under_review">Under Review</option>
-                    <option value="interview_scheduled">Interview / Assessment Scheduled</option>
-                    <option value="accepted">Accepted (Offer Letter Issued)</option>
-                    <option value="enrolled">Enrolled in School</option>
-                    <option value="rejected">Declined</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
+                {!currentUser?.isSales && (
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+                      Change Status
+                    </label>
+                    <select
+                      className="input-field"
+                      value={selectedApp.status}
+                      disabled={isPending}
+                      onChange={(e) => handleUpdateStatus(selectedApp.id, e.target.value)}
+                    >
+                      <option value="submitted">New / Received</option>
+                      <option value="under_review">Under Review</option>
+                      <option value="interview_scheduled">Interview / Assessment Scheduled</option>
+                      <option value="accepted">Accepted (Offer Letter Issued)</option>
+                      <option value="enrolled">Enrolled in School</option>
+                      <option value="rejected">Declined</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                )}
 
                 <div className="form-group">
                   <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600 }}>
-                    Internal Staff Notes
+                    {currentUser?.isSales ? 'Application Notes' : 'Internal Staff Notes'}
                   </label>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <input

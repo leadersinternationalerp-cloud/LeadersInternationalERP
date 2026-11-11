@@ -3,8 +3,8 @@ import type { Role } from './roles'
 export const ROUTE_ACL: Record<string, readonly Role[]> = {
   '/dashboard/admin': ['System Admin'],
   '/dashboard/director': ['System Admin', 'Director'],
-  '/dashboard/principal': ['System Admin', 'Director', 'Principal'],
   '/dashboard/principal/admissions': ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section', 'Sales'],
+  '/dashboard/principal': ['System Admin', 'Director', 'Principal'],
   '/dashboard/accountant': ['System Admin', 'Accountant'],
   '/dashboard/dean': ['System Admin', 'Director', 'Principal', 'Dean'],
   '/dashboard/hos': ['System Admin', 'Director', 'Principal', 'Head of Section'],
@@ -12,8 +12,10 @@ export const ROUTE_ACL: Record<string, readonly Role[]> = {
   '/dashboard/student': ['System Admin', 'Student'],
   '/dashboard/parent': ['System Admin', 'Parent'],
   '/dashboard/staff': ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section', 'Accountant', 'Teacher'],
-  '/dashboard/students/enroll': ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section', 'Sales'],
-  '/dashboard/students': ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section', 'Teacher', 'Sales'],
+  '/dashboard/students/enroll': ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section'],
+  '/dashboard/students': ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section', 'Teacher'],
+  '/dashboard/users': ['System Admin', 'Director'],
+  '/dashboard/calendar': ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section', 'Accountant', 'Teacher', 'Student', 'Parent'],
 }
 
 export function getAllowedRolesForPath(pathname: string): readonly Role[] | null {

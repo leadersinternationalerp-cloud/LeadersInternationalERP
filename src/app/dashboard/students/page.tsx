@@ -18,7 +18,6 @@ export default async function StudentsPage({
     'Dean',
     'Head of Section',
     'Teacher',
-    'Sales',
   ])
   const { user, roles, supabase } = session
 

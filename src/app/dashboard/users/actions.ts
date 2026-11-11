@@ -82,18 +82,30 @@ export async function createUserAction(prevState: FormState, formData: FormData)
     if (!authData.user) throw new Error('User creation failed')
 
     // 2. Insert into the public.profiles table
-    const { error: profileError } = await supabaseAdmin
+    const normalizedRoles = normalizeRoles({ role })
+    const profilePayload: Record<string, any> = {
+      id: authData.user.id,
+      first_name,
+      last_name,
+      email,
+      username,
+      role,
+      roles: normalizedRoles,
+      is_active: true
+    }
+
+    let { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .insert({
-        id: authData.user.id,
-        first_name,
-        last_name,
-        email,
-        username,
-        role,
-        roles: normalizeRoles({ role }),
-        is_active: true
-      })
+      .insert(profilePayload)
+
+    // Fallback if database enum user_role does not yet include the new role (e.g., "Sales")
+    if (profileError && /invalid input value for enum user_role/i.test(profileError.message)) {
+      const { role: _omittedRole, ...payloadWithoutEnumRole } = profilePayload
+      const retry = await supabaseAdmin
+        .from('profiles')
+        .insert(payloadWithoutEnumRole)
+      profileError = retry.error
+    }
 
     if (profileError) {
       // Rollback auth user creation if profile insert fails
@@ -187,10 +199,20 @@ export async function updateUserAction(
       updateData.username = username
     }
 
-    const { error: profileError } = await supabaseAdmin
+    let { error: profileError } = await supabaseAdmin
       .from('profiles')
       .update(updateData)
       .eq('id', userId)
+
+    // Fallback if database enum user_role does not yet include the new role (e.g., "Sales")
+    if (profileError && /invalid input value for enum user_role/i.test(profileError.message)) {
+      const { role: _omittedRole, ...updateWithoutEnumRole } = updateData
+      const retry = await supabaseAdmin
+        .from('profiles')
+        .update(updateWithoutEnumRole)
+        .eq('id', userId)
+      profileError = retry.error
+    }
 
     if (profileError) throw profileError
 

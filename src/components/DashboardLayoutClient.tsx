@@ -196,8 +196,7 @@ export default function DashboardLayoutClient({
                 userRoles.includes('Principal') || 
                 userRoles.includes('Dean') || 
                 userRoles.includes('Head of Section') || 
-                userRoles.includes('Accountant') ||
-                userRoles.includes('Sales')) && (
+                userRoles.includes('Accountant')) && (
                 <NavLink href="/dashboard" icon={LayoutDashboard}>
                   Dashboard Overview
                 </NavLink>
@@ -376,8 +375,7 @@ export default function DashboardLayoutClient({
         userRoles.includes('Head of Section') || 
         userRoles.includes('Teacher') || 
         userRoles.includes('Student') || 
-        userRoles.includes('Parent') ||
-        userRoles.includes('Sales')) && (
+        userRoles.includes('Parent')) && (
         <>
           <SectionHeader sectionKey="academics" label="Academics" />
           {expandedSections.academics && (
@@ -389,8 +387,7 @@ export default function DashboardLayoutClient({
               {(userRoles.includes('System Admin') || 
                 userRoles.includes('Director') || 
                 userRoles.includes('Principal') || 
-                userRoles.includes('Teacher') ||
-                userRoles.includes('Sales')) && (
+                userRoles.includes('Teacher')) && (
                 <NavLink href="/dashboard/students" icon={Users}>
                   Students List
                 </NavLink>
