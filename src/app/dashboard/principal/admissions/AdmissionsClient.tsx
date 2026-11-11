@@ -410,12 +410,12 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
         }}
       >
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h1 style={{ fontSize: '1.85rem', color: 'var(--color-primary)', margin: 0, fontWeight: 700 }}>
               Student Admissions Desk
             </h1>
             {currentUser?.isSales && (
-              <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+              <span className="inline-flex items-center px-3.5 py-1 rounded-full text-xs font-bold leading-snug bg-indigo-100 text-indigo-800 border border-indigo-200 whitespace-nowrap">
                 Sales Agent Portal
               </span>
             )}
@@ -426,22 +426,22 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
               : 'Online submissions from website, sales agent registrations, 1-click student enrollment, and official 2027 PDF forms.'}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <button
             type="button"
             onClick={() => setIsRegisterOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg active:scale-95 transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg active:scale-95 transition-all cursor-pointer whitespace-nowrap"
           >
-            <UserPlus size={16} />
+            <UserPlus size={16} className="shrink-0" />
             <span>+ Register Learner</span>
           </button>
 
           {!currentUser?.isSales && (
             <Link
               href="/dashboard/students"
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs whitespace-nowrap"
             >
-              <GraduationCap size={16} className="text-slate-500" />
+              <GraduationCap size={16} className="text-slate-500 shrink-0" />
               <span>Students List</span>
             </Link>
           )}
@@ -478,80 +478,93 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
       )}
 
       {/* 2. Stat Cards / KPI Grid */}
-      <div className={`grid grid-cols-1 sm:grid-cols-2 ${currentUser?.isSales ? 'lg:grid-cols-3' : 'lg:grid-cols-5'} gap-3.5`}>
-        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${currentUser?.isSales ? 'lg:grid-cols-3' : 'lg:grid-cols-5'} gap-4`}>
+        <div className="p-5 pt-6 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 leading-snug">
               {currentUser?.isSales ? 'My Registered Learners' : 'Total Applications'}
             </span>
-            <div className="p-2.5 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-slate-200/80 transition-colors">
+            <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-slate-200/80 transition-colors flex items-center justify-center shrink-0">
               <FileText size={18} />
             </div>
           </div>
-          <div className="text-2xl font-extrabold text-slate-900 font-[Outfit]">
-            {metrics.total}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">
-            {currentUser?.isSales ? `Attributed to ${currentUser.name}` : 'All registered learners'}
+          <div>
+            <div className="text-2xl font-extrabold text-slate-900 font-[Outfit] leading-tight">
+              {metrics.total}
+            </div>
+            <div
+              className="text-xs text-slate-500 mt-1 truncate"
+              title={currentUser?.isSales ? `Attributed to ${currentUser.name}` : 'All registered learners'}
+            >
+              {currentUser?.isSales ? `Attributed to ${currentUser.name}` : 'All registered learners'}
+            </div>
           </div>
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-slate-400 to-slate-600 opacity-60 group-hover:opacity-100 transition-opacity" />
         </div>
 
-        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-sky-600">New / Received</span>
-            <div className="p-2.5 rounded-xl bg-sky-50 text-sky-600 group-hover:bg-sky-100 transition-colors">
+        <div className="p-5 pt-6 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-sky-600 leading-snug">New / Received</span>
+            <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 group-hover:bg-sky-100 transition-colors flex items-center justify-center shrink-0">
               <Sparkles size={18} />
             </div>
           </div>
-          <div className="text-2xl font-extrabold text-slate-900 font-[Outfit]">
-            {metrics.submitted}
+          <div>
+            <div className="text-2xl font-extrabold text-slate-900 font-[Outfit] leading-tight">
+              {metrics.submitted}
+            </div>
+            <div className="text-xs text-slate-500 mt-1 truncate">Awaiting staff review</div>
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Awaiting staff review</div>
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-400 to-sky-600 opacity-60 group-hover:opacity-100 transition-opacity" />
         </div>
 
-        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-teal-600">Enrolled Students</span>
-            <div className="p-2.5 rounded-xl bg-teal-50 text-teal-600 group-hover:bg-teal-100 transition-colors">
+        <div className="p-5 pt-6 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-teal-600 leading-snug">Enrolled Students</span>
+            <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 group-hover:bg-teal-100 transition-colors flex items-center justify-center shrink-0">
               <GraduationCap size={18} />
             </div>
           </div>
-          <div className="text-2xl font-extrabold text-slate-900 font-[Outfit]">
-            {metrics.enrolled}
+          <div>
+            <div className="text-2xl font-extrabold text-slate-900 font-[Outfit] leading-tight">
+              {metrics.enrolled}
+            </div>
+            <div className="text-xs text-slate-500 mt-1 truncate">Placed in school classes</div>
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Placed in school classes</div>
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 to-teal-600 opacity-60 group-hover:opacity-100 transition-opacity" />
         </div>
 
         {!currentUser?.isSales && (
           <>
-            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">Sales Attribution</span>
-                <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100 transition-colors">
+            <div className="p-5 pt-6 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group flex flex-col justify-between">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 leading-snug">Sales Attribution</span>
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100 transition-colors flex items-center justify-center shrink-0">
                   <User size={18} />
                 </div>
               </div>
-              <div className="text-2xl font-extrabold text-slate-900 font-[Outfit]">
-                {metrics.salesCount}
+              <div>
+                <div className="text-2xl font-extrabold text-slate-900 font-[Outfit] leading-tight">
+                  {metrics.salesCount}
+                </div>
+                <div className="text-xs text-slate-500 mt-1 truncate">Registered by sales agents</div>
               </div>
-              <div className="text-[11px] text-slate-400 mt-0.5">Registered by sales agents</div>
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-400 to-indigo-600 opacity-60 group-hover:opacity-100 transition-opacity" />
             </div>
 
-            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">Website Direct</span>
-                <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100 transition-colors">
+            <div className="p-5 pt-6 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group flex flex-col justify-between">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 leading-snug">Website Direct</span>
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100 transition-colors flex items-center justify-center shrink-0">
                   <Sparkles size={18} />
                 </div>
               </div>
-              <div className="text-2xl font-extrabold text-slate-900 font-[Outfit]">
-                {metrics.websiteCount}
+              <div>
+                <div className="text-2xl font-extrabold text-slate-900 font-[Outfit] leading-tight">
+                  {metrics.websiteCount}
+                </div>
+                <div className="text-xs text-slate-500 mt-1 truncate">Attributed to (website)</div>
               </div>
-              <div className="text-[11px] text-slate-400 mt-0.5">Attributed to (website)</div>
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-emerald-600 opacity-60 group-hover:opacity-100 transition-opacity" />
             </div>
           </>
@@ -561,10 +574,10 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
       {/* 3. Search and Filters Toolbar */}
       <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex-1 min-w-[260px] relative">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input
             type="text"
-            className="w-full pl-10 pr-4 py-2 rounded-xl text-sm border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all bg-slate-50/50 hover:bg-white"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all bg-slate-50/50 hover:bg-white"
             placeholder="Search by learner name, parent, phone, class, or sales agent..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -576,7 +589,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl text-sm border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
+            className="px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
           >
             <option value="all">All Statuses</option>
             <option value="submitted">New / Received</option>
@@ -592,7 +605,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
             <select
               value={attributionFilter}
               onChange={(e) => setAttributionFilter(e.target.value)}
-              className="px-3 py-2 rounded-xl text-sm border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+              className="px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
             >
               <option value="all">All Attributions</option>
               <option value="website">Attributed to: (website)</option>
@@ -604,7 +617,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
           <select
             value={curriculumFilter}
             onChange={(e) => setCurriculumFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl text-sm border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
+            className="px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
           >
             <option value="all">All Curricula</option>
             <option value="cambridge">Cambridge</option>
