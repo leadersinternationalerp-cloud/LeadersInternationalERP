@@ -90,15 +90,39 @@ export async function updateApplicationStatusAction(
   return { ok: true, status: newStatus }
 }
 
+export interface EnrollLearnerDetailsInput {
+  targetClassId?: string
+  gradeLevel?: string
+  section?: string
+  admissionDate?: string
+  dob?: string
+  gender?: string
+  nationality?: string
+  languageAtHome?: string
+  previousSchool?: string
+  emergencyContact?: string
+  medicalInfo?: string
+  allergies?: string
+  notes?: string
+}
+
 export async function enrollLearnerAction(
   applicationId: string,
-  targetClassId?: string,
-  notes?: string
+  detailsOrClassId?: string | EnrollLearnerDetailsInput,
+  notesArg?: string
 ) {
   const session = await getSessionUser()
   if (!session.user || !hasAnyRole(session.roles, ALLOWED_STAFF_ROLES)) {
     return { error: 'Unauthorized to enroll learners' }
   }
+
+  const details: EnrollLearnerDetailsInput =
+    typeof detailsOrClassId === 'string'
+      ? { targetClassId: detailsOrClassId, notes: notesArg }
+      : { ...(detailsOrClassId || {}), notes: detailsOrClassId?.notes ?? notesArg }
+
+  const targetClassId = details.targetClassId
+  const notes = details.notes
 
   const supabase = createServiceClient()
 
@@ -135,13 +159,29 @@ export async function enrollLearnerAction(
       .maybeSingle()
 
     if (existingStudent) {
-      // If a targetClassId was passed, update their class
-      if (targetClassId) {
+      // Update their class, stream, and bio details if provided
+      const existingUpdate: Record<string, any> = {}
+      if (targetClassId) existingUpdate.class_id = targetClassId
+      if (details.gradeLevel) existingUpdate.grade_level = details.gradeLevel
+      if (details.section !== undefined) existingUpdate.section = details.section || null
+      if (details.dob !== undefined) existingUpdate.dob = details.dob || null
+      if (details.gender !== undefined) existingUpdate.gender = details.gender || null
+      if (details.nationality !== undefined) existingUpdate.nationality = details.nationality || null
+      if (details.languageAtHome !== undefined) existingUpdate.language_at_home = details.languageAtHome || null
+      if (details.previousSchool !== undefined) existingUpdate.previous_school = details.previousSchool || null
+      if (details.emergencyContact !== undefined) existingUpdate.emergency_contact = details.emergencyContact || null
+      if (details.medicalInfo !== undefined) existingUpdate.medical_info = details.medicalInfo || null
+      if (details.allergies !== undefined) existingUpdate.allergies = details.allergies || null
+      if (details.admissionDate !== undefined) existingUpdate.admission_date = details.admissionDate || null
+
+      if (Object.keys(existingUpdate).length > 0) {
         await supabase
           .from('students')
-          .update({ class_id: targetClassId })
+          .update(existingUpdate)
           .eq('id', existingStudent.id)
+      }
 
+      if (targetClassId) {
         await supabase
           .from('student_classes')
           .upsert({ student_id: existingStudent.id, class_id: targetClassId })
@@ -235,12 +275,15 @@ export async function enrollLearnerAction(
     if (classId) {
       matchedClass = classList.find((c) => c.id === classId)
     } else {
-      const searchName = (app.class_applied_for || '').trim().toLowerCase()
-      // Try exact name match
+      const searchName = (details.gradeLevel || app.class_applied_for || '').trim().toLowerCase()
+      const searchSection = (details.section || '').trim().toLowerCase()
+      // Try exact name + section match
       matchedClass = classList.find(
         (c) =>
-          (c.name || '').toLowerCase() === searchName ||
-          (c.class_name || '').toLowerCase() === searchName
+          ((c.name || '').toLowerCase() === searchName ||
+            (c.class_name || '').toLowerCase() === searchName ||
+            (c.grade_level || '').toLowerCase() === searchName) &&
+          (!searchSection || (c.section || '').toLowerCase() === searchSection)
       )
 
       if (!matchedClass) {
@@ -260,9 +303,13 @@ export async function enrollLearnerAction(
     }
   }
 
-  // 6. Insert Student Record
-  const resolvedGrade = matchedClass?.grade_level || matchedClass?.name || app.class_applied_for
-  const resolvedSection = matchedClass?.section || null
+  // 6. Insert Student Record with full additional details (class, stream/section, bio-data)
+  const resolvedGrade =
+    details.gradeLevel || matchedClass?.grade_level || matchedClass?.name || app.class_applied_for
+  const resolvedSection =
+    details.section !== undefined && details.section !== ''
+      ? details.section
+      : matchedClass?.section || null
 
   const { error: studentError } = await supabase.from('students').insert({
     id: studentUserId,
@@ -271,11 +318,17 @@ export async function enrollLearnerAction(
     grade_level: resolvedGrade,
     section: resolvedSection,
     class_id: classId,
-    dob: app.date_of_birth || null,
-    gender: app.gender || null,
-    nationality: app.nationality || 'Tanzanian',
-    medical_info: app.medical_conditions || null,
-    previous_school: app.previous_school || null,
+    dob: details.dob || app.date_of_birth || null,
+    gender: details.gender || app.gender || null,
+    nationality: details.nationality || app.nationality || 'Tanzanian',
+    language_at_home: details.languageAtHome || 'English',
+    medical_info: details.medicalInfo ?? app.medical_conditions ?? null,
+    allergies: details.allergies || null,
+    previous_school: details.previousSchool ?? app.previous_school ?? null,
+    emergency_contact:
+      details.emergencyContact ||
+      (app.parent_name ? `${app.parent_name} - ${app.parent_phone || ''}` : null),
+    admission_date: details.admissionDate || new Date().toISOString().slice(0, 10),
     source: app.source || 'website',
     registered_by: app.registered_by || null,
     sales_agent_name: app.sales_agent_name || null,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import StudentPhotoManager from '@/components/StudentPhotoManager'
 import {
@@ -14,12 +14,26 @@ import {
   Eye,
   HeartPulse,
   Phone,
+  FileText,
+  Paperclip,
+  Download,
 } from 'lucide-react'
 import {
   updateStudentAction,
   toggleStudentActiveAction,
   generateSingleStudentInvoiceAction,
 } from './enroll/actions'
+
+interface StudentDocumentItem {
+  id: string
+  label: string
+  file_name: string
+  url: string
+  path: string
+  mime_type?: string
+  size?: number
+  uploaded_at: string
+}
 
 interface StudentRecord {
   id: string
@@ -46,6 +60,7 @@ interface StudentRecord {
   parent_occupation?: string | null
   source?: string
   sales_agent_name?: string | null
+  documents?: StudentDocumentItem[] | null
   is_active?: boolean
   profiles?: {
     first_name: string
@@ -81,6 +96,10 @@ export default function StudentsListClient({
 
   // Bio Data view modal state
   const [viewingBioStudent, setViewingBioStudent] = useState<StudentRecord | null>(null)
+  const [studentDocs, setStudentDocs] = useState<StudentDocumentItem[]>([])
+  const [loadingDocs, setLoadingDocs] = useState(false)
+  const [uploadingDoc, setUploadingDoc] = useState(false)
+  const [newDocLabel, setNewDocLabel] = useState('Supporting Admission Document')
 
   // Edit modal state (Class placement & student bio data)
   const [editingStudent, setEditingStudent] = useState<StudentRecord | null>(null)
@@ -115,6 +134,56 @@ export default function StudentsListClient({
     !userRoles.some((r) =>
       ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section', 'Teacher'].includes(r)
     )
+
+  useEffect(() => {
+    if (!viewingBioStudent) {
+      setStudentDocs([])
+      return
+    }
+    let cancelled = false
+    setLoadingDocs(true)
+    fetch(`/api/students/documents?student_id=${encodeURIComponent(viewingBioStudent.id)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled && Array.isArray(data?.documents)) {
+          setStudentDocs(data.documents)
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoadingDocs(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [viewingBioStudent])
+
+  const handleUploadBioDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !viewingBioStudent) return
+    setUploadingDoc(true)
+    try {
+      const fd = new FormData()
+      fd.append('student_id', viewingBioStudent.id)
+      fd.append('label', newDocLabel.trim() || file.name)
+      fd.append('file', file)
+      const res = await fetch('/api/students/documents', {
+        method: 'POST',
+        body: fd,
+      })
+      const data = await res.json()
+      if (res.ok && Array.isArray(data?.documents)) {
+        setStudentDocs(data.documents)
+      } else {
+        alert(data?.error || 'Failed to upload document')
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Error uploading document')
+    } finally {
+      setUploadingDoc(false)
+      e.target.value = ''
+    }
+  }
 
   // 1. Calculate class statistics
   const gradeCounts = useMemo(() => {
@@ -174,6 +243,9 @@ export default function StudentsListClient({
     setStudents((prev) =>
       prev.map((s) => (s.id === studentId ? { ...s, photo_url: newUrl } : s))
     )
+    if (viewingBioStudent && viewingBioStudent.id === studentId) {
+      setViewingBioStudent((prev) => (prev ? { ...prev, photo_url: newUrl } : null))
+    }
   }
 
   const handleStartEdit = (student: StudentRecord) => {
@@ -346,7 +418,7 @@ export default function StudentsListClient({
           </div>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', margin: '0.25rem 0 0' }}>
             {isReceptionistOnly
-              ? 'View all students bio-data, parent/emergency contacts, class placement, and WALK IN attribution.'
+              ? 'View all students bio-data, parent/emergency contacts, class placement, documents, and WALK IN attribution.'
               : 'Enrolled learners, student bio-data, class placement, fee billing, and learner attribution.'}
           </p>
         </div>
@@ -395,6 +467,18 @@ export default function StudentsListClient({
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Search Bar */}
+      <div style={{ marginBottom: '1.25rem' }}>
+        <input
+          type="text"
+          className="input-field"
+          placeholder="Search students by name, Student ID, class/grade, parent phone, or attribution (WALK IN / Sales)..."
+          style={{ width: '100%', padding: '0.75rem 1rem' }}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </div>
 
       {/* Table Container */}
@@ -529,7 +613,7 @@ export default function StudentsListClient({
                           </span>
                         )}
                         <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                          Grade: {s.grade_level} {s.section ? `- ${s.section}` : ''}
+                          Grade: {s.grade_level} {s.section ? `- Stream ${s.section}` : ''}
                         </span>
                       </div>
                     </td>
@@ -775,7 +859,7 @@ export default function StudentsListClient({
               padding: '2rem',
               borderRadius: 'var(--radius-xl)',
               width: '100%',
-              maxWidth: '720px',
+              maxWidth: '760px',
               backgroundColor: 'var(--color-surface)',
               maxHeight: '92vh',
               overflowY: 'auto',
@@ -783,71 +867,79 @@ export default function StudentsListClient({
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                  <h2 style={{ fontSize: '1.4rem', margin: 0, color: 'var(--color-primary)' }}>
-                    {viewingBioStudent.profiles?.first_name} {viewingBioStudent.profiles?.last_name}
-                  </h2>
-                  <span
-                    style={{
-                      fontFamily: 'monospace',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      padding: '0.2rem 0.55rem',
-                      borderRadius: '6px',
-                      backgroundColor: 'rgba(0,0,0,0.05)',
-                      border: '1px solid var(--color-border)',
-                    }}
-                  >
-                    {viewingBioStudent.student_id}
-                  </span>
-                  {viewingBioStudent.source === 'walk_in' || viewingBioStudent.sales_agent_name?.toUpperCase() === 'WALK IN' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <StudentPhotoManager
+                  studentId={viewingBioStudent.id}
+                  currentPhotoUrl={viewingBioStudent.photo_url}
+                  studentName={`${viewingBioStudent.profiles?.first_name || ''} ${viewingBioStudent.profiles?.last_name || ''}`}
+                  onUploaded={(url) => handlePhotoUpdated(viewingBioStudent.id, url)}
+                />
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                    <h2 style={{ fontSize: '1.4rem', margin: 0, color: 'var(--color-primary)' }}>
+                      {viewingBioStudent.profiles?.first_name} {viewingBioStudent.profiles?.last_name}
+                    </h2>
                     <span
                       style={{
-                        padding: '0.2rem 0.65rem',
-                        borderRadius: '9999px',
-                        backgroundColor: '#fef3c7',
-                        color: '#78350f',
-                        fontSize: '0.75rem',
+                        fontFamily: 'monospace',
+                        fontSize: '0.8rem',
                         fontWeight: 700,
-                        border: '1px solid #fde68a',
+                        padding: '0.2rem 0.55rem',
+                        borderRadius: '6px',
+                        backgroundColor: 'rgba(0,0,0,0.05)',
+                        border: '1px solid var(--color-border)',
                       }}
                     >
-                      Attributed to: WALK IN
+                      {viewingBioStudent.student_id}
                     </span>
-                  ) : viewingBioStudent.sales_agent_name ? (
-                    <span
-                      style={{
-                        padding: '0.2rem 0.65rem',
-                        borderRadius: '9999px',
-                        backgroundColor: '#eef2ff',
-                        color: '#4338ca',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        border: '1px solid #c7d2fe',
-                      }}
-                    >
-                      Attributed to: {viewingBioStudent.sales_agent_name}
-                    </span>
-                  ) : (
-                    <span
-                      style={{
-                        padding: '0.2rem 0.65rem',
-                        borderRadius: '9999px',
-                        backgroundColor: '#ecfdf5',
-                        color: '#065f46',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        border: '1px solid #a7f3d0',
-                      }}
-                    >
-                      Attributed to: (website)
-                    </span>
-                  )}
+                    {viewingBioStudent.source === 'walk_in' || viewingBioStudent.sales_agent_name?.toUpperCase() === 'WALK IN' ? (
+                      <span
+                        style={{
+                          padding: '0.2rem 0.65rem',
+                          borderRadius: '9999px',
+                          backgroundColor: '#fef3c7',
+                          color: '#78350f',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          border: '1px solid #fde68a',
+                        }}
+                      >
+                        Attributed to: WALK IN
+                      </span>
+                    ) : viewingBioStudent.sales_agent_name ? (
+                      <span
+                        style={{
+                          padding: '0.2rem 0.65rem',
+                          borderRadius: '9999px',
+                          backgroundColor: '#eef2ff',
+                          color: '#4338ca',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          border: '1px solid #c7d2fe',
+                        }}
+                      >
+                        Attributed to: {viewingBioStudent.sales_agent_name}
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          padding: '0.2rem 0.65rem',
+                          borderRadius: '9999px',
+                          backgroundColor: '#ecfdf5',
+                          color: '#065f46',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          border: '1px solid #a7f3d0',
+                        }}
+                      >
+                        Attributed to: (website)
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                    Complete Student Bio Data, Stream Placement & Supporting Documents
+                  </p>
                 </div>
-                <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-                  Complete Student Bio Data & Registration Profile
-                </p>
               </div>
               <button
                 type="button"
@@ -881,7 +973,8 @@ export default function StudentsListClient({
                   2. Admission & Class Placement
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.85rem' }}>
-                  <div><strong>Grade / Class:</strong> {viewingBioStudent.grade_level} {viewingBioStudent.section ? `(${viewingBioStudent.section})` : ''}</div>
+                  <div><strong>Grade / Class:</strong> {viewingBioStudent.grade_level}</div>
+                  <div><strong>Stream / Section:</strong> {viewingBioStudent.section || 'A'}</div>
                   <div><strong>Admission Date:</strong> {viewingBioStudent.admission_date || 'N/A'}</div>
                   <div><strong>Previous School:</strong> {viewingBioStudent.previous_school || 'None recorded'}</div>
                   <div>
@@ -919,6 +1012,78 @@ export default function StudentsListClient({
                   <div><strong>Known Allergies:</strong> {viewingBioStudent.allergies || 'None reported'}</div>
                 </div>
               </div>
+            </div>
+
+            {/* 5. Uploaded Admission Documents */}
+            <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                <h4 style={{ margin: 0, fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <FileText size={14} /> 5. Uploaded Admission & Supporting Documents
+                </h4>
+
+                {canEnroll && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <input
+                      type="text"
+                      className="input-field"
+                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem', width: '190px' }}
+                      placeholder="Document label..."
+                      value={newDocLabel}
+                      onChange={(e) => setNewDocLabel(e.target.value)}
+                    />
+                    <label
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.7rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                    >
+                      <Paperclip size={12} />
+                      <span>{uploadingDoc ? 'Uploading...' : '+ Upload Document'}</span>
+                      <input
+                        type="file"
+                        accept=".pdf,image/*,.doc,.docx"
+                        style={{ display: 'none' }}
+                        disabled={uploadingDoc}
+                        onChange={handleUploadBioDocument}
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {loadingDocs ? (
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Loading student documents...</div>
+              ) : studentDocs.length === 0 ? (
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                  No supporting documents uploaded yet. Use <strong>+ Upload Document</strong> to attach birth certificates, transfer letters, or medical records.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {studentDocs.map((doc) => (
+                    <a
+                      key={doc.id}
+                      href={doc.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        padding: '0.4rem 0.75rem',
+                        borderRadius: '8px',
+                        backgroundColor: 'rgba(14, 165, 233, 0.08)',
+                        border: '1px solid rgba(14, 165, 233, 0.25)',
+                        color: 'var(--color-primary)',
+                        fontSize: '0.8rem',
+                        textDecoration: 'none',
+                        fontWeight: 600,
+                      }}
+                    >
+                      <Download size={13} />
+                      <span>{doc.label}:</span>
+                      <span style={{ fontWeight: 400, opacity: 0.85 }}>{doc.file_name}</span>
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>

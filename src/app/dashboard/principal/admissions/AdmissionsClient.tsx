@@ -25,6 +25,10 @@ import {
   Receipt,
   ArrowRight,
   Filter,
+  Camera,
+  Upload,
+  Paperclip,
+  FileCheck,
 } from 'lucide-react'
 import {
   updateApplicationStatusAction,
@@ -32,6 +36,7 @@ import {
   deleteApplicationAction,
   registerLearnerAction,
   type RegisterLearnerInput,
+  type EnrollLearnerDetailsInput,
 } from './actions'
 
 export interface AdmissionApplication {
@@ -157,18 +162,43 @@ const STATUS_CONFIG: Record<
   },
 }
 
+const STREAM_PRESETS = ['A', 'B', 'C', 'Blue', 'Gold', 'East', 'West']
+
 export default function AdmissionsClient({ initialApplications, classes = [], currentUser }: Props) {
   const [applications, setApplications] = useState<AdmissionApplication[]>(initialApplications)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [curriculumFilter, setCurriculumFilter] = useState<string>('all')
-  const [attributionFilter, setAttributionFilter] = useState<string>('all') // 'all' | 'website' | 'sales'
+  const [attributionFilter, setAttributionFilter] = useState<string>('all') // 'all' | 'website' | 'sales' | 'walk_in'
   const [selectedApp, setSelectedApp] = useState<AdmissionApplication | null>(null)
   const [previewPdfApp, setPreviewPdfApp] = useState<AdmissionApplication | null>(null)
   const [notesInput, setNotesInput] = useState('')
   const [targetClassId, setTargetClassId] = useState<string>('')
   const [isPending, startTransition] = useTransition()
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null)
+
+  // Enroll & Admit Student to Class Modal State
+  const [enrollingApp, setEnrollingApp] = useState<AdmissionApplication | null>(null)
+  const [isEnrollingSubmit, setIsEnrollingSubmit] = useState(false)
+  const [enrollForm, setEnrollForm] = useState<EnrollLearnerDetailsInput>({
+    targetClassId: '',
+    gradeLevel: '',
+    section: 'A',
+    admissionDate: new Date().toISOString().split('T')[0],
+    dob: '',
+    gender: 'Male',
+    nationality: 'Tanzanian',
+    languageAtHome: 'English',
+    previousSchool: '',
+    emergencyContact: '',
+    medicalInfo: '',
+    allergies: '',
+    notes: '',
+  })
+  const [enrollPhotoFile, setEnrollPhotoFile] = useState<File | null>(null)
+  const [enrollPhotoPreview, setEnrollPhotoPreview] = useState<string>('')
+  const [enrollDocs, setEnrollDocs] = useState<{ label: string; file: File }[]>([])
+  const [customDocLabel, setCustomDocLabel] = useState<string>('Additional Admission Document')
 
   // Registration Modal State for Sales Persons / Staff
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
@@ -259,6 +289,182 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
     setStatusMessage(null)
   }
 
+  const openEnrollModal = (app: AdmissionApplication, preselectedClassId?: string) => {
+    const appliedLower = (app.class_applied_for || '').toLowerCase()
+    const matchedClass =
+      (preselectedClassId && classes.find((c) => c.id === preselectedClassId)) ||
+      classes.find(
+        (c) =>
+          (c.name || c.class_name || '').toLowerCase() === appliedLower ||
+          (c.grade_level || '').toLowerCase() === appliedLower ||
+          (c.name || c.class_name || '').toLowerCase().includes(appliedLower) ||
+          appliedLower.includes((c.name || c.class_name || '').toLowerCase())
+      )
+
+    setEnrollingApp(app)
+    setEnrollForm({
+      targetClassId: matchedClass?.id || preselectedClassId || '',
+      gradeLevel: matchedClass?.grade_level || matchedClass?.name || app.class_applied_for || 'Cambridge Year 1',
+      section: matchedClass?.section || 'A',
+      admissionDate: new Date().toISOString().split('T')[0],
+      dob: app.date_of_birth || '',
+      gender: app.gender || 'Male',
+      nationality: app.nationality || 'Tanzanian',
+      languageAtHome: 'English',
+      previousSchool: app.previous_school || '',
+      emergencyContact:
+        app.guardian2_name && app.guardian2_phone
+          ? `${app.guardian2_name} (${app.guardian2_phone})`
+          : `${app.parent_name} (${app.parent_phone})`,
+      medicalInfo: app.medical_conditions || '',
+      allergies: '',
+      notes: app.notes || app.additional_notes || '',
+    })
+    setEnrollPhotoFile(null)
+    setEnrollPhotoPreview('')
+    setEnrollDocs([])
+    setCustomDocLabel('Additional Admission Document')
+    setStatusMessage(null)
+  }
+
+  const handleEnrollPhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setEnrollPhotoFile(file)
+    setEnrollPhotoPreview(URL.createObjectURL(file))
+  }
+
+  const handleSlotDocSelect = (label: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setEnrollDocs((prev) => {
+      const withoutExistingSlot = prev.filter((d) => d.label !== label)
+      return [...withoutExistingSlot, { label, file }]
+    })
+  }
+
+  const handleAdditionalDocsSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    const labelBase = customDocLabel.trim() || 'Supporting Document'
+    setEnrollDocs((prev) => [
+      ...prev,
+      ...files.map((file, idx) => ({
+        label: files.length > 1 ? `${labelBase} (${idx + 1})` : labelBase,
+        file,
+      })),
+    ])
+    e.target.value = ''
+  }
+
+  const removeEnrollDoc = (index: number) => {
+    setEnrollDocs((prev) => prev.filter((_, idx) => idx !== index))
+  }
+
+  const handleConfirmEnrollment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!enrollingApp) return
+
+    setIsEnrollingSubmit(true)
+    setStatusMessage(null)
+
+    try {
+      const res = await enrollLearnerAction(enrollingApp.id, enrollForm, enrollForm.notes || undefined)
+      if (!res.ok) {
+        setStatusMessage({
+          text: res.error || 'Failed to enroll learner into class',
+          type: 'error',
+        })
+        setIsEnrollingSubmit(false)
+        return
+      }
+
+      const studentUuid = res.student_user_id
+      let photoUploaded = false
+      let docsUploadedCount = 0
+
+      if (studentUuid) {
+        // 1. Upload Passport Photo if provided
+        if (enrollPhotoFile) {
+          try {
+            const photoFd = new FormData()
+            photoFd.append('student_id', studentUuid)
+            photoFd.append('photo', enrollPhotoFile)
+            const photoRes = await fetch('/api/students/photo', {
+              method: 'POST',
+              body: photoFd,
+            })
+            if (photoRes.ok) photoUploaded = true
+          } catch (err) {
+            console.warn('[AdmissionsClient] Photo upload warning:', err)
+          }
+        }
+
+        // 2. Upload Supporting Documents if provided
+        for (const docItem of enrollDocs) {
+          try {
+            const docFd = new FormData()
+            docFd.append('student_id', studentUuid)
+            docFd.append('label', docItem.label)
+            docFd.append('file', docItem.file)
+            const docRes = await fetch('/api/students/documents', {
+              method: 'POST',
+              body: docFd,
+            })
+            if (docRes.ok) docsUploadedCount++
+          } catch (err) {
+            console.warn('[AdmissionsClient] Document upload warning:', err)
+          }
+        }
+      }
+
+      setApplications((prev) =>
+        prev.map((a) =>
+          a.id === enrollingApp.id
+            ? {
+                ...a,
+                status: 'enrolled',
+                notes: enrollForm.notes || a.notes,
+                enrolled_student_id: studentUuid || a.enrolled_student_id,
+              }
+            : a
+        )
+      )
+
+      if (selectedApp && selectedApp.id === enrollingApp.id) {
+        setSelectedApp((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: 'enrolled',
+                notes: enrollForm.notes || prev.notes,
+                enrolled_student_id: studentUuid || prev.enrolled_student_id,
+              }
+            : null
+        )
+      }
+
+      const attachmentParts: string[] = []
+      if (photoUploaded) attachmentParts.push('passport photo')
+      if (docsUploadedCount > 0) attachmentParts.push(`${docsUploadedCount} document(s)`)
+      const attachmentSummary =
+        attachmentParts.length > 0 ? ` Uploaded ${attachmentParts.join(' & ')}.` : ''
+
+      setStatusMessage({
+        text: `✓ Success! ${enrollingApp.first_name} ${enrollingApp.last_name} admitted to ${enrollForm.gradeLevel || enrollingApp.class_applied_for} (Stream ${enrollForm.section || 'A'}) with Student ID: ${res.student_id}.${attachmentSummary}`,
+        type: 'success',
+      })
+      setEnrollingApp(null)
+    } catch (err: any) {
+      setStatusMessage({
+        text: err?.message || 'Unexpected error during student enrollment',
+        type: 'error',
+      })
+    } finally {
+      setIsEnrollingSubmit(false)
+    }
+  }
+
   const handleUpdateStatus = (appId: string, nextStatus: string) => {
     startTransition(async () => {
       setStatusMessage(null)
@@ -293,48 +499,6 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
       } else {
         setStatusMessage({
           text: res.error || 'Failed to update application',
-          type: 'error',
-        })
-      }
-    })
-  }
-
-  const handleEnrollLearner = (appId: string, classId?: string) => {
-    startTransition(async () => {
-      setStatusMessage(null)
-      const res = await enrollLearnerAction(appId, classId, notesInput || undefined)
-      if (res.ok) {
-        setApplications((prev) =>
-          prev.map((a) =>
-            a.id === appId
-              ? {
-                  ...a,
-                  status: 'enrolled',
-                  notes: notesInput || a.notes,
-                  enrolled_student_id: res.student_user_id || a.enrolled_student_id,
-                }
-              : a
-          )
-        )
-        if (selectedApp && selectedApp.id === appId) {
-          setSelectedApp((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  status: 'enrolled',
-                  notes: notesInput || prev.notes,
-                  enrolled_student_id: res.student_user_id || prev.enrolled_student_id,
-                }
-              : null
-          )
-        }
-        setStatusMessage({
-          text: `✓ Success! Learner enrolled with Student ID: ${res.student_id}. They now appear on the Students List and can be assigned to classes and invoiced!`,
-          type: 'success',
-        })
-      } else {
-        setStatusMessage({
-          text: res.error || 'Failed to enroll learner',
           type: 'error',
         })
       }
@@ -447,7 +611,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
               ? `Register new learner applications and track learners attributed to ${currentUser.name}.`
               : currentUser?.isReceptionist
               ? 'Admit applicants, register walk-in students (automatically attributed to "WALK IN"), and view student bio data.'
-              : 'Online submissions from website, walk-in & sales agent registrations, 1-click student enrollment, and official 2027 PDF forms.'}
+              : 'Online submissions from website, walk-in & sales agent registrations, student class admission modal, and official 2027 PDF forms.'}
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -846,15 +1010,15 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                             <span>Review</span>
                           </button>
 
-                          {/* 1-Click Enroll Button (Management only) */}
+                          {/* Enroll Action Button (Opens Additional Details Modal) */}
                           {!currentUser?.isSales && (
                             !isEnrolled ? (
                               <button
                                 type="button"
-                                onClick={() => handleEnrollLearner(app.id)}
-                                disabled={isPending}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-2xs transition-all active:scale-95"
-                                title="Enroll Student in Classes & Students List"
+                                onClick={() => openEnrollModal(app)}
+                                disabled={isPending || isEnrollingSubmit}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-2xs transition-all active:scale-95 cursor-pointer"
+                                title="Open Admission Modal to Select Class, Stream, Photo & Documents"
                               >
                                 <GraduationCap size={13} />
                                 <span>Enroll</span>
@@ -980,7 +1144,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
               </div>
             </div>
 
-            {/* Enrollment Action Box (Management only) */}
+            {/* Enrollment Action Box (Management & Receptionist) */}
             {!currentUser?.isSales && (
               <div className="p-4 rounded-2xl bg-teal-50/70 border border-teal-200/90 shadow-xs">
                 <div className="flex items-center justify-between mb-3">
@@ -1026,12 +1190,12 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                 ) : (
                   <div className="flex flex-col gap-3">
                     <p className="text-xs text-teal-800 m-0">
-                      Marking as enrolled will create the student's official account, student ID, assign them to a class, link parents, and make them available for invoicing.
+                      Click <strong>Enroll Learner Now</strong> to open the Class Admission Form where you can specify Class, Stream, Passport Photo, and Supporting Documents.
                     </p>
                     <div className="flex items-center gap-3 flex-wrap">
                       <div className="flex-1 min-w-[220px]">
                         <label className="text-[11px] font-bold uppercase tracking-wider text-teal-900 block mb-1">
-                          Select Class for Placement
+                          Pre-Select Class for Placement
                         </label>
                         <select
                           value={targetClassId}
@@ -1049,8 +1213,8 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
 
                       <button
                         type="button"
-                        disabled={isPending}
-                        onClick={() => handleEnrollLearner(selectedApp.id, targetClassId || undefined)}
+                        disabled={isPending || isEnrollingSubmit}
+                        onClick={() => openEnrollModal(selectedApp, targetClassId || undefined)}
                         className="mt-4 px-4 py-2 rounded-xl text-xs font-bold bg-teal-700 hover:bg-teal-800 text-white shadow-md hover:shadow-lg active:scale-95 transition-all inline-flex items-center gap-2 cursor-pointer"
                       >
                         <GraduationCap size={15} />
@@ -1169,6 +1333,454 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5B. ENROLL & ADMIT STUDENT TO CLASS MODAL (Asks for Class, Stream, Photo, and Other Documents) */}
+      {enrollingApp && (
+        <div
+          className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[70] flex items-center justify-center p-3 sm:p-5"
+          onClick={() => !isEnrollingSubmit && setEnrollingApp(null)}
+        >
+          <div
+            className="glass-panel"
+            style={{
+              maxWidth: '860px',
+              width: '100%',
+              maxHeight: '93vh',
+              overflowY: 'auto',
+              borderRadius: 'var(--radius-xl)',
+              padding: '1.75rem',
+              backgroundColor: 'var(--color-surface)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between pb-4 border-b border-slate-200 gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-teal-600 text-white flex items-center justify-center shadow-md shrink-0">
+                  <GraduationCap size={24} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 m-0">
+                      Admit & Enroll Student to Class
+                    </h2>
+                    <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-200">
+                      {enrollingApp.application_no}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 m-0 mt-1">
+                    Complete student class placement, stream, passport photo, and supporting documents for{' '}
+                    <strong className="text-slate-800">
+                      {enrollingApp.first_name} {enrollingApp.middle_name ? `${enrollingApp.middle_name} ` : ''}
+                      {enrollingApp.last_name}
+                    </strong>
+                    .
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isEnrollingSubmit}
+                onClick={() => setEnrollingApp(null)}
+                className="text-slate-400 hover:text-slate-700 p-1"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmEnrollment} className="flex flex-col gap-5 mt-5">
+              {/* SECTION 1: CLASS, STREAM & ADMISSION PLACEMENT */}
+              <div className="p-4 rounded-2xl bg-teal-50/60 border border-teal-200/80 flex flex-col gap-3.5">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="text-xs font-bold uppercase tracking-wider text-teal-900 flex items-center gap-1.5">
+                    <School size={15} className="text-teal-700" />
+                    <span>1. Class & Stream Placement</span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-teal-800 bg-white/80 px-2.5 py-0.5 rounded-full border border-teal-200">
+                    Applied for: {enrollingApp.class_applied_for} ({enrollingApp.curriculum || 'Cambridge'})
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* School Class Dropdown */}
+                  <div className="form-group sm:col-span-2">
+                    <label className="form-label text-xs font-semibold text-slate-800">
+                      Assign School Class *
+                    </label>
+                    <select
+                      className="input-field text-sm bg-white"
+                      value={enrollForm.targetClassId || ''}
+                      onChange={(e) => {
+                        const selectedId = e.target.value
+                        const found = classes.find((c) => c.id === selectedId)
+                        setEnrollForm((prev) => ({
+                          ...prev,
+                          targetClassId: selectedId,
+                          gradeLevel: found ? found.grade_level || found.name || prev.gradeLevel : prev.gradeLevel,
+                          section: found?.section ? found.section : prev.section,
+                        }))
+                      }}
+                    >
+                      <option value="">
+                        Auto-create / match "{enrollForm.gradeLevel || enrollingApp.class_applied_for}" (Stream {enrollForm.section || 'A'})
+                      </option>
+                      {classes.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name || c.class_name} {c.section ? `— Stream ${c.section}` : ''} ({c.grade_level || 'Class'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Grade / Class Level */}
+                  <div className="form-group">
+                    <label className="form-label text-xs font-semibold text-slate-800">
+                      Class / Grade Level *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Cambridge Year 1"
+                      className="input-field text-sm bg-white"
+                      value={enrollForm.gradeLevel || ''}
+                      onChange={(e) => setEnrollForm({ ...enrollForm, gradeLevel: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Stream / Section */}
+                  <div className="form-group">
+                    <label className="form-label text-xs font-semibold text-slate-800">
+                      Stream / Section *
+                    </label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. A, B, Blue, Gold"
+                        className="input-field text-sm bg-white flex-1"
+                        value={enrollForm.section || ''}
+                        onChange={(e) => setEnrollForm({ ...enrollForm, section: e.target.value })}
+                      />
+                      <select
+                        aria-label="Stream presets"
+                        className="px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700"
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            setEnrollForm({ ...enrollForm, section: e.target.value })
+                          }
+                        }}
+                      >
+                        <option value="">Presets</option>
+                        {STREAM_PRESETS.map((st) => (
+                          <option key={st} value={st}>
+                            Stream {st}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="form-group">
+                    <label className="form-label text-xs font-semibold text-slate-800">Admission Date *</label>
+                    <input
+                      type="date"
+                      required
+                      className="input-field text-sm bg-white"
+                      value={enrollForm.admissionDate || ''}
+                      onChange={(e) => setEnrollForm({ ...enrollForm, admissionDate: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label text-xs font-semibold text-slate-800">Date of Birth</label>
+                    <input
+                      type="date"
+                      className="input-field text-sm bg-white"
+                      value={enrollForm.dob || ''}
+                      onChange={(e) => setEnrollForm({ ...enrollForm, dob: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label text-xs font-semibold text-slate-800">Gender</label>
+                    <select
+                      className="input-field text-sm bg-white"
+                      value={enrollForm.gender || 'Male'}
+                      onChange={(e) => setEnrollForm({ ...enrollForm, gender: e.target.value })}
+                    >
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: STUDENT PASSPORT PHOTO & SUPPORTING ADMISSION DOCUMENTS */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 flex flex-col gap-4">
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <Camera size={15} className="text-indigo-600" />
+                  <span>2. Student Passport Photo & Supporting Admission Documents</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                  {/* Passport Photo Upload Box */}
+                  <div className="p-3.5 rounded-xl bg-white border border-slate-200 flex flex-col items-center text-center gap-2.5">
+                    <div className="w-24 h-24 rounded-2xl bg-slate-100 border-2 border-dashed border-slate-300 overflow-hidden flex items-center justify-center relative">
+                      {enrollPhotoPreview ? (
+                        <img
+                          src={enrollPhotoPreview}
+                          alt="Student passport preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center text-slate-400 p-2">
+                          <Camera size={26} />
+                          <span className="text-[10px] font-semibold mt-1">Passport Photo</span>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">Student Passport Photo</div>
+                      <p className="text-[11px] text-slate-500 m-0">JPG, PNG or WebP (Max 5MB)</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 cursor-pointer transition-colors">
+                        <Upload size={13} />
+                        <span>{enrollPhotoFile ? 'Change Photo' : 'Upload Photo'}</span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          className="hidden"
+                          onChange={handleEnrollPhotoSelect}
+                        />
+                      </label>
+                      {enrollPhotoFile && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEnrollPhotoFile(null)
+                            setEnrollPhotoPreview('')
+                          }}
+                          className="text-xs text-rose-600 hover:underline"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Supporting Documents Upload Slots */}
+                  <div className="md:col-span-2 flex flex-col gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {[
+                        'Birth Certificate / Passport',
+                        'Transfer / Previous Report Card',
+                        'Medical / Immunization Record',
+                      ].map((slotLabel) => {
+                        const attached = enrollDocs.find((d) => d.label === slotLabel)
+                        return (
+                          <label
+                            key={slotLabel}
+                            className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between gap-2 ${
+                              attached
+                                ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900'
+                                : 'bg-white border-slate-200 hover:border-indigo-300 text-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-1.5">
+                              <span className="text-xs font-bold leading-snug">{slotLabel}</span>
+                              {attached ? (
+                                <FileCheck size={15} className="text-emerald-600 shrink-0" />
+                              ) : (
+                                <Paperclip size={14} className="text-slate-400 shrink-0" />
+                              )}
+                            </div>
+                            <div className="text-[11px] truncate text-slate-500">
+                              {attached ? attached.file.name : 'Click to attach PDF/Image'}
+                            </div>
+                            <input
+                              type="file"
+                              accept=".pdf,image/*,.doc,.docx"
+                              className="hidden"
+                              onChange={(e) => handleSlotDocSelect(slotLabel, e)}
+                            />
+                          </label>
+                        )
+                      })}
+                    </div>
+
+                    {/* Custom / Additional Document Uploader */}
+                    <div className="p-3 rounded-xl bg-white border border-slate-200 flex flex-wrap items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Document label (e.g. National ID, Visa, Fee Receipt)"
+                        className="input-field text-xs flex-1 min-w-[180px]"
+                        value={customDocLabel}
+                        onChange={(e) => setCustomDocLabel(e.target.value)}
+                      />
+                      <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-900 text-white cursor-pointer transition-colors shrink-0">
+                        <Paperclip size={13} />
+                        <span>+ Attach Other Document(s)</span>
+                        <input
+                          type="file"
+                          multiple
+                          accept=".pdf,image/*,.doc,.docx"
+                          className="hidden"
+                          onChange={handleAdditionalDocsSelect}
+                        />
+                      </label>
+                    </div>
+
+                    {/* Attached Documents Pill List */}
+                    {enrollDocs.length > 0 && (
+                      <div className="flex flex-col gap-1.5">
+                        <div className="text-[11px] font-bold uppercase text-slate-500">
+                          Attached Documents ({enrollDocs.length})
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {enrollDocs.map((doc, idx) => (
+                            <span
+                              key={`${doc.label}-${idx}`}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-indigo-50 text-indigo-900 border border-indigo-200"
+                            >
+                              <FileCheck size={12} className="text-indigo-600 shrink-0" />
+                              <strong className="font-semibold">{doc.label}:</strong>
+                              <span className="truncate max-w-[150px]">{doc.file.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => removeEnrollDoc(idx)}
+                                className="text-slate-400 hover:text-rose-600 ml-1"
+                                title="Remove document"
+                              >
+                                <X size={13} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: ADDITIONAL STUDENT BIO & HEALTH DETAILS */}
+              <div className="p-4 rounded-2xl bg-white border border-slate-200 flex flex-col gap-3.5">
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                  <HeartHandshake size={15} className="text-rose-600" />
+                  <span>3. Additional Bio-Data, Welfare & Emergency Details</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="form-group">
+                    <label className="form-label text-xs font-semibold">Nationality</label>
+                    <input
+                      type="text"
+                      className="input-field text-sm"
+                      placeholder="e.g. Tanzanian"
+                      value={enrollForm.nationality || ''}
+                      onChange={(e) => setEnrollForm({ ...enrollForm, nationality: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label text-xs font-semibold">Language Spoken at Home</label>
+                    <input
+                      type="text"
+                      className="input-field text-sm"
+                      placeholder="e.g. English, Swahili"
+                      value={enrollForm.languageAtHome || ''}
+                      onChange={(e) => setEnrollForm({ ...enrollForm, languageAtHome: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label text-xs font-semibold">Previous School</label>
+                    <input
+                      type="text"
+                      className="input-field text-sm"
+                      placeholder="Previous school attended"
+                      value={enrollForm.previousSchool || ''}
+                      onChange={(e) => setEnrollForm({ ...enrollForm, previousSchool: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="form-group">
+                    <label className="form-label text-xs font-semibold">Emergency Contact (Name & Phone)</label>
+                    <input
+                      type="text"
+                      className="input-field text-sm"
+                      placeholder="Emergency contact person & phone"
+                      value={enrollForm.emergencyContact || ''}
+                      onChange={(e) => setEnrollForm({ ...enrollForm, emergencyContact: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label text-xs font-semibold">Medical Conditions</label>
+                    <input
+                      type="text"
+                      className="input-field text-sm"
+                      placeholder="Any medical conditions (or None)"
+                      value={enrollForm.medicalInfo || ''}
+                      onChange={(e) => setEnrollForm({ ...enrollForm, medicalInfo: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label text-xs font-semibold">Known Allergies</label>
+                    <input
+                      type="text"
+                      className="input-field text-sm"
+                      placeholder="Food/medication allergies (or None)"
+                      value={enrollForm.allergies || ''}
+                      onChange={(e) => setEnrollForm({ ...enrollForm, allergies: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label text-xs font-semibold">Admission / Class Placement Notes</label>
+                  <input
+                    type="text"
+                    className="input-field text-sm"
+                    placeholder="Optional admission remarks or special class instructions..."
+                    value={enrollForm.notes || ''}
+                    onChange={(e) => setEnrollForm({ ...enrollForm, notes: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Footer Actions */}
+              <div className="flex items-center justify-between pt-3 border-t border-slate-200 flex-wrap gap-3">
+                <div className="text-xs text-slate-500">
+                  Parent Linked: <strong className="text-slate-800">{enrollingApp.parent_name}</strong> ({enrollingApp.parent_phone})
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={isEnrollingSubmit}
+                    onClick={() => setEnrollingApp(null)}
+                    className="btn btn-secondary text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isEnrollingSubmit}
+                    className="px-5 py-2.5 rounded-xl text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white shadow-md hover:shadow-lg active:scale-95 transition-all inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <GraduationCap size={17} />
+                    <span>
+                      {isEnrollingSubmit
+                        ? 'Admitting & Uploading...'
+                        : `Confirm & Admit to ${enrollForm.gradeLevel || enrollingApp.class_applied_for} (${enrollForm.section || 'A'})`}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}
