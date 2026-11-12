@@ -230,6 +230,9 @@ export default function DashboardLayoutClient({
                   <NavLink href="/dashboard/students/enroll" icon={UsersRound}>
                     Register / Enroll Student
                   </NavLink>
+                  <NavLink href="/dashboard/accountant/invoices" icon={Receipt}>
+                    Student Invoices
+                  </NavLink>
                 </>
               )}
 
@@ -280,7 +283,9 @@ export default function DashboardLayoutClient({
       {(userRoles.includes('System Admin') || 
         userRoles.includes('Director') || 
         userRoles.includes('Principal') || 
+        userRoles.includes('Head of Section') || 
         userRoles.includes('Accountant') || 
+        userRoles.includes('Receptionist') || 
         userRoles.includes('Student') || 
         userRoles.includes('Parent')) && (
         <>

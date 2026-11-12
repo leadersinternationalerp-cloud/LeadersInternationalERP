@@ -434,6 +434,16 @@ export default function StudentsListClient({
             <School size={16} /> Admissions Desk
           </Link>
 
+          {canInvoice && (
+            <Link
+              href="/dashboard/accountant/invoices"
+              className="btn btn-secondary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}
+            >
+              <Receipt size={16} /> Student Invoices
+            </Link>
+          )}
+
           {canEnroll && (
             <Link
               href="/dashboard/students/enroll"

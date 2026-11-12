@@ -632,13 +632,22 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
           </button>
 
           {!currentUser?.isSales && (
-            <Link
-              href="/dashboard/students"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs whitespace-nowrap"
-            >
-              <GraduationCap size={16} className="text-slate-500 shrink-0" />
-              <span>Students List</span>
-            </Link>
+            <>
+              <Link
+                href="/dashboard/students"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs whitespace-nowrap"
+              >
+                <GraduationCap size={16} className="text-slate-500 shrink-0" />
+                <span>Students List</span>
+              </Link>
+              <Link
+                href="/dashboard/accountant/invoices"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs whitespace-nowrap"
+              >
+                <Receipt size={16} className="text-emerald-600 shrink-0" />
+                <span>Student Invoices</span>
+              </Link>
+            </>
           )}
         </div>
       </div>
