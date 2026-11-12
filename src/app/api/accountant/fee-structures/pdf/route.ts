@@ -4,6 +4,7 @@ import { drawLetterhead } from '@/lib/pdfLetterhead'
 import { route } from '@/lib/api/handler'
 import { FINANCE_ROLES } from '@/lib/auth/roles'
 import { ApiError } from '@/lib/api/errors'
+import { generateWingFeeStructurePdf } from '@/lib/pdf/FeeStructureWingPdfGenerator'
 
 export const GET = route(
   async ({ user, req, requestId }) => {
@@ -13,6 +14,7 @@ export const GET = route(
     const academic_year = searchParams.get('academic_year')
     const term = searchParams.get('term')
     const grade_level = searchParams.get('grade_level')
+    const wingParam = searchParams.get('wing')
 
     // Query fee structures
     let query = supabase
@@ -37,6 +39,25 @@ export const GET = route(
     }
 
     const activeFees = fees || []
+
+    // If a specific Wing (Cambridge or NECTA) is requested, render the official colored Wing Fee Structure PDF
+    if (wingParam && (wingParam.toLowerCase() === 'cambridge' || wingParam.toLowerCase() === 'necta')) {
+      const normalizedWing = wingParam.toLowerCase() === 'cambridge' ? 'Cambridge' : 'NECTA'
+      const yearLabel = academic_year && academic_year !== 'all' ? academic_year : '2027'
+      const wingBuffer = await generateWingFeeStructurePdf(normalizedWing, yearLabel, activeFees)
+      const fileSlug = `${normalizedWing.toLowerCase()}-fee-structure-${yearLabel}.pdf`
+
+      return new Response(new Uint8Array(wingBuffer), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `inline; filename="${fileSlug}"`,
+          'Content-Length': wingBuffer.length.toString(),
+          'Cache-Control': 'private, no-store',
+          'X-Request-Id': requestId,
+        },
+      })
+    }
 
     // 1. Grouping for Table 1 (Summary by Term)
     const summaryGroups: {

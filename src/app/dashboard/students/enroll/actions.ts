@@ -8,6 +8,7 @@ import { logAuditAction } from '@/utils/audit'
 import { getSessionUser } from '@/lib/auth/session'
 import { hasAnyRole } from '@/lib/auth/roles'
 import { sanitizePostgrestValue, escapeLike } from '@/lib/sanitize'
+import { resolveClassFeeStructures } from '@/lib/finance/feeStructureHelper'
 
 const ALLOWED_STAFF_ROLES = [
   'System Admin',
@@ -245,11 +246,64 @@ export async function enrollStudentAction(formData: any) {
     }
   }
 
-  await logAuditAction('Student Enrolled', 'students', { student_id: studentIdStr, user_id: userId, source: studentSource, attribution: studentAttribution })
+  // 6. Auto-generate initial Term 1 fee invoice based on placed class
+  let invoiceId: string | null = null
+  let invoiceTotal = 0
+  try {
+    const resolved = await resolveClassFeeStructures(
+      supabaseService,
+      formData.grade_level || 'Grade 1',
+      'Term 1',
+      '2027',
+      true
+    )
+    if (resolved.items.length > 0) {
+      const totalAmount = resolved.items.reduce((sum, f) => sum + Number(f.amount), 0)
+      const { data: newInvoice, error: invErr } = await supabaseService
+        .from('invoices')
+        .insert({
+          student_id: userId,
+          academic_year: resolved.academicYearUsed,
+          term: 'Term 1',
+          total_amount: totalAmount,
+          discount_amount: 0.0,
+          status: 'Pending',
+          due_date: resolved.dueDate,
+          generated_by: session.user.id,
+        })
+        .select('id')
+        .single()
+
+      if (newInvoice && !invErr) {
+        const items = resolved.items.map((f) => ({
+          invoice_id: newInvoice.id,
+          fee_structure_id: f.id,
+          amount: f.amount,
+          description: f.fee_type || 'Tuition Fee',
+        }))
+        await supabaseService.from('invoice_items').insert(items)
+        invoiceId = newInvoice.id
+        invoiceTotal = totalAmount
+      }
+    }
+  } catch (invErr) {
+    console.warn('[enrollStudentAction] auto-invoice notice:', invErr)
+  }
+
+  await logAuditAction('Student Enrolled', 'students', { student_id: studentIdStr, user_id: userId, source: studentSource, attribution: studentAttribution, invoice_id: invoiceId })
 
   revalidatePath('/dashboard/students')
   revalidatePath('/dashboard/principal/admissions')
-  return { success: true, student_id: studentIdStr, attribution: studentAttribution }
+  revalidatePath('/dashboard/accountant/invoices')
+  revalidatePath('/dashboard/accountant/fee-balances')
+  return {
+    success: true,
+    student_id: studentIdStr,
+    student_user_id: userId,
+    attribution: studentAttribution,
+    invoice_id: invoiceId,
+    invoice_total: invoiceTotal,
+  }
 }
 
 export async function updateStudentAction(studentId: string, formData: any) {
@@ -471,7 +525,7 @@ export async function generateSingleStudentInvoiceAction(
   dueDate?: string
 ) {
   const session = await getSessionUser()
-  if (!session.user || !hasAnyRole(session.roles, ALLOWED_STAFF_ROLES)) {
+  if (!session.user || !hasAnyRole(session.roles, [...ALLOWED_STAFF_ROLES, 'Accountant'])) {
     return { error: 'Unauthorized to generate student invoices' }
   }
 
@@ -489,14 +543,17 @@ export async function generateSingleStudentInvoiceAction(
   }
 
   // 2. Fetch fee structures for this grade level
-  const { data: feeStructures, error: feeError } = await supabase
-    .from('fee_structures')
-    .select('*')
-    .ilike('grade_level', `%${student.grade_level}%`)
+  const resolved = await resolveClassFeeStructures(
+    supabase,
+    student.grade_level,
+    term,
+    academicYear,
+    term === 'Term 1'
+  )
 
-  if (feeError || !feeStructures || feeStructures.length === 0) {
+  if (!resolved.items || resolved.items.length === 0) {
     return {
-      error: `No fee structures configured for grade level "${student.grade_level}". Please add fee structures under Finance -> Fee Structures first.`,
+      error: `No fee structures configured for grade level "${student.grade_level}". Please add or sync fee structures under Finance -> Fee Structures first.`,
     }
   }
 
@@ -506,29 +563,29 @@ export async function generateSingleStudentInvoiceAction(
     .select('id')
     .eq('student_id', studentId)
     .eq('term', term)
-    .eq('academic_year', academicYear)
+    .eq('academic_year', resolved.academicYearUsed)
     .maybeSingle()
 
   if (existingInv) {
     return {
-      error: `An invoice for ${term} (${academicYear}) already exists for this student.`,
+      error: `An invoice for ${term} (${resolved.academicYearUsed}) already exists for this student.`,
       invoice_id: existingInv.id,
     }
   }
 
-  const totalAmount = feeStructures.reduce((sum, f) => sum + Number(f.amount), 0)
+  const totalAmount = resolved.items.reduce((sum, f) => sum + Number(f.amount), 0)
 
   // 4. Create new invoice
   const { data: newInvoice, error: invError } = await supabase
     .from('invoices')
     .insert({
       student_id: studentId,
-      academic_year: academicYear,
+      academic_year: resolved.academicYearUsed,
       term: term,
       total_amount: totalAmount,
       discount_amount: 0.0,
       status: 'Pending',
-      due_date: dueDate || null,
+      due_date: dueDate || resolved.dueDate,
       generated_by: session.user.id,
     })
     .select('id')
@@ -539,7 +596,7 @@ export async function generateSingleStudentInvoiceAction(
   }
 
   // 5. Insert invoice items
-  const items = feeStructures.map((f) => ({
+  const items = resolved.items.map((f) => ({
     invoice_id: newInvoice.id,
     fee_structure_id: f.id,
     amount: f.amount,

@@ -6,6 +6,7 @@ import { hasAnyRole } from '@/lib/auth/roles'
 import { createServiceClient } from '@/utils/supabase/service'
 import { revalidatePath } from 'next/cache'
 import { logAuditAction } from '@/utils/audit'
+import { resolveClassFeeStructures } from '@/lib/finance/feeStructureHelper'
 
 const ALLOWED_STAFF_ROLES = [
   'System Admin',
@@ -422,35 +423,41 @@ export async function enrollLearnerAction(
     .update(updatePayload)
     .eq('id', applicationId)
 
-  // 10. Automatically generate initial fee invoice if fee structure exists
+  // 10. Automatically generate initial fee invoice if fee structure exists for placed class
   let invoiceGenerated = false
+  let invoiceId: string | null = null
+  let invoiceTotal = 0
   try {
-    const academicYear = app.academic_year || '2026/2027'
+    const academicYear = app.academic_year || '2027'
     const term = app.start_term || 'Term 1'
 
-    const { data: feeStructures } = await supabase
-      .from('fee_structures')
-      .select('*')
-      .or(`grade_level.ilike.%${resolvedGrade}%,grade_level.ilike.%${app.class_applied_for}%`)
+    const resolved = await resolveClassFeeStructures(
+      supabase,
+      resolvedGrade || app.class_applied_for,
+      term,
+      academicYear,
+      true
+    )
 
-    if (feeStructures && feeStructures.length > 0) {
-      const totalAmount = feeStructures.reduce((sum, f) => sum + Number(f.amount), 0)
-      const { data: newInvoice } = await supabase
+    if (resolved.items.length > 0) {
+      const totalAmount = resolved.items.reduce((sum, f) => sum + Number(f.amount), 0)
+      const { data: newInvoice, error: invErr } = await supabase
         .from('invoices')
         .insert({
           student_id: studentUserId,
-          academic_year: academicYear,
+          academic_year: resolved.academicYearUsed,
           term: term,
           total_amount: totalAmount,
           discount_amount: 0.0,
           status: 'Pending',
+          due_date: resolved.dueDate,
           generated_by: session.user.id,
         })
         .select('id')
         .single()
 
-      if (newInvoice) {
-        const items = feeStructures.map((f) => ({
+      if (newInvoice && !invErr) {
+        const items = resolved.items.map((f) => ({
           invoice_id: newInvoice.id,
           fee_structure_id: f.id,
           amount: f.amount,
@@ -458,6 +465,8 @@ export async function enrollLearnerAction(
         }))
         await supabase.from('invoice_items').insert(items)
         invoiceGenerated = true
+        invoiceId = newInvoice.id
+        invoiceTotal = totalAmount
       }
     }
   } catch (invErr) {
@@ -469,6 +478,7 @@ export async function enrollLearnerAction(
     user_id: studentUserId,
     application_id: applicationId,
     class_id: classId,
+    invoice_id: invoiceId,
   })
 
   // Revalidate relevant pages
@@ -485,6 +495,8 @@ export async function enrollLearnerAction(
     student_user_id: studentUserId,
     class_id: classId,
     invoice_generated: invoiceGenerated,
+    invoice_id: invoiceId,
+    invoice_total: invoiceTotal,
   }
 }
 

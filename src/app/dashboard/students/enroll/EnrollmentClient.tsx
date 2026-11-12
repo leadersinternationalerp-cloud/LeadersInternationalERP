@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import { searchParentsAction, enrollStudentAction } from './actions'
-import { Sparkles, Camera, Paperclip, FileCheck, X } from 'lucide-react'
+import { Sparkles, Camera, Paperclip, FileCheck, X, Download } from 'lucide-react'
 
 export default function EnrollmentClient({ isReceptionist = false }: { isReceptionist?: boolean }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [enrolledInvoiceUrl, setEnrolledInvoiceUrl] = useState('')
 
   const [formData, setFormData] = useState({
     first_name: '',
@@ -157,6 +158,7 @@ export default function EnrollmentClient({ isReceptionist = false }: { isRecepti
     setLoading(true)
     setError('')
     setSuccess('')
+    setEnrolledInvoiceUrl('')
 
     const res = await enrollStudentAction(formData)
 
@@ -218,10 +220,22 @@ export default function EnrollmentClient({ isReceptionist = false }: { isRecepti
       }
     }
 
+    const invoiceUrl = res.invoice_id
+      ? `/api/accountant/invoices/pdf?invoice_id=${encodeURIComponent(res.invoice_id)}&download=1`
+      : res.student_user_id
+      ? `/api/accountant/invoices/pdf?student_id=${encodeURIComponent(res.student_user_id)}&download=1`
+      : ''
+
+    if (res.invoice_id && invoiceUrl) {
+      setEnrolledInvoiceUrl(invoiceUrl)
+    }
+
     setSuccess(
       `Student enrolled successfully into ${formData.grade_level} (Stream ${formData.section || 'A'})! Generated ID: ${generatedStudentId}${
-        docsUploadedCount > 0 ? ` • Uploaded ${docsUploadedCount} document(s)` : ''
-      }${isReceptionist ? ' • Attributed to: WALK IN' : ''}`
+        res.invoice_total ? ` • Invoice Generated: TZS ${Number(res.invoice_total).toLocaleString()}` : ''
+      }${docsUploadedCount > 0 ? ` • Uploaded ${docsUploadedCount} document(s)` : ''}${
+        isReceptionist ? ' • Attributed to: WALK IN' : ''
+      }`
     )
 
     // Reset Form
@@ -280,9 +294,33 @@ export default function EnrollmentClient({ isReceptionist = false }: { isRecepti
               color: 'var(--color-success)',
               borderRadius: 'var(--radius-md)',
               marginBottom: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.75rem',
             }}
           >
-            {success}
+            <span>{success}</span>
+            {enrolledInvoiceUrl && (
+              <a
+                href={enrolledInvoiceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-primary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.45rem 0.9rem',
+                  fontSize: '0.8rem',
+                  textDecoration: 'none',
+                }}
+              >
+                <Download size={14} />
+                <span>Download Invoice (PDF)</span>
+              </a>
+            )}
           </div>
         )}
 

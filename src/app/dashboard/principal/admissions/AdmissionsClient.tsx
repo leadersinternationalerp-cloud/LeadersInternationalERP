@@ -175,7 +175,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
   const [notesInput, setNotesInput] = useState('')
   const [targetClassId, setTargetClassId] = useState<string>('')
   const [isPending, startTransition] = useTransition()
-  const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null)
+  const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info'; invoiceUrl?: string } | null>(null)
 
   // Enroll & Admit Student to Class Modal State
   const [enrollingApp, setEnrollingApp] = useState<AdmissionApplication | null>(null)
@@ -450,9 +450,16 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
       const attachmentSummary =
         attachmentParts.length > 0 ? ` Uploaded ${attachmentParts.join(' & ')}.` : ''
 
+      const invoiceDownloadUrl = res.invoice_id
+        ? `/api/accountant/invoices/pdf?invoice_id=${encodeURIComponent(res.invoice_id)}&download=1`
+        : studentUuid
+        ? `/api/accountant/invoices/pdf?student_id=${encodeURIComponent(studentUuid)}&download=1`
+        : undefined
+
       setStatusMessage({
-        text: `✓ Success! ${enrollingApp.first_name} ${enrollingApp.last_name} admitted to ${enrollForm.gradeLevel || enrollingApp.class_applied_for} (Stream ${enrollForm.section || 'A'}) with Student ID: ${res.student_id}.${attachmentSummary}`,
+        text: `✓ Success! ${enrollingApp.first_name} ${enrollingApp.last_name} admitted to ${enrollForm.gradeLevel || enrollingApp.class_applied_for} (Stream ${enrollForm.section || 'A'}) with Student ID: ${res.student_id}.${attachmentSummary}${res.invoice_generated ? ` Invoice generated (TZS ${Number(res.invoice_total || 0).toLocaleString()}).` : ''}`,
         type: 'success',
+        invoiceUrl: res.invoice_generated ? invoiceDownloadUrl : undefined,
       })
       setEnrollingApp(null)
     } catch (err: any) {
@@ -498,7 +505,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
         })
       } else {
         setStatusMessage({
-          text: res.error || 'Failed to update application',
+          text: ('error' in res ? res.error : undefined) || 'Failed to update application',
           type: 'error',
         })
       }
@@ -647,13 +654,24 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
               : 'bg-sky-50 text-sky-900 border-sky-200'
           }`}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {statusMessage.type === 'success' ? (
               <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
             ) : (
               <Clock size={20} className="text-sky-600 shrink-0" />
             )}
             <span className="text-sm font-medium">{statusMessage.text}</span>
+            {statusMessage.invoiceUrl && (
+              <a
+                href={statusMessage.invoiceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-xs transition-colors"
+              >
+                <Download size={13} />
+                <span>Download Invoice (PDF)</span>
+              </a>
+            )}
           </div>
           <button
             type="button"
@@ -1024,14 +1042,28 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                                 <span>Enroll</span>
                               </button>
                             ) : (
-                              <Link
-                                href="/dashboard/students"
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 transition-colors"
-                                title="View Enrolled Student in Students List"
-                              >
-                                <Check size={13} />
-                                <span>Enrolled</span>
-                              </Link>
+                              <div className="inline-flex items-center gap-1">
+                                {app.enrolled_student_id && (
+                                  <a
+                                    href={`/api/accountant/invoices/pdf?student_id=${encodeURIComponent(app.enrolled_student_id)}&download=1`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-colors"
+                                    title="Download Student Fee Invoice PDF"
+                                  >
+                                    <Receipt size={13} />
+                                    <span>Invoice</span>
+                                  </a>
+                                )}
+                                <Link
+                                  href="/dashboard/students"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 transition-colors"
+                                  title="View Enrolled Student in Students List"
+                                >
+                                  <Check size={13} />
+                                  <span>Enrolled</span>
+                                </Link>
+                              </div>
                             )
                           )}
 
@@ -1169,6 +1201,17 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                       This learner is enrolled in the school student database! They appear in the active student directory, are placed in class, and invoices can be generated.
                     </p>
                     <div className="flex items-center gap-2.5 mt-2 flex-wrap">
+                      {selectedApp.enrolled_student_id && (
+                        <a
+                          href={`/api/accountant/invoices/pdf?student_id=${encodeURIComponent(selectedApp.enrolled_student_id)}&download=1`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white transition-colors"
+                        >
+                          <Download size={13} />
+                          <span>Download Student Invoice (PDF)</span>
+                        </a>
+                      )}
                       <Link
                         href="/dashboard/students"
                         className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-teal-700 hover:bg-teal-800 text-white transition-colors"
@@ -1176,15 +1219,13 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                         <span>View in Students List</span>
                         <ArrowRight size={13} />
                       </Link>
-                      {!currentUser?.isReceptionist && (
-                        <Link
-                          href="/dashboard/accountant/invoices"
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-teal-300 text-teal-800 hover:bg-teal-50 transition-colors"
-                        >
-                          <Receipt size={13} />
-                          <span>Invoices & Fee Statements</span>
-                        </Link>
-                      )}
+                      <Link
+                        href="/dashboard/accountant/invoices"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-teal-300 text-teal-800 hover:bg-teal-50 transition-colors"
+                      >
+                        <Receipt size={13} />
+                        <span>Invoices & Fee Statements</span>
+                      </Link>
                     </div>
                   </div>
                 ) : (

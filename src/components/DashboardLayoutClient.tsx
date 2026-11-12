@@ -313,11 +313,19 @@ export default function DashboardLayoutClient({
                 </>
               )}
 
+              {(userRoles.includes('System Admin') ||
+                userRoles.includes('Director') ||
+                userRoles.includes('Principal') ||
+                userRoles.includes('Head of Section') ||
+                userRoles.includes('Accountant') ||
+                userRoles.includes('Receptionist')) && (
+                <NavLink href="/dashboard/accountant/invoices" icon={Receipt}>
+                  Student Invoices
+                </NavLink>
+              )}
+
               {(userRoles.includes('System Admin') || userRoles.includes('Accountant')) && (
                 <>
-                  <NavLink href="/dashboard/accountant/invoices" icon={Receipt}>
-                    Student Invoices
-                  </NavLink>
                   <NavLink href="/dashboard/accountant/payments" icon={CreditCard}>
                     Record Payments
                   </NavLink>

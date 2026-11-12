@@ -6,6 +6,8 @@ import { revalidatePath } from 'next/cache'
 import { logAuditAction } from '@/utils/audit'
 import { AccountingService } from '@/lib/accounting/AccountingService'
 import { isCurrentOrPast } from '@/utils/billing'
+import { getOfficial2027FeeRows } from '@/lib/finance/feeStructureHelper'
+import { createServiceClient } from '@/utils/supabase/service'
 
 // Save Fee Structure
 export async function saveFeeStructureAction(formData: FormData) {
@@ -19,6 +21,10 @@ export async function saveFeeStructureAction(formData: FormData) {
 
   const payable_once = formData.get('payable_once') === 'on'
   const payable_annually = formData.get('payable_annually') === 'on'
+  const wing = (formData.get('wing') as string) || (grade_level.toLowerCase().includes('cambridge') ? 'Cambridge' : 'NECTA')
+  const monthlyRaw = parseFloat((formData.get('monthly_amount') as string) || '')
+  const annualRaw = parseFloat((formData.get('annual_amount') as string) || '')
+  const due_date = (formData.get('due_date') as string) || null
 
   if (!academic_year || !term || !grade_level || !fee_type || isNaN(amount)) {
     return { error: 'All fields are required.' }
@@ -42,6 +48,10 @@ export async function saveFeeStructureAction(formData: FormData) {
     grade_level,
     fee_type,
     amount,
+    monthly_amount: isNaN(monthlyRaw) ? 0 : monthlyRaw,
+    annual_amount: isNaN(annualRaw) ? 0 : annualRaw,
+    wing,
+    due_date,
     description,
     payable_once,
     payable_annually,
@@ -54,6 +64,104 @@ export async function saveFeeStructureAction(formData: FormData) {
 
   revalidatePath('/dashboard/accountant/fee-structures')
   return { success: true }
+}
+
+export async function updateFeeStructureAction(id: string, formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const { data: prof } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
+  const userRoles = normalizeRoles(prof)
+  const isAllowed = userRoles.some(r => ['System Admin', 'Director', 'Principal'].includes(r))
+  if (!isAllowed) {
+    return { error: 'Forbidden: You do not have permission to modify fee structures.' }
+  }
+
+  const academic_year = formData.get('academic_year') as string
+  const term = formData.get('term') as string
+  const grade_level = formData.get('grade_level') as string
+  const fee_type = formData.get('fee_type') as string
+  const amount = parseFloat(formData.get('amount') as string)
+  const monthlyRaw = parseFloat((formData.get('monthly_amount') as string) || '')
+  const annualRaw = parseFloat((formData.get('annual_amount') as string) || '')
+  const wing = (formData.get('wing') as string) || (grade_level.toLowerCase().includes('cambridge') ? 'Cambridge' : 'NECTA')
+  const due_date = (formData.get('due_date') as string) || null
+  const description = (formData.get('description') as string) || ''
+  const payable_once = formData.get('payable_once') === 'on'
+  const payable_annually = formData.get('payable_annually') === 'on'
+
+  if (!id || !academic_year || !term || !grade_level || !fee_type || isNaN(amount)) {
+    return { error: 'All required fields must be filled.' }
+  }
+
+  const service = createServiceClient()
+  const { error } = await service
+    .from('fee_structures')
+    .update({
+      academic_year,
+      term,
+      grade_level,
+      fee_type,
+      amount,
+      monthly_amount: isNaN(monthlyRaw) ? 0 : monthlyRaw,
+      annual_amount: isNaN(annualRaw) ? 0 : annualRaw,
+      wing,
+      due_date,
+      description,
+      payable_once,
+      payable_annually,
+    })
+    .eq('id', id)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  revalidatePath('/dashboard/accountant/fee-structures')
+  return { success: true }
+}
+
+export async function seed2027FeeStructuresAction() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const { data: prof } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
+  const userRoles = normalizeRoles(prof)
+  const isAllowed = userRoles.some(r => ['System Admin', 'Director', 'Principal', 'Accountant'].includes(r))
+  if (!isAllowed) {
+    return { error: 'Forbidden' }
+  }
+
+  const service = createServiceClient()
+  const officialRows = getOfficial2027FeeRows()
+
+  const { data: existing } = await service
+    .from('fee_structures')
+    .select('id, academic_year, term, grade_level, fee_type')
+    .eq('academic_year', '2027')
+
+  const existingKeys = new Set(
+    (existing || []).map(r => `${r.academic_year}|${r.term}|${r.grade_level}|${r.fee_type}`)
+  )
+
+  const toInsert = officialRows
+    .filter(r => !existingKeys.has(`${r.academic_year}|${r.term}|${r.grade_level}|${r.fee_type}`))
+    .map(r => ({
+      ...r,
+      created_by: user.id,
+    }))
+
+  if (toInsert.length > 0) {
+    const { error } = await service.from('fee_structures').insert(toInsert)
+    if (error) {
+      return { error: error.message }
+    }
+  }
+
+  revalidatePath('/dashboard/accountant/fee-structures')
+  return { success: true, inserted: toInsert.length }
 }
 
 export async function deleteFeeStructureAction(id: string) {

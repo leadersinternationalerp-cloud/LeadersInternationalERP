@@ -1,12 +1,32 @@
-import { createClient } from '@/utils/supabase/server'
+import { createServiceClient } from '@/utils/supabase/service'
+import { getSessionUser } from '@/lib/auth/session'
+import { hasAnyRole } from '@/lib/auth/roles'
 import { generateInvoicesAction } from '../actions'
 import InvoicesClient from './InvoicesClient'
 
+const INVOICE_ACCESS_ROLES = [
+  'System Admin',
+  'Director',
+  'Principal',
+  'Head of Section',
+  'Accountant',
+  'Receptionist',
+] as const
+
 export default async function InvoicesPage() {
-  const supabase = await createClient()
+  const session = await getSessionUser()
+  if (!session.user || !hasAnyRole(session.roles, INVOICE_ACCESS_ROLES)) {
+    return (
+      <div style={{ padding: '2rem', color: 'var(--color-error)', fontWeight: 600 }}>
+        Access Denied. You do not have permission to view student invoices.
+      </div>
+    )
+  }
+
+  const supabase = createServiceClient()
 
   // Fetch all invoices joining students, profiles, and payments
-  const { data: invoicesRaw, error } = await supabase
+  const { data: invoicesRaw } = await supabase
     .from('invoices')
     .select(`
       *,
@@ -14,7 +34,7 @@ export default async function InvoicesPage() {
         id,
         student_id,
         grade_level,
-        profiles (
+        profiles!students_id_fkey (
           first_name,
           last_name,
           email
@@ -26,23 +46,14 @@ export default async function InvoicesPage() {
     `)
     .order('created_at', { ascending: false })
 
-  const invoices = (invoicesRaw || []).map(inv => {
+  const invoices = (invoicesRaw || []).map((inv) => {
     const paid = (inv.payments || []).reduce((sum: number, p: any) => sum + Number(p.amount), 0)
     return {
       ...inv,
       total_paid: paid,
-      students: inv.students // Map relation name correctly for the client
+      students: inv.students,
     }
   })
-
-  function formatTZS(amount: number) {
-    return new Intl.NumberFormat('en-TZ', {
-      style: 'currency',
-      currency: 'TZS',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount)
-  }
 
   // Server action handler to trigger generation
   async function handleBulkGenerate(formData: FormData) {
@@ -60,21 +71,21 @@ export default async function InvoicesPage() {
   return (
     <div>
       <h1 style={{ fontSize: '1.75rem', marginBottom: '1.5rem', color: 'var(--color-primary)' }}>
-        Invoices & Billing Manager
+        Student Invoices & Billing Manager
       </h1>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2.5fr', gap: '2rem', alignItems: 'start' }}>
         {/* Bulk Invoices Generation Panel */}
         <div className="glass-panel" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
           <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Bulk Invoice Generator</h2>
-          
+
           <form action={handleBulkGenerate} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div className="form-group">
               <label className="form-label">Academic Year</label>
-              <select name="academic_year" className="input-field" required defaultValue="2025-2026">
-                <option value="2024-2025">2024-2025</option>
-                <option value="2025-2026">2025-2026</option>
+              <select name="academic_year" className="input-field" required defaultValue="2027">
+                <option value="2027">2027</option>
                 <option value="2026-2027">2026-2027</option>
+                <option value="2025-2026">2025-2026</option>
               </select>
             </div>
 
@@ -90,27 +101,40 @@ export default async function InvoicesPage() {
             <div className="form-group">
               <label className="form-label">Target Grade Level</label>
               <select name="grade_level" className="input-field" required>
-                <option value="Grade 1">Grade 1</option>
-                <option value="Grade 2">Grade 2</option>
-                <option value="Grade 3">Grade 3</option>
-                <option value="Grade 4">Grade 4</option>
-                <option value="Grade 5">Grade 5</option>
-                <option value="Grade 6">Grade 6</option>
-                <option value="Grade 7">Grade 7</option>
-                <option value="Grade 8">Grade 8</option>
+                <optgroup label="Cambridge Wing">
+                  <option value="Cambridge Year 1">Cambridge Year 1</option>
+                  <option value="Cambridge Year 2">Cambridge Year 2</option>
+                  <option value="Cambridge Year 3">Cambridge Year 3</option>
+                  <option value="Cambridge Year 4">Cambridge Year 4</option>
+                  <option value="Cambridge Year 5">Cambridge Year 5</option>
+                  <option value="Cambridge Year 6">Cambridge Year 6</option>
+                </optgroup>
+                <optgroup label="NECTA Wing">
+                  <option value="Baby Class">Baby Class</option>
+                  <option value="Nursery">Nursery</option>
+                  <option value="Grade 1">Grade 1</option>
+                  <option value="Grade 2">Grade 2</option>
+                  <option value="Grade 3">Grade 3</option>
+                  <option value="Grade 4">Grade 4</option>
+                  <option value="Grade 5">Grade 5</option>
+                  <option value="Grade 6">Grade 6</option>
+                  <option value="Grade 7">Grade 7</option>
+                  <option value="Grade 8">Grade 8</option>
+                </optgroup>
               </select>
             </div>
 
             <div className="form-group">
               <label className="form-label">Due Date</label>
-              <input type="date" name="due_date" className="input-field" required />
+              <input type="date" name="due_date" className="input-field" required defaultValue="2027-01-08" />
             </div>
 
             <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem', marginTop: '0.5rem' }}>
               Generate Invoices
             </button>
             <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
-              Generates invoices for all enrolled students in the grade level, including any outstanding balances carried forward from previous terms.
+              Generates invoices for all enrolled students in the grade level, including any outstanding balances
+              carried forward from previous terms.
             </p>
           </form>
         </div>

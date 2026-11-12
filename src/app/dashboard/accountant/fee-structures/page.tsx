@@ -34,17 +34,35 @@ export default async function FeeStructuresPage() {
   const { data: fees } = await supabase
     .from('fee_structures')
     .select('*')
-    .order('created_at', { ascending: false })
+    .order('academic_year', { ascending: false })
+    .order('grade_level', { ascending: true })
+    .order('term', { ascending: true })
 
   // Fetch classes matching system database classes
   const { data: dbClasses } = await supabase
     .from('classes')
     .select('name')
 
-  const defaultGrades = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8']
-  const systemGrades = dbClasses && dbClasses.length > 0
-    ? Array.from(new Set(dbClasses.map(c => c.name))).filter(Boolean).sort()
-    : defaultGrades
+  const defaultGrades = [
+    'Cambridge Year 1',
+    'Cambridge Year 2',
+    'Cambridge Year 3',
+    'Cambridge Year 4',
+    'Cambridge Year 5',
+    'Cambridge Year 6',
+    'Baby Class',
+    'Nursery',
+    'Grade 1',
+    'Grade 2',
+    'Grade 3',
+    'Grade 4',
+    'Grade 5',
+    'Grade 6',
+    'Grade 7',
+    'Grade 8',
+  ]
+  const dbGradeNames = dbClasses ? dbClasses.map(c => c.name).filter(Boolean) : []
+  const systemGrades = Array.from(new Set([...defaultGrades, ...dbGradeNames])).sort()
 
   // Fetch academic years
   const { data: dbYears } = await supabase
@@ -52,9 +70,8 @@ export default async function FeeStructuresPage() {
     .select('name')
     .order('name', { ascending: false })
 
-  const academicYears = dbYears && dbYears.length > 0
-    ? dbYears.map(y => y.name)
-    : ['2024-2025', '2025-2026', '2026-2027']
+  const dbYearNames = dbYears ? dbYears.map(y => y.name).filter(Boolean) : []
+  const academicYears = Array.from(new Set(['2027', ...dbYearNames, '2026-2027', '2025-2026']))
 
   // Handle delete on server side via Server Action directly
   async function handleDelete(formData: FormData) {

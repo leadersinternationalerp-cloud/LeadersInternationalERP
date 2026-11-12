@@ -389,7 +389,9 @@ export default function StudentsListClient({
     userRoles.includes('System Admin') ||
     userRoles.includes('Director') ||
     userRoles.includes('Principal') ||
-    userRoles.includes('Accountant')
+    userRoles.includes('Head of Section') ||
+    userRoles.includes('Accountant') ||
+    userRoles.includes('Receptionist')
 
   return (
     <div>
@@ -1086,7 +1088,16 @@ export default function StudentsListClient({
               )}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
+              <a
+                href={`/api/accountant/invoices/pdf?student_id=${encodeURIComponent(viewingBioStudent.id)}&download=1`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', textDecoration: 'none' }}
+              >
+                <Receipt size={14} /> Download Invoice (PDF)
+              </a>
               {canEnroll && (
                 <button
                   type="button"
@@ -1552,14 +1563,25 @@ export default function StudentsListClient({
                 Fee structure amounts configured for this grade level will be billed automatically.
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
-                <Link
-                  href="/dashboard/accountant/invoices"
-                  className="btn btn-secondary text-xs"
-                  style={{ textDecoration: 'none' }}
-                >
-                  View All Invoices →
-                </Link>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <a
+                    href={`/api/accountant/invoices/pdf?student_id=${encodeURIComponent(invoicingStudent.id)}&download=1`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-secondary text-xs"
+                    style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                  >
+                    <Receipt size={13} /> Download Invoice PDF
+                  </a>
+                  <Link
+                    href="/dashboard/accountant/invoices"
+                    className="btn btn-secondary text-xs"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    View All Invoices →
+                  </Link>
+                </div>
 
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button
