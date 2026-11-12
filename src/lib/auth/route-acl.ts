@@ -6,6 +6,8 @@ export const ROUTE_ACL: Record<string, readonly Role[]> = {
   '/dashboard/principal/admissions': ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section', 'Sales', 'Receptionist'],
   '/dashboard/principal': ['System Admin', 'Director', 'Principal'],
   '/dashboard/accountant/invoices': ['System Admin', 'Director', 'Principal', 'Head of Section', 'Accountant', 'Receptionist'],
+  '/dashboard/accountant/fee-structures': ['System Admin', 'Director', 'Principal', 'Accountant'],
+  '/dashboard/accountant/fee-balances': ['System Admin', 'Director', 'Principal', 'Accountant'],
   '/dashboard/accountant': ['System Admin', 'Accountant'],
   '/dashboard/dean': ['System Admin', 'Director', 'Principal', 'Dean'],
   '/dashboard/hos': ['System Admin', 'Director', 'Principal', 'Head of Section'],
