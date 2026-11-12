@@ -98,7 +98,7 @@ export async function loginAction(prevState: FormState, formData: FormData): Pro
   }
 
   revalidatePath('/', 'layout')
-  if (roles.length === 1 && roles[0] === 'Sales') {
+  if (roles.length === 1 && (roles[0] === 'Sales' || roles[0] === 'Receptionist')) {
     redirect('/dashboard/principal/admissions')
   }
   redirect('/dashboard')

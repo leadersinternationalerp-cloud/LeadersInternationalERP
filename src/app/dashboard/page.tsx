@@ -26,6 +26,9 @@ export default async function DashboardPage() {
   if (userRoles.includes('Parent') && userRoles.length === 1) {
     redirect('/dashboard/parent/dashboard')
   }
+  if (userRoles.length === 1 && (userRoles[0] === 'Sales' || userRoles[0] === 'Receptionist')) {
+    redirect('/dashboard/principal/admissions')
+  }
 
   // 1. Fetch KPI totals for Director/Principal/Accountant
   const { count: studentCount } = await supabase

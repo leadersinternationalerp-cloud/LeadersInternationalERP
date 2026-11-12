@@ -100,6 +100,7 @@ interface CurrentUser {
   email: string
   roles: string[]
   isSales?: boolean
+  isReceptionist?: boolean
 }
 
 interface Props {
@@ -189,6 +190,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
     feePlan: 'Standard Termly',
     transportRequired: false,
     additionalNotes: '',
+    enrollImmediately: false,
   })
 
   // Metrics
@@ -198,8 +200,17 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
       submitted: applications.filter((a) => a.status === 'submitted').length,
       underReview: applications.filter((a) => a.status === 'under_review').length,
       enrolled: applications.filter((a) => a.status === 'enrolled').length,
-      salesCount: applications.filter((a) => a.sales_agent_name || a.source === 'sales').length,
-      websiteCount: applications.filter((a) => !a.sales_agent_name && a.source !== 'sales').length,
+      walkInCount: applications.filter(
+        (a) => a.source === 'walk_in' || a.sales_agent_name?.toUpperCase() === 'WALK IN'
+      ).length,
+      salesCount: applications.filter(
+        (a) =>
+          (a.sales_agent_name && a.sales_agent_name.toUpperCase() !== 'WALK IN') ||
+          a.source === 'sales'
+      ).length,
+      websiteCount: applications.filter(
+        (a) => !a.sales_agent_name && a.source !== 'sales' && a.source !== 'walk_in'
+      ).length,
     }
   }, [applications])
 
@@ -229,10 +240,12 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
             app.class_applied_for.toLowerCase().includes('necta') ||
             app.class_applied_for.toLowerCase().includes('grade')))
 
-      const isSalesAttributed = Boolean(app.sales_agent_name || app.source === 'sales')
+      const isWalkIn = Boolean(app.source === 'walk_in' || app.sales_agent_name?.toUpperCase() === 'WALK IN')
+      const isSalesAttributed = Boolean(!isWalkIn && (app.sales_agent_name || app.source === 'sales'))
       const matchAttribution =
         attributionFilter === 'all' ||
-        (attributionFilter === 'website' && !isSalesAttributed) ||
+        (attributionFilter === 'walk_in' && isWalkIn) ||
+        (attributionFilter === 'website' && !isSalesAttributed && !isWalkIn) ||
         (attributionFilter === 'sales' && isSalesAttributed)
 
       return matchSearch && matchStatus && matchCurriculum && matchAttribution
@@ -364,8 +377,11 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
       if (res.ok && res.application) {
         setApplications((prev) => [res.application, ...prev])
         setIsRegisterOpen(false)
+        const attributionLabel = res.application.sales_agent_name || (currentUser?.isReceptionist ? 'WALK IN' : 'Sales Agent')
         setStatusMessage({
-          text: `✓ Learner "${res.application.first_name} ${res.application.last_name}" registered successfully! Attributed to: ${res.application.sales_agent_name || 'Sales Agent'}. Application #: ${res.application.application_no}`,
+          text: res.enrolled
+            ? `✓ Learner "${res.application.first_name} ${res.application.last_name}" registered & enrolled! Student ID: ${res.student_id} • Attributed to: ${attributionLabel}.`
+            : `✓ Learner "${res.application.first_name} ${res.application.last_name}" registered successfully! Attributed to: ${attributionLabel}. Application #: ${res.application.application_no}`,
           type: 'success',
         })
         // Reset form
@@ -387,6 +403,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
           feePlan: 'Standard Termly',
           transportRequired: false,
           additionalNotes: '',
+          enrollImmediately: false,
         })
       } else {
         setStatusMessage({
@@ -419,11 +436,18 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                 Sales Agent Portal
               </span>
             )}
+            {currentUser?.isReceptionist && (
+              <span className="inline-flex items-center px-3.5 py-1 rounded-full text-xs font-bold leading-snug bg-amber-100 text-amber-900 border border-amber-200 whitespace-nowrap">
+                Receptionist Desk • Walk-In Admissions
+              </span>
+            )}
           </div>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginTop: '0.25rem', margin: 0 }}>
             {currentUser?.isSales
               ? `Register new learner applications and track learners attributed to ${currentUser.name}.`
-              : 'Online submissions from website, sales agent registrations, 1-click student enrollment, and official 2027 PDF forms.'}
+              : currentUser?.isReceptionist
+              ? 'Admit applicants, register walk-in students (automatically attributed to "WALK IN"), and view student bio data.'
+              : 'Online submissions from website, walk-in & sales agent registrations, 1-click student enrollment, and official 2027 PDF forms.'}
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -600,7 +624,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
             <option value="rejected">Declined</option>
           </select>
 
-          {/* Attribution Filter (Management only) */}
+          {/* Attribution Filter (Management & Receptionist) */}
           {!currentUser?.isSales && (
             <select
               value={attributionFilter}
@@ -608,6 +632,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
               className="px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
             >
               <option value="all">All Attributions</option>
+              <option value="walk_in">Attributed to: WALK IN</option>
               <option value="website">Attributed to: (website)</option>
               <option value="sales">Attributed to: Sales Agents</option>
             </select>
@@ -667,7 +692,8 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
               ) : (
                 filtered.map((app) => {
                   const conf = STATUS_CONFIG[app.status] || STATUS_CONFIG.submitted
-                  const isSales = Boolean(app.sales_agent_name || app.source === 'sales')
+                  const isWalkIn = Boolean(app.source === 'walk_in' || app.sales_agent_name?.toUpperCase() === 'WALK IN')
+                  const isSales = Boolean(!isWalkIn && (app.sales_agent_name || app.source === 'sales'))
                   const isEnrolled = app.status === 'enrolled'
 
                   return (
@@ -748,7 +774,15 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
 
                       {/* Attribution */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        {isSales ? (
+                        {isWalkIn ? (
+                          <span
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200 shadow-2xs"
+                            title="Attributed to: WALK IN (Registered at Reception Desk)"
+                          >
+                            <User size={12} className="text-amber-600 shrink-0" />
+                            <span>WALK IN</span>
+                          </span>
+                        ) : isSales ? (
                           <span
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200 shadow-2xs"
                             title={`Attributed to: ${app.sales_agent_name || 'Sales Agent'}`}
@@ -924,7 +958,12 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Attribution:</span>
-                {selectedApp.sales_agent_name ? (
+                {selectedApp.source === 'walk_in' || selectedApp.sales_agent_name?.toUpperCase() === 'WALK IN' ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                    <User size={13} className="text-amber-600" />
+                    <span>WALK IN</span>
+                  </span>
+                ) : selectedApp.sales_agent_name ? (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-900 border border-indigo-200">
                     <User size={13} className="text-indigo-600" />
                     <span>{selectedApp.sales_agent_name}</span>
@@ -937,7 +976,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                 )}
               </div>
               <div className="text-xs text-slate-500">
-                Source: <strong>{selectedApp.source || 'website'}</strong>
+                Source: <strong>{selectedApp.source === 'walk_in' ? 'WALK IN' : selectedApp.source || 'website'}</strong>
               </div>
             </div>
 
@@ -973,13 +1012,15 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                         <span>View in Students List</span>
                         <ArrowRight size={13} />
                       </Link>
-                      <Link
-                        href="/dashboard/accountant/invoices"
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-teal-300 text-teal-800 hover:bg-teal-50 transition-colors"
-                      >
-                        <Receipt size={13} />
-                        <span>Invoices & Fee Statements</span>
-                      </Link>
+                      {!currentUser?.isReceptionist && (
+                        <Link
+                          href="/dashboard/accountant/invoices"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-teal-300 text-teal-800 hover:bg-teal-50 transition-colors"
+                        >
+                          <Receipt size={13} />
+                          <span>Invoices & Fee Statements</span>
+                        </Link>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -1157,7 +1198,9 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                 <p className="text-xs text-slate-500 m-0 mt-0.5">
                   Attributed to:{' '}
                   <strong>
-                    {currentUser?.name || 'Sales Staff'} ({currentUser?.isSales ? 'Sales' : 'Staff'})
+                    {currentUser?.isReceptionist
+                      ? 'WALK IN (Receptionist Desk)'
+                      : `${currentUser?.name || 'Sales Staff'} (${currentUser?.isSales ? 'Sales' : 'Staff'})`}
                   </strong>
                 </p>
               </div>
@@ -1327,12 +1370,34 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                 />
               </div>
 
+              {!currentUser?.isSales && (
+                <label className="flex items-center gap-2.5 p-3 rounded-xl bg-teal-50/70 border border-teal-200 text-xs text-teal-900 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(regForm.enrollImmediately)}
+                    onChange={(e) => setRegForm({ ...regForm, enrollImmediately: e.target.checked })}
+                    className="rounded border-teal-400 text-teal-700 focus:ring-teal-500"
+                  />
+                  <span>
+                    <strong>Admit & Enroll Immediately into School</strong> — Create student ID, place in class, and add to Students List right now.
+                  </span>
+                </label>
+              )}
+
               {/* Attribution confirmation */}
               <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200 text-xs text-indigo-900 flex items-center gap-2">
                 <User size={15} className="text-indigo-600 shrink-0" />
                 <span>
-                  This registration will be attributed to{' '}
-                  <strong>{currentUser?.name || 'Sales Staff'}</strong> as the registered sales person.
+                  {currentUser?.isReceptionist ? (
+                    <>
+                      This registration will be attributed to <strong>WALK IN</strong> (Registered by Receptionist).
+                    </>
+                  ) : (
+                    <>
+                      This registration will be attributed to{' '}
+                      <strong>{currentUser?.name || 'Sales Staff'}</strong> as the registered sales person.
+                    </>
+                  )}
                 </span>
               </div>
 

@@ -15,6 +15,7 @@ const ALLOWED_STAFF_ROLES = [
   'Head of Section',
   'Accountant',
   'Sales',
+  'Receptionist',
 ] as const
 
 const VALID_STATUSES = [
@@ -48,13 +49,14 @@ export async function updateApplicationStatusAction(
 
   const supabase = createServiceClient()
 
-  // Sales users can only update applications attributed to them
+  // Sales users can only update applications attributed to them; Management and Receptionist can manage all
   const isManagement = hasAnyRole(session.roles, [
     'System Admin',
     'Director',
     'Principal',
     'Dean',
     'Head of Section',
+    'Receptionist',
   ])
 
   const updateData: Record<string, unknown> = {
@@ -117,6 +119,7 @@ export async function enrollLearnerAction(
     'Principal',
     'Dean',
     'Head of Section',
+    'Receptionist',
   ])
 
   if (!isManagement && app.registered_by !== session.user.id) {
@@ -490,6 +493,7 @@ export interface RegisterLearnerInput {
   feePlan?: string
   medicalConditions?: string
   additionalNotes?: string
+  enrollImmediately?: boolean
 }
 
 export async function registerLearnerAction(payload: RegisterLearnerInput) {
@@ -505,9 +509,14 @@ export async function registerLearnerAction(payload: RegisterLearnerInput) {
   const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase()
   const applicationNo = `LIS-${year}-${randomSuffix}`
 
-  // Attribution resolution
-  const isSales = session.roles.includes('Sales')
+  // Attribution resolution: Students registered by Receptionist are attributed to "WALK IN"
+  const isReceptionist = session.roles.includes('Receptionist')
+  const isSales = session.roles.includes('Sales') && !isReceptionist
   const agentName = `${session.profile?.first_name || ''} ${session.profile?.last_name || ''}`.trim() || session.user.email || 'Sales Agent'
+  const resolvedSource = isReceptionist ? 'walk_in' : isSales ? 'sales' : 'in_person'
+  const resolvedAttribution = isReceptionist
+    ? 'WALK IN'
+    : `${agentName} (${isSales ? 'Sales' : session.roles[0] || 'Staff'})`
 
   const { data, error } = await supabase
     .from('admission_applications')
@@ -538,9 +547,9 @@ export async function registerLearnerAction(payload: RegisterLearnerInput) {
       medical_conditions: payload.medicalConditions || null,
       additional_notes: payload.additionalNotes || null,
 
-      source: isSales ? 'sales' : 'in_person',
+      source: resolvedSource,
       registered_by: session.user.id,
-      sales_agent_name: `${agentName} (${isSales ? 'Sales' : session.roles[0] || 'Staff'})`,
+      sales_agent_name: resolvedAttribution,
       status: 'submitted',
     })
     .select('*')
@@ -549,6 +558,23 @@ export async function registerLearnerAction(payload: RegisterLearnerInput) {
   if (error) {
     console.error('[admissions/register] DB insert failed:', error)
     return { error: error.message }
+  }
+
+  // If caller requested immediate admission/enrollment (and is authorized to enroll)
+  if (payload.enrollImmediately && !isSales) {
+    const enrollRes = await enrollLearnerAction(data.id)
+    if (enrollRes.ok) {
+      return {
+        ok: true,
+        application: {
+          ...data,
+          status: 'enrolled',
+          enrolled_student_id: enrollRes.student_user_id,
+        },
+        enrolled: true,
+        student_id: enrollRes.student_id,
+      }
+    }
   }
 
   revalidatePath('/dashboard/principal/admissions')

@@ -108,6 +108,7 @@ export async function updateSession(request: NextRequest) {
 
       const roles = normalizeRoles(profile)
       const isSalesOnly = roles.length === 1 && roles[0] === 'Sales'
+      const isReceptionistOnly = roles.length === 1 && roles[0] === 'Receptionist'
 
       if (isSalesOnly && !pathname.startsWith('/dashboard/principal/admissions') && !pathname.startsWith('/dashboard/profile') && !pathname.startsWith('/dashboard/notifications')) {
         const url = request.nextUrl.clone()
@@ -115,10 +116,22 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url)
       }
 
+      if (
+        isReceptionistOnly &&
+        !pathname.startsWith('/dashboard/principal/admissions') &&
+        !pathname.startsWith('/dashboard/students') &&
+        !pathname.startsWith('/dashboard/profile') &&
+        !pathname.startsWith('/dashboard/notifications')
+      ) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/dashboard/principal/admissions'
+        return NextResponse.redirect(url)
+      }
+
       if (allowedRoles && !hasAnyRole(roles, allowedRoles)) {
         const url = request.nextUrl.clone()
-        url.pathname = isSalesOnly ? '/dashboard/principal/admissions' : '/dashboard'
-        if (!isSalesOnly) url.searchParams.set('denied', '1')
+        url.pathname = (isSalesOnly || isReceptionistOnly) ? '/dashboard/principal/admissions' : '/dashboard'
+        if (!isSalesOnly && !isReceptionistOnly) url.searchParams.set('denied', '1')
         return NextResponse.redirect(url)
       }
     }

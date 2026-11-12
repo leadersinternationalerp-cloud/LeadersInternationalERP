@@ -84,6 +84,7 @@ export function CreateUserForm() {
                   <option value="Dean">Dean</option>
                   <option value="Head of Section">Head of Section</option>
                   <option value="Sales">Sales</option>
+                  <option value="Receptionist">Receptionist</option>
                 </select>
               </div>
 

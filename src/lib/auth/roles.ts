@@ -9,6 +9,7 @@ export const ROLES = [
   'Student',
   'Parent',
   'Sales',
+  'Receptionist',
 ] as const
 
 export type Role = (typeof ROLES)[number]
@@ -23,6 +24,10 @@ const ALIASES: Record<string, Role> = {
   'sales person': 'Sales',
   salesperson: 'Sales',
   'Sales Person': 'Sales',
+  receptionist: 'Receptionist',
+  'front desk': 'Receptionist',
+  frontdesk: 'Receptionist',
+  'Front Desk': 'Receptionist',
 }
 
 export function coerceRole(value: string | null | undefined): Role | null {
@@ -58,6 +63,7 @@ export const STAFF_ROLES: Role[] = [
   'Accountant',
   'Teacher',
   'Sales',
+  'Receptionist',
 ]
 
 export const MANAGEMENT_ROLES: Role[] = [

@@ -38,7 +38,7 @@ export async function assertClassInScope(user: ApiUser, classId: string): Promis
 }
 
 export async function assertStudentInScope(user: ApiUser, studentId: string): Promise<void> {
-  if (hasAny(user.roles, MANAGEMENT_ROLES)) {
+  if (hasAny(user.roles, MANAGEMENT_ROLES) || user.roles.includes('Receptionist')) {
     return
   }
 

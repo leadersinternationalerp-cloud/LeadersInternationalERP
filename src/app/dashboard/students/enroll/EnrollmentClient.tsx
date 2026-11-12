@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { searchParentsAction, enrollStudentAction } from './actions'
 import { Sparkles, Camera } from 'lucide-react'
 
-export default function EnrollmentClient() {
+export default function EnrollmentClient({ isReceptionist = false }: { isReceptionist?: boolean }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -160,7 +160,11 @@ export default function EnrollmentClient() {
       }
     }
 
-    setSuccess(`Student enrolled successfully! Generated ID: ${generatedStudentId}`)
+    setSuccess(
+      `Student enrolled successfully! Generated ID: ${generatedStudentId}${
+        isReceptionist ? ' • Attributed to: WALK IN' : ''
+      }`
+    )
     
     // Reset Form
     setFormData({

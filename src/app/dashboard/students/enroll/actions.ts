@@ -9,7 +9,14 @@ import { getSessionUser } from '@/lib/auth/session'
 import { hasAnyRole } from '@/lib/auth/roles'
 import { sanitizePostgrestValue, escapeLike } from '@/lib/sanitize'
 
-const ALLOWED_STAFF_ROLES = ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section'] as const
+const ALLOWED_STAFF_ROLES = [
+  'System Admin',
+  'Director',
+  'Principal',
+  'Dean',
+  'Head of Section',
+  'Receptionist',
+] as const
 
 export async function searchParentsAction(query: string) {
   const session = await getSessionUser()
@@ -131,11 +138,16 @@ export async function enrollStudentAction(formData: any) {
     }
   }
 
-  // 4. Insert Student Record with EY specific fields
+  // 4. Insert Student Record with EY specific fields & Walk-In Attribution for Receptionist
+  const isReceptionist = session.roles.includes('Receptionist')
+  const studentSource = isReceptionist ? 'walk_in' : 'in_person'
+  const studentAttribution = isReceptionist ? 'WALK IN' : null
+
   const { error: studentError } = await supabaseService
     .from('students')
     .insert({
       id: userId,
+      profile_id: userId,
       student_id: studentIdStr,
       grade_level: formData.grade_level,
       section: formData.section || null,
@@ -147,12 +159,62 @@ export async function enrollStudentAction(formData: any) {
       allergies: formData.allergies || null,
       language_at_home: formData.language_at_home || null,
       previous_school: formData.previous_school || null,
-      emergency_contact: formData.emergency_contact || null
+      emergency_contact: formData.emergency_contact || null,
+      source: studentSource,
+      registered_by: session.user.id,
+      sales_agent_name: studentAttribution,
+      is_active: true,
     })
 
   if (studentError) {
     await supabaseService.auth.admin.deleteUser(userId)
     return { error: `Failed to create student record: ${studentError.message}` }
+  }
+
+  // Also record in admission_applications so Admissions Desk reflects Walk-In / Direct enrollments
+  try {
+    const year = new Date().getFullYear()
+    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase()
+    const applicationNo = `LIS-${year}-${randomSuffix}`
+
+    const { data: appData } = await supabaseService
+      .from('admission_applications')
+      .insert({
+        application_no: applicationNo,
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        date_of_birth: formData.dob || null,
+        gender: formData.gender || null,
+        nationality: formData.nationality || 'Tanzanian',
+        curriculum: (formData.grade_level || '').toLowerCase().includes('cambridge') ? 'Cambridge' : 'NECTA',
+        class_applied_for: formData.grade_level,
+        academic_year: `${year}/${year + 1}`,
+        start_term: 'Term 1',
+        previous_school: formData.previous_school || null,
+        parent_name: formData.emergency_contact || `${formData.first_name} ${formData.last_name} Guardian`,
+        parent_relationship: formData.relationship || 'Parent',
+        parent_email: email,
+        parent_phone: formData.phone || formData.emergency_contact || 'N/A',
+        medical_conditions: formData.medical_info || null,
+        additional_notes: formData.allergies ? `Allergies: ${formData.allergies}` : null,
+        source: studentSource,
+        registered_by: session.user.id,
+        sales_agent_name: studentAttribution,
+        enrolled_student_id: userId,
+        reviewed_by: session.user.id,
+        status: 'enrolled',
+      })
+      .select('id')
+      .maybeSingle()
+
+    if (appData?.id) {
+      await supabaseService
+        .from('students')
+        .update({ admission_id: appData.id })
+        .eq('id', userId)
+    }
+  } catch (appErr) {
+    console.warn('[enrollStudentAction] non-critical admission sync warning:', appErr)
   }
 
   // Insert into student_classes junction table if classId is found
@@ -183,10 +245,11 @@ export async function enrollStudentAction(formData: any) {
     }
   }
 
-  await logAuditAction('Student Enrolled', 'students', { student_id: studentIdStr, user_id: userId })
+  await logAuditAction('Student Enrolled', 'students', { student_id: studentIdStr, user_id: userId, source: studentSource, attribution: studentAttribution })
 
   revalidatePath('/dashboard/students')
-  return { success: true, student_id: studentIdStr }
+  revalidatePath('/dashboard/principal/admissions')
+  return { success: true, student_id: studentIdStr, attribution: studentAttribution }
 }
 
 export async function updateStudentAction(studentId: string, formData: any) {
@@ -245,14 +308,24 @@ export async function updateStudentAction(studentId: string, formData: any) {
     }
   }
 
-  // 3. Update Student Record (grade_level, section, class_id)
+  // 3. Update Student Record (grade_level, section, class_id, and bio-data fields)
+  const studentUpdatePayload: Record<string, any> = {
+    grade_level: formData.grade_level,
+    section: formData.section || null,
+    class_id: classId,
+  }
+  if (formData.dob !== undefined) studentUpdatePayload.dob = formData.dob || null
+  if (formData.gender !== undefined) studentUpdatePayload.gender = formData.gender || null
+  if (formData.nationality !== undefined) studentUpdatePayload.nationality = formData.nationality || null
+  if (formData.medical_info !== undefined) studentUpdatePayload.medical_info = formData.medical_info || null
+  if (formData.allergies !== undefined) studentUpdatePayload.allergies = formData.allergies || null
+  if (formData.language_at_home !== undefined) studentUpdatePayload.language_at_home = formData.language_at_home || null
+  if (formData.previous_school !== undefined) studentUpdatePayload.previous_school = formData.previous_school || null
+  if (formData.emergency_contact !== undefined) studentUpdatePayload.emergency_contact = formData.emergency_contact || null
+
   const { error: studentError } = await supabaseService
     .from('students')
-    .update({
-      grade_level: formData.grade_level,
-      section: formData.section || null,
-      class_id: classId
-    })
+    .update(studentUpdatePayload)
     .eq('id', studentId)
 
   if (studentError) {

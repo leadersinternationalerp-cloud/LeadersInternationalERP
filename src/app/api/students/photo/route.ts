@@ -108,7 +108,7 @@ export const POST = route(
     return ok({ photo_url: publicUrl }, { requestId }, 201)
   },
   {
-    roles: [...MANAGEMENT_ROLES, 'Teacher'],
+    roles: [...MANAGEMENT_ROLES, 'Teacher', 'Receptionist'],
     rateLimit: { key: 'photo-upload', max: 20, windowMs: 3600_000 },
   }
 )
@@ -135,5 +135,5 @@ export const DELETE = route(
 
     return ok({ success: true }, { requestId })
   },
-  { roles: [...MANAGEMENT_ROLES, 'Teacher'] }
+  { roles: [...MANAGEMENT_ROLES, 'Teacher', 'Receptionist'] }
 )

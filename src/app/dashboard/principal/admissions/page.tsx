@@ -14,6 +14,7 @@ const ALLOWED_STAFF_ROLES = [
   'Head of Section',
   'Accountant',
   'Sales',
+  'Receptionist',
 ] as const
 
 const PURGED_APPLICATION_NOS = ['LIS-2026-960M', 'LIS-2026-YOSZ', 'IS-2026-960M']
@@ -38,8 +39,9 @@ export default async function PrincipalAdmissionsPage() {
   }
 
   const isSalesOnly = session.roles.includes('Sales') && !session.roles.some((r) =>
-    ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section', 'Accountant'].includes(r)
+    ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section', 'Accountant', 'Receptionist'].includes(r)
   )
+  const isReceptionist = session.roles.includes('Receptionist')
 
   const agentFullName = `${session.profile?.first_name || ''} ${session.profile?.last_name || ''}`.trim()
 
@@ -88,10 +90,11 @@ export default async function PrincipalAdmissionsPage() {
         classes={classesData || []}
         currentUser={{
           id: session.user.id,
-          name: `${session.profile?.first_name || ''} ${session.profile?.last_name || ''}`.trim() || 'Sales Staff',
+          name: `${session.profile?.first_name || ''} ${session.profile?.last_name || ''}`.trim() || (isReceptionist ? 'Receptionist' : 'Sales Staff'),
           email: session.user.email || '',
           roles: session.roles,
           isSales: isSalesOnly,
+          isReceptionist,
         }}
       />
     </div>

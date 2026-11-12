@@ -4,7 +4,6 @@ import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import StudentPhotoManager from '@/components/StudentPhotoManager'
 import {
-  Search,
   UserPlus,
   FileSpreadsheet,
   Users,
@@ -12,10 +11,9 @@ import {
   User,
   Sparkles,
   School,
-  CheckCircle2,
-  X,
-  ArrowRight,
-  GraduationCap,
+  Eye,
+  HeartPulse,
+  Phone,
 } from 'lucide-react'
 import {
   updateStudentAction,
@@ -31,8 +29,23 @@ interface StudentRecord {
   section?: string
   parent_contact?: string
   class_id?: string
+  dob?: string | null
+  gender?: string | null
+  nationality?: string | null
+  place_of_birth?: string | null
+  medical_info?: string | null
+  allergies?: string | null
+  language_at_home?: string | null
+  previous_school?: string | null
+  emergency_contact?: string | null
+  admission_date?: string | null
+  parent_name?: string | null
+  parent_relationship?: string | null
+  parent_email?: string | null
+  parent_address?: string | null
+  parent_occupation?: string | null
   source?: string
-  sales_agent_name?: string
+  sales_agent_name?: string | null
   is_active?: boolean
   profiles?: {
     first_name: string
@@ -61,31 +74,47 @@ interface StudentsListClientProps {
 export default function StudentsListClient({
   initialStudents,
   userRoles,
-  terms,
   classes = [],
 }: StudentsListClientProps) {
   const [students, setStudents] = useState<StudentRecord[]>(initialStudents)
   const [search, setSearch] = useState('')
 
-  // Edit modal state (Class placement & student info)
+  // Bio Data view modal state
+  const [viewingBioStudent, setViewingBioStudent] = useState<StudentRecord | null>(null)
+
+  // Edit modal state (Class placement & student bio data)
   const [editingStudent, setEditingStudent] = useState<StudentRecord | null>(null)
   const [editForm, setEditForm] = useState({
     first_name: '',
     last_name: '',
     email: '',
     phone: '',
+    dob: '',
+    gender: 'Male',
+    nationality: 'Tanzanian',
+    language_at_home: 'English',
+    previous_school: '',
+    emergency_contact: '',
+    medical_info: '',
+    allergies: '',
     grade_level: '',
     section: '',
     class_id: '',
   })
   const [saving, setSaving] = useState(false)
 
-  // Invoice generator modal state (Requirement 3)
+  // Invoice generator modal state
   const [invoicingStudent, setInvoicingStudent] = useState<StudentRecord | null>(null)
   const [invoiceTerm, setInvoiceTerm] = useState('Term 1')
   const [invoiceYear, setInvoiceYear] = useState('2026/2027')
   const [invoicing, setInvoicing] = useState(false)
   const [invoiceStatus, setInvoiceStatus] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+
+  const isReceptionistOnly =
+    userRoles.includes('Receptionist') &&
+    !userRoles.some((r) =>
+      ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section', 'Teacher'].includes(r)
+    )
 
   // 1. Calculate class statistics
   const gradeCounts = useMemo(() => {
@@ -106,7 +135,9 @@ export default function StudentsListClient({
       const studentId = s.student_id?.toLowerCase() || ''
       const email = s.profiles?.email?.toLowerCase() || ''
       const parentContact = s.parent_contact?.toLowerCase() || ''
+      const parentName = s.parent_name?.toLowerCase() || ''
       const sales = s.sales_agent_name?.toLowerCase() || ''
+      const source = s.source?.toLowerCase() || ''
       const grade = s.grade_level?.toLowerCase() || ''
 
       return (
@@ -114,14 +145,17 @@ export default function StudentsListClient({
         studentId.includes(term) ||
         email.includes(term) ||
         parentContact.includes(term) ||
+        parentName.includes(term) ||
         sales.includes(term) ||
+        source.includes(term) ||
         grade.includes(term)
       )
     })
   }, [students, search])
 
-  // Determine report card generation link depending on role
+  // Determine report card generation link depending on role (Receptionist does NOT see academics)
   const getReportCardLink = () => {
+    if (isReceptionistOnly) return '#'
     if (userRoles.includes('System Admin') || userRoles.includes('Principal') || userRoles.includes('Director')) {
       return '/dashboard/principal/report-cards'
     }
@@ -149,6 +183,14 @@ export default function StudentsListClient({
       last_name: student.profiles?.last_name || '',
       email: student.profiles?.email || '',
       phone: student.profiles?.phone || student.parent_contact || '',
+      dob: student.dob || '',
+      gender: student.gender || 'Male',
+      nationality: student.nationality || 'Tanzanian',
+      language_at_home: student.language_at_home || 'English',
+      previous_school: student.previous_school || '',
+      emergency_contact: student.emergency_contact || '',
+      medical_info: student.medical_info || '',
+      allergies: student.allergies || '',
       grade_level: student.grade_level || 'Grade 1',
       section: student.section || '',
       class_id: student.class_id || '',
@@ -165,7 +207,7 @@ export default function StudentsListClient({
       if (res.error) {
         alert(res.error)
       } else {
-        alert('Student details and class placement successfully updated!')
+        alert('Student bio-data and class placement successfully updated!')
 
         // Update local state to reflect changes instantly
         setStudents((prev) =>
@@ -176,6 +218,14 @@ export default function StudentsListClient({
                   grade_level: editForm.grade_level,
                   section: editForm.section,
                   class_id: editForm.class_id || s.class_id,
+                  dob: editForm.dob || null,
+                  gender: editForm.gender || null,
+                  nationality: editForm.nationality || null,
+                  language_at_home: editForm.language_at_home || null,
+                  previous_school: editForm.previous_school || null,
+                  emergency_contact: editForm.emergency_contact || null,
+                  medical_info: editForm.medical_info || null,
+                  allergies: editForm.allergies || null,
                   parent_contact: editForm.phone || s.parent_contact,
                   profiles: s.profiles
                     ? {
@@ -260,7 +310,8 @@ export default function StudentsListClient({
     userRoles.includes('Principal') ||
     userRoles.includes('Dean') ||
     userRoles.includes('Head of Section') ||
-    userRoles.includes('Sales')
+    userRoles.includes('Sales') ||
+    userRoles.includes('Receptionist')
 
   const canInvoice =
     userRoles.includes('System Admin') ||
@@ -273,13 +324,34 @@ export default function StudentsListClient({
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)', margin: 0 }}>Student Directory</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)', margin: 0 }}>
+              {isReceptionistOnly ? 'Students List & Bio Data' : 'Student Directory'}
+            </h1>
+            {userRoles.includes('Receptionist') && (
+              <span
+                style={{
+                  padding: '0.2rem 0.7rem',
+                  borderRadius: '9999px',
+                  backgroundColor: '#fef3c7',
+                  color: '#78350f',
+                  border: '1px solid #fde68a',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                }}
+              >
+                Receptionist Desk • Bio Data Only
+              </span>
+            )}
+          </div>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', margin: '0.25rem 0 0' }}>
-            Enrolled learners, class placement, fee billing, and learner attribution.
+            {isReceptionistOnly
+              ? 'View all students bio-data, parent/emergency contacts, class placement, and WALK IN attribution.'
+              : 'Enrolled learners, student bio-data, class placement, fee billing, and learner attribution.'}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <Link
             href="/dashboard/principal/admissions"
             className="btn btn-secondary"
@@ -294,7 +366,7 @@ export default function StudentsListClient({
               className="btn btn-primary"
               style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}
             >
-              <UserPlus size={18} /> Enroll Student
+              <UserPlus size={18} /> {userRoles.includes('Receptionist') ? 'Register Walk-In Student' : 'Enroll Student'}
             </Link>
           )}
         </div>
@@ -327,280 +399,555 @@ export default function StudentsListClient({
 
       {/* Table Container */}
       <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ backgroundColor: 'rgba(0,0,0,0.03)', borderBottom: '1px solid var(--color-border)' }}>
-              <th style={{ padding: '1rem', width: '80px', fontWeight: 600 }}>Photo</th>
-              <th style={{ padding: '1rem', fontWeight: 600 }}>Student ID</th>
-              <th style={{ padding: '1rem', fontWeight: 600 }}>Name</th>
-              <th style={{ padding: '1rem', fontWeight: 600 }}>Class & Grade</th>
-              <th style={{ padding: '1rem', fontWeight: 600 }}>Attributed To</th>
-              <th style={{ padding: '1rem', fontWeight: 600 }}>Contact Details</th>
-              <th style={{ padding: '1rem', textAlign: 'right', fontWeight: 600, minWidth: '320px' }}>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredStudents.map((s) => {
-              const matchedClass = classes.find((c) => c.id === s.class_id)
-              const classNameDisplay = matchedClass
-                ? `${matchedClass.name || matchedClass.class_name}${matchedClass.section ? ` (${matchedClass.section})` : ''}`
-                : null
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ backgroundColor: 'rgba(0,0,0,0.03)', borderBottom: '1px solid var(--color-border)' }}>
+                <th style={{ padding: '1rem', width: '80px', fontWeight: 600 }}>Photo</th>
+                <th style={{ padding: '1rem', fontWeight: 600 }}>Student ID</th>
+                <th style={{ padding: '1rem', fontWeight: 600 }}>Name & Bio Summary</th>
+                <th style={{ padding: '1rem', fontWeight: 600 }}>Class & Grade</th>
+                <th style={{ padding: '1rem', fontWeight: 600 }}>Attributed To</th>
+                <th style={{ padding: '1rem', fontWeight: 600 }}>Guardian & Contact</th>
+                <th style={{ padding: '1rem', textAlign: 'right', fontWeight: 600, minWidth: '300px' }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredStudents.map((s) => {
+                const matchedClass = classes.find((c) => c.id === s.class_id)
+                const classNameDisplay = matchedClass
+                  ? `${matchedClass.name || matchedClass.class_name}${matchedClass.section ? ` (${matchedClass.section})` : ''}`
+                  : null
 
-              const isSales = Boolean(s.sales_agent_name || s.source === 'sales')
+                const isWalkIn = Boolean(s.source === 'walk_in' || s.sales_agent_name?.toUpperCase() === 'WALK IN')
+                const isSales = Boolean(!isWalkIn && (s.sales_agent_name || s.source === 'sales'))
 
-              return (
-                <tr
-                  key={s.id}
-                  style={{
-                    borderBottom: '1px solid var(--color-border)',
-                    opacity: s.is_active === false ? 0.6 : 1,
-                  }}
-                >
-                  <td style={{ padding: '0.75rem 1rem' }}>
-                    <StudentPhotoManager
-                      studentId={s.id}
-                      currentPhotoUrl={s.photo_url}
-                      studentName={`${s.profiles?.first_name || ''} ${s.profiles?.last_name || ''}`}
-                      onUploaded={(url) => handlePhotoUpdated(s.id, url)}
-                    />
-                  </td>
-                  <td style={{ padding: '1rem', fontWeight: 600, fontFamily: 'monospace' }}>{s.student_id}</td>
-                  <td style={{ padding: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontWeight: 600 }}>
-                        {s.profiles?.first_name} {s.profiles?.last_name}
-                      </span>
-                      {s.is_active === false && (
-                        <span
-                          style={{
-                            padding: '0.15rem 0.4rem',
-                            borderRadius: '4px',
-                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                            color: 'var(--color-error)',
-                            fontSize: '0.7rem',
-                            fontWeight: 600,
-                          }}
-                        >
-                          Inactive
+                return (
+                  <tr
+                    key={s.id}
+                    style={{
+                      borderBottom: '1px solid var(--color-border)',
+                      opacity: s.is_active === false ? 0.6 : 1,
+                    }}
+                  >
+                    <td style={{ padding: '0.75rem 1rem' }}>
+                      <StudentPhotoManager
+                        studentId={s.id}
+                        currentPhotoUrl={s.photo_url}
+                        studentName={`${s.profiles?.first_name || ''} ${s.profiles?.last_name || ''}`}
+                        onUploaded={(url) => handlePhotoUpdated(s.id, url)}
+                      />
+                    </td>
+                    <td style={{ padding: '1rem', fontWeight: 600, fontFamily: 'monospace' }}>{s.student_id}</td>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            onClick={() => setViewingBioStudent(s)}
+                            style={{
+                              fontWeight: 700,
+                              color: 'var(--color-primary)',
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              textDecoration: 'underline',
+                              textUnderlineOffset: '2px',
+                            }}
+                            title="Click to view full Student Bio Data"
+                          >
+                            {s.profiles?.first_name} {s.profiles?.last_name}
+                          </button>
+                          {s.is_active === false && (
+                            <span
+                              style={{
+                                padding: '0.15rem 0.4rem',
+                                borderRadius: '4px',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                color: 'var(--color-error)',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                              }}
+                            >
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                          {s.gender && <span>{s.gender}</span>}
+                          {s.dob && <span>• DOB: {s.dob}</span>}
+                          {s.nationality && <span>• {s.nationality}</span>}
+                        </div>
+                        {(s.medical_info || s.allergies) && (
+                          <div style={{ fontSize: '0.72rem', color: '#b45309', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <HeartPulse size={12} />
+                            <span>Medical/Allergy Note</span>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Class & Grade Placement */}
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                        {classNameDisplay ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              padding: '0.2rem 0.5rem',
+                              borderRadius: '6px',
+                              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                              color: 'var(--color-success)',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              width: 'fit-content',
+                            }}
+                          >
+                            <School size={12} />
+                            {classNameDisplay}
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              padding: '0.15rem 0.45rem',
+                              borderRadius: '4px',
+                              backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                              color: '#b45309',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              width: 'fit-content',
+                            }}
+                          >
+                            Unplaced in Class
+                          </span>
+                        )}
+                        <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                          Grade: {s.grade_level} {s.section ? `- ${s.section}` : ''}
                         </span>
-                      )}
-                    </div>
-                  </td>
+                      </div>
+                    </td>
 
-                  {/* Class & Grade Placement */}
-                  <td style={{ padding: '1rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                      {classNameDisplay ? (
+                    {/* Attribution Badge */}
+                    <td style={{ padding: '1rem' }}>
+                      {isWalkIn ? (
                         <span
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '0.3rem',
-                            padding: '0.2rem 0.5rem',
-                            borderRadius: '6px',
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                            color: 'var(--color-success)',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            width: 'fit-content',
+                            gap: '0.35rem',
+                            padding: '0.2rem 0.65rem',
+                            borderRadius: '9999px',
+                            backgroundColor: '#fef3c7',
+                            color: '#78350f',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            border: '1px solid #fde68a',
                           }}
+                          title="Attributed to: WALK IN (Registered by Receptionist)"
                         >
-                          <School size={12} />
-                          {classNameDisplay}
+                          <User size={12} />
+                          <span>WALK IN</span>
+                        </span>
+                      ) : isSales ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '9999px',
+                            backgroundColor: '#eef2ff',
+                            color: '#4338ca',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            border: '1px solid #c7d2fe',
+                          }}
+                          title={`Attributed to: ${s.sales_agent_name || 'Sales Agent'}`}
+                        >
+                          <User size={12} />
+                          <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {s.sales_agent_name || 'Sales Agent'}
+                          </span>
                         </span>
                       ) : (
                         <span
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '0.3rem',
-                            padding: '0.15rem 0.45rem',
-                            borderRadius: '4px',
-                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                            color: '#b45309',
+                            gap: '0.35rem',
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '9999px',
+                            backgroundColor: '#ecfdf5',
+                            color: '#065f46',
                             fontSize: '0.75rem',
                             fontWeight: 600,
-                            width: 'fit-content',
+                            border: '1px solid #a7f3d0',
                           }}
+                          title="Direct Website Applicant"
                         >
-                          Unplaced in Class
+                          <Sparkles size={12} />
+                          <span>(website)</span>
                         </span>
                       )}
-                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                        Grade: {s.grade_level} {s.section ? `- ${s.section}` : ''}
-                      </span>
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* Attribution Badge */}
-                  <td style={{ padding: '1rem' }}>
-                    {isSales ? (
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: '9999px',
-                          backgroundColor: '#eef2ff',
-                          color: '#4338ca',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          border: '1px solid #c7d2fe',
-                        }}
-                        title={`Attributed to: ${s.sales_agent_name || 'Sales Agent'}`}
-                      >
-                        <User size={12} />
-                        <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {s.sales_agent_name || 'Sales Agent'}
-                        </span>
-                      </span>
-                    ) : (
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: '9999px',
-                          backgroundColor: '#ecfdf5',
-                          color: '#065f46',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          border: '1px solid #a7f3d0',
-                        }}
-                        title="Direct Website Applicant"
-                      >
-                        <Sparkles size={12} />
-                        <span>(website)</span>
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Contact */}
-                  <td style={{ padding: '1rem' }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>{s.profiles?.email || 'No email'}</div>
-                    {s.parent_contact && s.parent_contact !== 'No phone' && (
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
-                        Phone: {s.parent_contact}
+                    {/* Contact */}
+                    <td style={{ padding: '1rem' }}>
+                      {s.parent_name && (
+                        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-text)' }}>
+                          {s.parent_name} {s.parent_relationship ? `(${s.parent_relationship})` : ''}
+                        </div>
+                      )}
+                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--color-text-muted)' }}>
+                        {s.parent_email || s.profiles?.email || 'No email'}
                       </div>
-                    )}
-                  </td>
+                      {s.parent_contact && s.parent_contact !== 'No phone' && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <Phone size={11} /> {s.parent_contact}
+                        </div>
+                      )}
+                    </td>
 
-                  {/* Actions */}
-                  <td style={{ padding: '1rem', textAlign: 'right' }}>
-                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                      {/* Generate Invoice Button */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setInvoicingStudent(s)
-                          setInvoiceStatus(null)
-                        }}
-                        className="btn btn-secondary"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          backgroundColor: 'var(--color-primary)',
-                          color: '#ffffff',
-                          border: 'none',
-                          padding: '0.4rem 0.75rem',
-                          fontSize: '0.8rem',
-                          fontWeight: 600,
-                          borderRadius: 'var(--radius-md)',
-                        }}
-                        title="Generate Fee Invoice for Student"
-                      >
-                        <Receipt size={13} />
-                        <span>Invoice</span>
-                      </button>
-
-                      {/* Edit / Class Placement Button */}
-                      {canEnroll && (
+                    {/* Actions */}
+                    <td style={{ padding: '1rem', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                        {/* View Full Bio Data Button */}
                         <button
                           type="button"
-                          onClick={() => handleStartEdit(s)}
-                          className="btn btn-primary"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            padding: '0.4rem 0.75rem',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            borderRadius: 'var(--radius-md)',
-                            border: 'none',
-                          }}
-                          title="Place in Class & Edit Details"
-                        >
-                          ✏ Edit
-                        </button>
-                      )}
-
-                      {/* Report Cards */}
-                      {reportLink !== '#' && (
-                        <Link
-                          href={reportLink}
+                          onClick={() => setViewingBioStudent(s)}
                           className="btn btn-secondary"
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '0.35rem',
-                            backgroundColor: 'var(--color-secondary)',
-                            color: '#ffffff',
-                            border: 'none',
                             padding: '0.4rem 0.75rem',
                             fontSize: '0.8rem',
                             fontWeight: 600,
-                            textDecoration: 'none',
                             borderRadius: 'var(--radius-md)',
                           }}
+                          title="View Complete Student Bio Data"
                         >
-                          <FileSpreadsheet size={13} />
-                          <span>Reports</span>
-                        </Link>
-                      )}
-
-                      {/* Activate / Deactivate */}
-                      {canEnroll && (
-                        <button
-                          type="button"
-                          onClick={() => handleToggleActive(s)}
-                          className="btn"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            padding: '0.4rem 0.65rem',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            borderRadius: 'var(--radius-md)',
-                            border: 'none',
-                            backgroundColor: s.is_active !== false ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                            color: s.is_active !== false ? 'var(--color-error)' : 'var(--color-success)',
-                          }}
-                        >
-                          {s.is_active !== false ? 'Deactivate' : 'Activate'}
+                          <Eye size={13} />
+                          <span>Bio Data</span>
                         </button>
-                      )}
-                    </div>
+
+                        {/* Generate Invoice Button (Finance & Management only) */}
+                        {canInvoice && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setInvoicingStudent(s)
+                              setInvoiceStatus(null)
+                            }}
+                            className="btn btn-secondary"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              backgroundColor: 'var(--color-primary)',
+                              color: '#ffffff',
+                              border: 'none',
+                              padding: '0.4rem 0.75rem',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              borderRadius: 'var(--radius-md)',
+                            }}
+                            title="Generate Fee Invoice for Student"
+                          >
+                            <Receipt size={13} />
+                            <span>Invoice</span>
+                          </button>
+                        )}
+
+                        {/* Edit / Class Placement Button */}
+                        {canEnroll && (
+                          <button
+                            type="button"
+                            onClick={() => handleStartEdit(s)}
+                            className="btn btn-primary"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              padding: '0.4rem 0.75rem',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              borderRadius: 'var(--radius-md)',
+                              border: 'none',
+                            }}
+                            title="Place in Class & Edit Bio Data"
+                          >
+                            ✏ Edit
+                          </button>
+                        )}
+
+                        {/* Report Cards (Academic roles only — hidden from Receptionist) */}
+                        {reportLink !== '#' && (
+                          <Link
+                            href={reportLink}
+                            className="btn btn-secondary"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              backgroundColor: 'var(--color-secondary)',
+                              color: '#ffffff',
+                              border: 'none',
+                              padding: '0.4rem 0.75rem',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              textDecoration: 'none',
+                              borderRadius: 'var(--radius-md)',
+                            }}
+                          >
+                            <FileSpreadsheet size={13} />
+                            <span>Reports</span>
+                          </Link>
+                        )}
+
+                        {/* Activate / Deactivate */}
+                        {canEnroll && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleActive(s)}
+                            className="btn"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.4rem 0.65rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              borderRadius: 'var(--radius-md)',
+                              border: 'none',
+                              backgroundColor: s.is_active !== false ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                              color: s.is_active !== false ? 'var(--color-error)' : 'var(--color-success)',
+                            }}
+                          >
+                            {s.is_active !== false ? 'Deactivate' : 'Activate'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+
+              {filteredStudents.length === 0 && (
+                <tr>
+                  <td colSpan={7} style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                    No students matching your search filters.
                   </td>
                 </tr>
-              )
-            })}
-
-            {filteredStudents.length === 0 && (
-              <tr>
-                <td colSpan={7} style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                  No students matching your search filters.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Edit & Class Placement Modal (Requirement 3) */}
+      {/* Full Student Bio Data Modal */}
+      {viewingBioStudent && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}
+          onClick={() => setViewingBioStudent(null)}
+        >
+          <div
+            className="glass-panel"
+            style={{
+              padding: '2rem',
+              borderRadius: 'var(--radius-xl)',
+              width: '100%',
+              maxWidth: '720px',
+              backgroundColor: 'var(--color-surface)',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <h2 style={{ fontSize: '1.4rem', margin: 0, color: 'var(--color-primary)' }}>
+                    {viewingBioStudent.profiles?.first_name} {viewingBioStudent.profiles?.last_name}
+                  </h2>
+                  <span
+                    style={{
+                      fontFamily: 'monospace',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: '6px',
+                      backgroundColor: 'rgba(0,0,0,0.05)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  >
+                    {viewingBioStudent.student_id}
+                  </span>
+                  {viewingBioStudent.source === 'walk_in' || viewingBioStudent.sales_agent_name?.toUpperCase() === 'WALK IN' ? (
+                    <span
+                      style={{
+                        padding: '0.2rem 0.65rem',
+                        borderRadius: '9999px',
+                        backgroundColor: '#fef3c7',
+                        color: '#78350f',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        border: '1px solid #fde68a',
+                      }}
+                    >
+                      Attributed to: WALK IN
+                    </span>
+                  ) : viewingBioStudent.sales_agent_name ? (
+                    <span
+                      style={{
+                        padding: '0.2rem 0.65rem',
+                        borderRadius: '9999px',
+                        backgroundColor: '#eef2ff',
+                        color: '#4338ca',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        border: '1px solid #c7d2fe',
+                      }}
+                    >
+                      Attributed to: {viewingBioStudent.sales_agent_name}
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        padding: '0.2rem 0.65rem',
+                        borderRadius: '9999px',
+                        backgroundColor: '#ecfdf5',
+                        color: '#065f46',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        border: '1px solid #a7f3d0',
+                      }}
+                    >
+                      Attributed to: (website)
+                    </span>
+                  )}
+                </div>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                  Complete Student Bio Data & Registration Profile
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingBioStudent(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+              {/* 1. Personal Bio Data */}
+              <div style={{ padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', letterSpacing: '0.05em' }}>
+                  1. Student Bio Data
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.85rem' }}>
+                  <div><strong>Full Name:</strong> {viewingBioStudent.profiles?.first_name} {viewingBioStudent.profiles?.last_name}</div>
+                  <div><strong>Student ID:</strong> {viewingBioStudent.student_id}</div>
+                  <div><strong>Gender:</strong> {viewingBioStudent.gender || 'Not specified'}</div>
+                  <div><strong>Date of Birth:</strong> {viewingBioStudent.dob || 'Not specified'}</div>
+                  {viewingBioStudent.place_of_birth && <div><strong>Place of Birth:</strong> {viewingBioStudent.place_of_birth}</div>}
+                  <div><strong>Nationality:</strong> {viewingBioStudent.nationality || 'Tanzanian'}</div>
+                  <div><strong>Language at Home:</strong> {viewingBioStudent.language_at_home || 'English'}</div>
+                </div>
+              </div>
+
+              {/* 2. Admission & Placement Info */}
+              <div style={{ padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', letterSpacing: '0.05em' }}>
+                  2. Admission & Class Placement
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.85rem' }}>
+                  <div><strong>Grade / Class:</strong> {viewingBioStudent.grade_level} {viewingBioStudent.section ? `(${viewingBioStudent.section})` : ''}</div>
+                  <div><strong>Admission Date:</strong> {viewingBioStudent.admission_date || 'N/A'}</div>
+                  <div><strong>Previous School:</strong> {viewingBioStudent.previous_school || 'None recorded'}</div>
+                  <div>
+                    <strong>Attribution:</strong>{' '}
+                    {viewingBioStudent.source === 'walk_in' || viewingBioStudent.sales_agent_name?.toUpperCase() === 'WALK IN'
+                      ? 'WALK IN'
+                      : viewingBioStudent.sales_agent_name || '(website)'}
+                  </div>
+                  <div><strong>Status:</strong> {viewingBioStudent.is_active !== false ? 'Active' : 'Inactive'}</div>
+                </div>
+              </div>
+
+              {/* 3. Parent / Guardian & Emergency Contact */}
+              <div style={{ padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', letterSpacing: '0.05em' }}>
+                  3. Parent / Guardian & Contact
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.85rem' }}>
+                  <div><strong>Parent / Guardian:</strong> {viewingBioStudent.parent_name || 'Not recorded'} {viewingBioStudent.parent_relationship ? `(${viewingBioStudent.parent_relationship})` : ''}</div>
+                  <div><strong>Contact Phone:</strong> {viewingBioStudent.parent_contact || viewingBioStudent.profiles?.phone || 'N/A'}</div>
+                  <div><strong>Contact Email:</strong> {viewingBioStudent.parent_email || viewingBioStudent.profiles?.email || 'N/A'}</div>
+                  {viewingBioStudent.parent_occupation && <div><strong>Occupation:</strong> {viewingBioStudent.parent_occupation}</div>}
+                  {viewingBioStudent.parent_address && <div><strong>Address:</strong> {viewingBioStudent.parent_address}</div>}
+                  <div><strong>Emergency Contact:</strong> {viewingBioStudent.emergency_contact || viewingBioStudent.parent_contact || 'N/A'}</div>
+                </div>
+              </div>
+
+              {/* 4. Health & Medical Bio Data */}
+              <div style={{ padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', letterSpacing: '0.05em' }}>
+                  4. Medical & Health Bio Data
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.85rem' }}>
+                  <div><strong>Medical Conditions:</strong> {viewingBioStudent.medical_info || 'None reported'}</div>
+                  <div><strong>Known Allergies:</strong> {viewingBioStudent.allergies || 'None reported'}</div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+              {canEnroll && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    const target = viewingBioStudent
+                    setViewingBioStudent(null)
+                    handleStartEdit(target)
+                  }}
+                >
+                  ✏ Edit Bio Data & Class
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setViewingBioStudent(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Bio Data & Class Placement Modal */}
       {editingStudent && (
         <div
           style={{
@@ -624,7 +971,7 @@ export default function StudentsListClient({
               padding: '2rem',
               borderRadius: 'var(--radius-xl)',
               width: '100%',
-              maxWidth: '650px',
+              maxWidth: '680px',
               backgroundColor: 'var(--color-surface)',
               maxHeight: '92vh',
               overflowY: 'auto',
@@ -634,7 +981,7 @@ export default function StudentsListClient({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
               <div>
                 <h2 style={{ fontSize: '1.35rem', margin: 0, color: 'var(--color-primary)' }}>
-                  Edit Student & Class Placement
+                  Edit Student Bio Data & Class Placement
                 </h2>
                 <p style={{ margin: '0.2rem 0 0', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
                   Student ID: <strong>{editingStudent.student_id}</strong>
@@ -685,11 +1032,11 @@ export default function StudentsListClient({
                   ))}
                 </select>
                 <p style={{ margin: '0.4rem 0 0', fontSize: '0.75rem', color: '#047857' }}>
-                  Assigning a class places the student in the class register and links them to the teacher timetable.
+                  Assigning a class places the student in the class register.
                 </p>
               </div>
 
-              {/* Personal Info */}
+              {/* Personal Bio Data */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label className="form-label" style={{ fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>
@@ -720,31 +1067,76 @@ export default function StudentsListClient({
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  className="input-field"
-                  style={{ width: '100%' }}
-                  value={editForm.email}
-                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    className="input-field"
+                    style={{ width: '100%' }}
+                    value={editForm.dob}
+                    onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>
+                    Gender
+                  </label>
+                  <select
+                    className="input-field"
+                    style={{ width: '100%', padding: '0.6rem' }}
+                    value={editForm.gender}
+                    onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>
+                    Nationality
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    style={{ width: '100%' }}
+                    value={editForm.nationality}
+                    onChange={(e) => setEditForm({ ...editForm, nationality: e.target.value })}
+                  />
+                </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>
-                  Contact Phone Number
-                </label>
-                <input
-                  type="text"
-                  className="input-field"
-                  style={{ width: '100%' }}
-                  value={editForm.phone}
-                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                  placeholder="e.g. +255712345678"
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    className="input-field"
+                    style={{ width: '100%' }}
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>
+                    Contact Phone Number
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    style={{ width: '100%' }}
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    placeholder="e.g. +255712345678"
+                  />
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -808,6 +1200,65 @@ export default function StudentsListClient({
                 </div>
               </div>
 
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>
+                    Previous School
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    style={{ width: '100%' }}
+                    value={editForm.previous_school}
+                    onChange={(e) => setEditForm({ ...editForm, previous_school: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>
+                    Emergency Contact
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    style={{ width: '100%' }}
+                    value={editForm.emergency_contact}
+                    onChange={(e) => setEditForm({ ...editForm, emergency_contact: e.target.value })}
+                    placeholder="Name & Phone"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>
+                    Medical Conditions
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    style={{ width: '100%' }}
+                    value={editForm.medical_info}
+                    onChange={(e) => setEditForm({ ...editForm, medical_info: e.target.value })}
+                    placeholder="e.g. Asthma, none"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600, marginBottom: '0.35rem', display: 'block' }}>
+                    Allergies
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    style={{ width: '100%' }}
+                    value={editForm.allergies}
+                    onChange={(e) => setEditForm({ ...editForm, allergies: e.target.value })}
+                    placeholder="e.g. Peanuts, none"
+                  />
+                </div>
+              </div>
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
                 <button
                   type="button"
@@ -826,7 +1277,7 @@ export default function StudentsListClient({
         </div>
       )}
 
-      {/* Quick Fee Invoice Generator Modal (Requirement 3) */}
+      {/* Quick Fee Invoice Generator Modal */}
       {invoicingStudent && (
         <div
           style={{

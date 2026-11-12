@@ -75,6 +75,7 @@ export default function DashboardLayoutClient({
     if (pathname.includes('/hos')) return 'Section Operations'
     if (pathname.includes('/staff/self-service')) return 'Self Service'
     if (pathname.includes('/students/enroll')) return 'Student Enrollment'
+    if (pathname.includes('/students')) return 'Students List & Bio Data'
     if (pathname.includes('/profile')) return 'My Profile'
     if (pathname.includes('/settings')) return 'Settings'
     return 'Dashboard Overview'
@@ -186,7 +187,8 @@ export default function DashboardLayoutClient({
         userRoles.includes('Head of Section') || 
         userRoles.includes('Accountant') || 
         userRoles.includes('Teacher') ||
-        userRoles.includes('Sales')) && (
+        userRoles.includes('Sales') ||
+        userRoles.includes('Receptionist')) && (
         <>
           <SectionHeader sectionKey="management" label="Management" />
           {expandedSections.management && (
@@ -213,10 +215,22 @@ export default function DashboardLayoutClient({
                 userRoles.includes('Principal') ||
                 userRoles.includes('Head of Section') ||
                 userRoles.includes('Dean') ||
-                userRoles.includes('Sales')) && (
+                userRoles.includes('Sales') ||
+                userRoles.includes('Receptionist')) && (
                 <NavLink href="/dashboard/principal/admissions" icon={FileSpreadsheet}>
                   Admissions Desk
                 </NavLink>
+              )}
+
+              {userRoles.includes('Receptionist') && (
+                <>
+                  <NavLink href="/dashboard/students" icon={Users}>
+                    Students List
+                  </NavLink>
+                  <NavLink href="/dashboard/students/enroll" icon={UsersRound}>
+                    Register / Enroll Student
+                  </NavLink>
+                </>
               )}
 
               {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
