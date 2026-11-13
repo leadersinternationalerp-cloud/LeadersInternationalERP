@@ -625,17 +625,40 @@ export async function registerLearnerAction(payload: RegisterLearnerInput) {
     return { error: error.message }
   }
 
+  // Persist TZS 20,000 application form invoice
+  let createdInvoice: any = null
+  const { data: invRow, error: invError } = await supabase
+    .from('admission_invoices')
+    .insert({
+      application_id: data.id,
+      invoice_no: `INV-${applicationNo}`,
+      amount: 20000,
+      currency: 'TZS',
+      status: 'unpaid',
+    })
+    .select('*')
+    .single()
+
+  if (invError) {
+    console.warn('[admissions/register] admission_invoices insert warning:', invError.message)
+  } else {
+    createdInvoice = invRow
+  }
+
   // If caller requested immediate admission/enrollment (and is authorized to enroll)
   if (payload.enrollImmediately && !isSales) {
     const enrollRes = await enrollLearnerAction(data.id)
     if (enrollRes.ok) {
+      revalidatePath('/dashboard/accountant/invoices')
       return {
         ok: true,
         application: {
           ...data,
           status: 'enrolled',
           enrolled_student_id: enrollRes.student_user_id,
+          admission_invoices: createdInvoice ? [createdInvoice] : [],
         },
+        invoice: createdInvoice,
         enrolled: true,
         student_id: enrollRes.student_id,
       }
@@ -643,5 +666,95 @@ export async function registerLearnerAction(payload: RegisterLearnerInput) {
   }
 
   revalidatePath('/dashboard/principal/admissions')
-  return { ok: true, application: data }
+  revalidatePath('/dashboard/accountant/invoices')
+  return {
+    ok: true,
+    application: {
+      ...data,
+      admission_invoices: createdInvoice ? [createdInvoice] : [],
+    },
+    invoice: createdInvoice,
+  }
+}
+
+const INVOICE_SETTLEMENT_ROLES = [
+  'System Admin',
+  'Director',
+  'Principal',
+  'Accountant',
+  'Receptionist',
+] as const
+
+export async function markAdmissionInvoicePaidAction(input: {
+  invoiceId?: string
+  applicationId: string
+  paymentMethod: string
+  paymentReference?: string
+  notes?: string
+}) {
+  const session = await getSessionUser()
+  if (!session.user || !hasAnyRole(session.roles, INVOICE_SETTLEMENT_ROLES)) {
+    return { error: 'Unauthorized to mark admission invoices as paid' }
+  }
+
+  const supabase = createServiceClient()
+  const now = new Date().toISOString()
+
+  let updatedInvoice: any = null
+
+  if (input.invoiceId) {
+    const { data, error } = await supabase
+      .from('admission_invoices')
+      .update({
+        status: 'paid',
+        payment_method: input.paymentMethod || 'Cash',
+        payment_reference: input.paymentReference?.trim() || null,
+        notes: input.notes?.trim() || null,
+        paid_at: now,
+        paid_by: session.user.id,
+        updated_at: now,
+      })
+      .eq('id', input.invoiceId)
+      .select('*')
+      .single()
+
+    if (error) return { error: error.message }
+    updatedInvoice = data
+  } else {
+    // Upsert by application_id in case application predated the invoice table
+    const { data: appRow } = await supabase
+      .from('admission_applications')
+      .select('application_no')
+      .eq('id', input.applicationId)
+      .single()
+
+    const invoiceNo = `INV-${appRow?.application_no || input.applicationId.slice(0, 8).toUpperCase()}`
+    const { data, error } = await supabase
+      .from('admission_invoices')
+      .upsert(
+        {
+          application_id: input.applicationId,
+          invoice_no: invoiceNo,
+          amount: 20000,
+          currency: 'TZS',
+          status: 'paid',
+          payment_method: input.paymentMethod || 'Cash',
+          payment_reference: input.paymentReference?.trim() || null,
+          notes: input.notes?.trim() || null,
+          paid_at: now,
+          paid_by: session.user.id,
+          updated_at: now,
+        },
+        { onConflict: 'application_id' }
+      )
+      .select('*')
+      .single()
+
+    if (error) return { error: error.message }
+    updatedInvoice = data
+  }
+
+  revalidatePath('/dashboard/principal/admissions')
+  revalidatePath('/dashboard/accountant/invoices')
+  return { ok: true, invoice: updatedInvoice }
 }

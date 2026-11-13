@@ -35,9 +35,24 @@ import {
   enrollLearnerAction,
   deleteApplicationAction,
   registerLearnerAction,
+  markAdmissionInvoicePaidAction,
   type RegisterLearnerInput,
   type EnrollLearnerDetailsInput,
 } from './actions'
+import { downloadApplicationInvoicePdf } from '@/lib/admissions/applicationInvoicePdf'
+
+export interface AdmissionInvoice {
+  id: string
+  application_id: string
+  invoice_no: string
+  amount: number
+  currency: string
+  status: 'unpaid' | 'paid' | 'waived'
+  payment_method?: string | null
+  payment_reference?: string | null
+  paid_at?: string | null
+  created_at?: string
+}
 
 export interface AdmissionApplication {
   id: string
@@ -89,6 +104,7 @@ export interface AdmissionApplication {
   email_sent_at?: string | null
   notes?: string | null
   created_at: string
+  admission_invoices?: AdmissionInvoice[]
 }
 
 export interface ClassOption {
@@ -175,7 +191,21 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
   const [notesInput, setNotesInput] = useState('')
   const [targetClassId, setTargetClassId] = useState<string>('')
   const [isPending, startTransition] = useTransition()
-  const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info'; invoiceUrl?: string } | null>(null)
+  const [statusMessage, setStatusMessage] = useState<{
+    text: string
+    type: 'success' | 'error' | 'info'
+    invoiceUrl?: string
+    invoiceApp?: AdmissionApplication
+  } | null>(null)
+
+  const canSettleInvoices = Boolean(
+    currentUser?.roles?.some((r) =>
+      ['System Admin', 'Director', 'Principal', 'Accountant', 'Receptionist'].includes(r)
+    )
+  )
+  const [payingInvoiceApp, setPayingInvoiceApp] = useState<AdmissionApplication | null>(null)
+  const [payMethod, setPayMethod] = useState('Cash')
+  const [payReference, setPayReference] = useState('')
 
   // Enroll & Admit Student to Class Modal State
   const [enrollingApp, setEnrollingApp] = useState<AdmissionApplication | null>(null)
@@ -572,8 +602,9 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
         setStatusMessage({
           text: res.enrolled
             ? `✓ Learner "${res.application.first_name} ${res.application.last_name}" registered & enrolled! Student ID: ${res.student_id} • Attributed to: ${attributionLabel}.`
-            : `✓ Learner "${res.application.first_name} ${res.application.last_name}" registered successfully! Attributed to: ${attributionLabel}. Application #: ${res.application.application_no}`,
+            : `✓ Learner "${res.application.first_name} ${res.application.last_name}" registered! Attributed to: ${attributionLabel}. Ref: ${res.application.application_no} • TZS 20,000 Invoice ready.`,
           type: 'success',
+          invoiceApp: res.application,
         })
         // Reset form
         setRegForm({
@@ -603,6 +634,65 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
       } else {
         setStatusMessage({
           text: res.error || 'Failed to register learner',
+          type: 'error',
+        })
+      }
+    })
+  }
+
+  const triggerAppInvoiceDownload = (app: AdmissionApplication) => {
+    const inv = app.admission_invoices?.[0]
+    downloadApplicationInvoicePdf({
+      reference: app.application_no,
+      invoiceNo: inv?.invoice_no || `INV-${app.application_no}`,
+      issueDate: new Date(inv?.created_at || app.created_at).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }),
+      status: inv?.status || 'unpaid',
+      amount: Number(inv?.amount || 20000),
+      studentName: [app.first_name, app.middle_name, app.last_name].filter(Boolean).join(' '),
+      parentName: app.parent_name,
+      parentPhone: app.parent_phone,
+      parentEmail: app.parent_email,
+      curriculum: app.curriculum || 'Cambridge',
+      applyingFor: app.class_applied_for,
+      startTerm: app.start_term || 'Term 1',
+      paymentMethod: inv?.payment_method,
+      paymentReference: inv?.payment_reference,
+      paidAt: inv?.paid_at,
+    })
+  }
+
+  const handleMarkInvoicePaid = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!payingInvoiceApp) return
+    const existingInv = payingInvoiceApp.admission_invoices?.[0]
+    startTransition(async () => {
+      const res = await markAdmissionInvoicePaidAction({
+        invoiceId: existingInv?.id,
+        applicationId: payingInvoiceApp.id,
+        paymentMethod: payMethod,
+        paymentReference: payReference,
+      })
+      if (res.ok && res.invoice) {
+        setApplications((prev) =>
+          prev.map((a) =>
+            a.id === payingInvoiceApp.id ? { ...a, admission_invoices: [res.invoice] } : a
+          )
+        )
+        setStatusMessage({
+          text: `✓ Admission Invoice ${res.invoice.invoice_no} (TZS 20,000) marked as PAID via ${payMethod}.`,
+          type: 'success',
+          invoiceApp: { ...payingInvoiceApp, admission_invoices: [res.invoice] },
+        })
+        setPayingInvoiceApp(null)
+        setPayMethod('Cash')
+        setPayReference('')
+      } else {
+        setStatusMessage({
+          text: res.error || 'Failed to mark invoice as paid',
           type: 'error',
         })
       }
@@ -717,6 +807,16 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                 <Download size={13} />
                 <span>Download Invoice (PDF)</span>
               </a>
+            )}
+            {statusMessage.invoiceApp && (
+              <button
+                type="button"
+                onClick={() => triggerAppInvoiceDownload(statusMessage.invoiceApp!)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-xs transition-colors cursor-pointer"
+              >
+                <Download size={13} />
+                <span>Download 20,000 TZS Invoice (PDF)</span>
+              </button>
             )}
           </div>
           <button
@@ -1085,17 +1185,63 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
 
                       {/* Status */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold shadow-2xs whitespace-nowrap ${conf.badgeClass}`}
-                        >
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${conf.dotClass}`} />
-                          <span>{conf.label}</span>
-                        </span>
+                        <div className="flex flex-col gap-1.5 items-start">
+                          <span
+                            className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold shadow-2xs whitespace-nowrap ${conf.badgeClass}`}
+                          >
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${conf.dotClass}`} />
+                            <span>{conf.label}</span>
+                          </span>
+                          {(() => {
+                            const inv = app.admission_invoices?.[0]
+                            const isPaid = inv?.status === 'paid'
+                            return (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold border ${
+                                  isPaid
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                                }`}
+                                title={inv?.invoice_no || `INV-${app.application_no}`}
+                              >
+                                <Receipt size={11} />
+                                <span>20,000 TZS · {isPaid ? 'Paid' : 'Unpaid'}</span>
+                              </span>
+                            )
+                          })()}
+                        </div>
                       </td>
 
                       {/* Actions */}
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
                         <div className="inline-flex items-center justify-end gap-1.5">
+                          {/* Download 20,000 TZS Application Invoice */}
+                          <button
+                            type="button"
+                            onClick={() => triggerAppInvoiceDownload(app)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 transition-colors cursor-pointer"
+                            title="Download 20,000 TZS Application Invoice PDF"
+                          >
+                            <Receipt size={13} />
+                            <span>20k Inv</span>
+                          </button>
+
+                          {/* Mark Application Invoice Paid */}
+                          {canSettleInvoices && app.admission_invoices?.[0]?.status !== 'paid' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPayingInvoiceApp(app)
+                                setPayMethod('Cash')
+                                setPayReference('')
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-all cursor-pointer"
+                              title="Mark 20,000 TZS Application Invoice as Paid"
+                            >
+                              <CheckCircle2 size={13} />
+                              <span>Mark Paid</span>
+                            </button>
+                          )}
                           {/* View Form PDF in Modal */}
                           <button
                             type="button"
@@ -2289,7 +2435,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                   className="btn btn-primary text-sm inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700"
                 >
                   <UserPlus size={16} />
-                  <span>{isPending ? 'Registering...' : 'Register Learner'}</span>
+                  <span>{isPending ? 'Submitting & Generating Invoice...' : 'Submit & Pay (TZS 20,000 Invoice)'}</span>
                 </button>
               </div>
             </form>
@@ -2357,6 +2503,91 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                 title={`Official Admission Form - ${previewPdfApp.application_no}`}
               />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. Mark 20,000 TZS Application Invoice Paid Modal */}
+      {payingInvoiceApp && (
+        <div
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setPayingInvoiceApp(null)}
+        >
+          <div
+            className="glass-panel"
+            style={{
+              maxWidth: '460px',
+              width: '100%',
+              borderRadius: 'var(--radius-xl)',
+              padding: '1.5rem',
+              backgroundColor: 'var(--color-surface)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 m-0">Mark Application Invoice Paid</h3>
+                <p className="text-xs text-slate-500 m-0 mt-0.5">
+                  {payingInvoiceApp.first_name} {payingInvoiceApp.last_name} ·{' '}
+                  {payingInvoiceApp.admission_invoices?.[0]?.invoice_no || `INV-${payingInvoiceApp.application_no}`} ·{' '}
+                  <strong>TZS 20,000</strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPayingInvoiceApp(null)}
+                className="text-slate-400 hover:text-slate-700"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleMarkInvoicePaid} className="flex flex-col gap-4 mt-4">
+              <div className="form-group">
+                <label className="form-label text-xs font-semibold">Payment Method *</label>
+                <select
+                  className="input-field text-sm"
+                  value={payMethod}
+                  onChange={(e) => setPayMethod(e.target.value)}
+                  required
+                >
+                  <option value="Cash">Cash (Accounts / Reception)</option>
+                  <option value="M-Pesa">M-Pesa</option>
+                  <option value="Airtel Money">Airtel Money</option>
+                  <option value="Tigo Pesa">Tigo Pesa</option>
+                  <option value="Bank Transfer">Bank Transfer (NMB / CRDB)</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label text-xs font-semibold">Receipt / Transaction Reference</label>
+                <input
+                  type="text"
+                  className="input-field text-sm"
+                  placeholder="e.g. MPESA-9X2K1 or Receipt #042"
+                  value={payReference}
+                  onChange={(e) => setPayReference(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setPayingInvoiceApp(null)}
+                  className="btn btn-secondary text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="btn btn-primary text-sm inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <CheckCircle2 size={15} />
+                  <span>{isPending ? 'Saving...' : 'Confirm Paid (TZS 20,000)'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

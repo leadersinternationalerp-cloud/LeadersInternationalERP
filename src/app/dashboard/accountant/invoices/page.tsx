@@ -55,6 +55,35 @@ export default async function InvoicesPage() {
     }
   })
 
+  // Fetch admission form invoices (TZS 20,000)
+  let admissionInvoices: any[] = []
+  try {
+    const { data: admInvRaw } = await supabase
+      .from('admission_invoices')
+      .select(`
+        *,
+        admission_applications:application_id (
+          id,
+          application_no,
+          first_name,
+          middle_name,
+          last_name,
+          curriculum,
+          class_applied_for,
+          start_term,
+          parent_name,
+          parent_phone,
+          parent_email,
+          source,
+          sales_agent_name
+        )
+      `)
+      .order('created_at', { ascending: false })
+    admissionInvoices = admInvRaw || []
+  } catch (admErr) {
+    console.warn('[invoices/page] admission_invoices query notice:', admErr)
+  }
+
   // Server action handler to trigger generation
   async function handleBulkGenerate(formData: FormData) {
     'use server'
@@ -140,7 +169,7 @@ export default async function InvoicesPage() {
         </div>
 
         {/* Invoices List */}
-        <InvoicesClient initialInvoices={invoices || []} />
+        <InvoicesClient initialInvoices={invoices || []} initialAdmissionInvoices={admissionInvoices} />
       </div>
     </div>
   )

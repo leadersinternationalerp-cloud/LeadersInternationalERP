@@ -195,7 +195,9 @@ export const POST = route(
 
     // 2. Persist in database
     const supabase = createServiceClient()
-    const { error: dbError } = await supabase.from('admission_applications').insert({
+    const { data: insertedApp, error: dbError } = await supabase
+      .from('admission_applications')
+      .insert({
       application_no: applicationNo,
       first_name: firstName,
       last_name: lastName,
@@ -238,10 +240,23 @@ export const POST = route(
       pdf_sent_to_school: false,
       pdf_sent_to_parent: false,
     })
+      .select('id')
+      .single()
 
     if (dbError) {
       console.error('[admissions/apply] DB insert error:', dbError)
       // Even if DB has issue, we proceed to dispatch email so application is not lost
+    } else if (insertedApp?.id) {
+      const { error: invErr } = await supabase.from('admission_invoices').insert({
+        application_id: insertedApp.id,
+        invoice_no: `INV-${applicationNo}`,
+        amount: 20000,
+        currency: 'TZS',
+        status: 'unpaid',
+      })
+      if (invErr) {
+        console.warn('[admissions/apply] admission_invoices insert warning:', invErr.message)
+      }
     }
 
     // 3. Dispatch Email to Admissions Office

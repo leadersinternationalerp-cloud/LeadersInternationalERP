@@ -61,15 +61,31 @@ export default async function PrincipalAdmissionsPage() {
     console.error('[admissions/page] failed to fetch applications:', error)
   }
 
-  // 3. Fetch school classes for enrollment placement
+  // 3. Fetch admission fee invoices (graceful if migration not yet applied)
+  let invoicesByAppId: Record<string, any[]> = {}
+  try {
+    const { data: invData } = await supabase
+      .from('admission_invoices')
+      .select('*')
+    if (invData) {
+      for (const inv of invData) {
+        if (!invoicesByAppId[inv.application_id]) invoicesByAppId[inv.application_id] = []
+        invoicesByAppId[inv.application_id].push(inv)
+      }
+    }
+  } catch (invErr) {
+    console.warn('[admissions/page] admission_invoices query notice:', invErr)
+  }
+
+  // 4. Fetch school classes for enrollment placement
   const { data: classesData } = await supabase
     .from('classes')
     .select('id, name, class_name, section, grade_level')
     .order('name', { ascending: true })
 
-  // 4. Defensively filter out purged records and enforce Sales attribution scope
-  const applications: AdmissionApplication[] = ((data || []) as AdmissionApplication[]).filter(
-    (app) => {
+  // 5. Defensively filter out purged records and enforce Sales attribution scope
+  const applications: AdmissionApplication[] = ((data || []) as AdmissionApplication[])
+    .filter((app) => {
       if (
         PURGED_APPLICATION_NOS.includes(app.application_no) ||
         PURGED_EMAILS.includes(app.parent_email?.toLowerCase())
@@ -80,8 +96,11 @@ export default async function PrincipalAdmissionsPage() {
         return app.registered_by === session.user.id
       }
       return true
-    }
-  )
+    })
+    .map((app) => ({
+      ...app,
+      admission_invoices: invoicesByAppId[app.id] || [],
+    }))
 
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
