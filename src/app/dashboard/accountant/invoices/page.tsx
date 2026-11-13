@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/utils/supabase/service'
+import { ensureMissingAdmissionInvoices } from '@/lib/admissions/ensureAdmissionInvoices'
 import { getSessionUser } from '@/lib/auth/session'
 import { hasAnyRole } from '@/lib/auth/roles'
 import { generateInvoicesAction } from '../actions'
@@ -55,9 +56,10 @@ export default async function InvoicesPage() {
     }
   })
 
-  // Fetch admission form invoices (TZS 20,000)
+  // Backfill & fetch admission form invoices (TZS 20,000)
   let admissionInvoices: any[] = []
   try {
+    await ensureMissingAdmissionInvoices(supabase)
     const { data: admInvRaw } = await supabase
       .from('admission_invoices')
       .select(`

@@ -1,6 +1,7 @@
 import { getSessionUser } from '@/lib/auth/session'
 import { hasAnyRole } from '@/lib/auth/roles'
 import { createServiceClient } from '@/utils/supabase/service'
+import { ensureMissingAdmissionInvoices } from '@/lib/admissions/ensureAdmissionInvoices'
 import AdmissionsClient, { type AdmissionApplication } from './AdmissionsClient'
 import { redirect } from 'next/navigation'
 
@@ -61,9 +62,10 @@ export default async function PrincipalAdmissionsPage() {
     console.error('[admissions/page] failed to fetch applications:', error)
   }
 
-  // 3. Fetch admission fee invoices (graceful if migration not yet applied)
+  // 3. Backfill & fetch admission fee invoices (graceful if migration not yet applied)
   let invoicesByAppId: Record<string, any[]> = {}
   try {
+    await ensureMissingAdmissionInvoices(supabase)
     const { data: invData } = await supabase
       .from('admission_invoices')
       .select('*')
