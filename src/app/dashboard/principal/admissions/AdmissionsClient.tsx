@@ -202,23 +202,28 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
 
   // Registration Modal State for Sales Persons / Staff
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
+  const [showClassBreakdown, setShowClassBreakdown] = useState(false)
   const [regForm, setRegForm] = useState<RegisterLearnerInput>({
     firstName: '',
     lastName: '',
     middleName: '',
     gender: 'Male',
     dob: '',
-    classAppliedFor: 'Cambridge Year 1',
+    nationality: 'Tanzanian',
+    classAppliedFor: classes[0]?.class_name || classes[0]?.name || 'Cambridge Year 1',
     curriculum: 'Cambridge',
     academicYear: '2026/2027',
     startTerm: 'Term 1',
+    previousSchool: '',
     parentName: '',
     parentPhone: '',
+    parentWhatsapp: '',
     parentEmail: '',
-    parentRelationship: 'Parent',
+    parentRelationship: 'Mother',
     parentAddress: '',
     feePlan: 'Standard Termly',
     transportRequired: false,
+    medicalConditions: '',
     additionalNotes: '',
     enrollImmediately: false,
   })
@@ -281,6 +286,21 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
       return matchSearch && matchStatus && matchCurriculum && matchAttribution
     })
   }, [applications, searchTerm, statusFilter, curriculumFilter, attributionFilter])
+
+  const classGenderBreakdown = useMemo(() => {
+    const map = new Map<string, { classroom: string; male: number; female: number; enrolled: number; total: number }>()
+    for (const app of filtered) {
+      const cls = (app.class_applied_for || 'Unassigned').trim()
+      const row = map.get(cls) || { classroom: cls, male: 0, female: 0, enrolled: 0, total: 0 }
+      const g = (app.gender || '').toLowerCase()
+      if (g === 'male') row.male += 1
+      else if (g === 'female') row.female += 1
+      if (app.status === 'enrolled') row.enrolled += 1
+      row.total += 1
+      map.set(cls, row)
+    }
+    return Array.from(map.values()).sort((a, b) => a.classroom.localeCompare(b.classroom))
+  }, [filtered])
 
   const openModal = (app: AdmissionApplication) => {
     setSelectedApp(app)
@@ -562,17 +582,21 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
           middleName: '',
           gender: 'Male',
           dob: '',
-          classAppliedFor: 'Cambridge Year 1',
+          nationality: 'Tanzanian',
+          classAppliedFor: classes[0]?.class_name || classes[0]?.name || 'Cambridge Year 1',
           curriculum: 'Cambridge',
           academicYear: '2026/2027',
           startTerm: 'Term 1',
+          previousSchool: '',
           parentName: '',
           parentPhone: '',
+          parentWhatsapp: '',
           parentEmail: '',
-          parentRelationship: 'Parent',
+          parentRelationship: 'Mother',
           parentAddress: '',
           feePlan: 'Standard Termly',
           transportRequired: false,
+          medicalConditions: '',
           additionalNotes: '',
           enrollImmediately: false,
         })
@@ -629,6 +653,19 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
           >
             <UserPlus size={16} className="shrink-0" />
             <span>+ Register Learner</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowClassBreakdown((v) => !v)}
+            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-colors shadow-2xs whitespace-nowrap cursor-pointer ${
+              showClassBreakdown
+                ? 'bg-slate-900 text-white border-slate-900'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            <School size={16} className={showClassBreakdown ? 'text-amber-400 shrink-0' : 'text-slate-500 shrink-0'} />
+            <span>Class &amp; Gender Breakdown</span>
           </button>
 
           {!currentUser?.isSales && (
@@ -785,6 +822,60 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
           </>
         )}
       </div>
+
+      {/* Collapsible Classroom & Gender Breakdown */}
+      {showClassBreakdown && (
+        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 m-0">
+                Classroom &amp; Gender Breakdown
+              </h3>
+              <p className="text-xs text-slate-500 m-0 mt-0.5">
+                Live breakdown of filtered applications ({filtered.length} total) across classrooms.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowClassBreakdown(false)}
+              className="text-slate-400 hover:text-slate-700 p-1"
+              aria-label="Close breakdown"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          {classGenderBreakdown.length === 0 ? (
+            <div className="text-xs text-slate-500 py-4 text-center">
+              No applications match the current filters.
+            </div>
+          ) : (
+            <div className="table-wrapper">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th>Classroom</th>
+                    <th className="text-right">Male</th>
+                    <th className="text-right">Female</th>
+                    <th className="text-right">Enrolled</th>
+                    <th className="text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {classGenderBreakdown.map((row) => (
+                    <tr key={row.classroom}>
+                      <td className="font-semibold text-slate-900">{row.classroom}</td>
+                      <td className="text-right">{row.male}</td>
+                      <td className="text-right">{row.female}</td>
+                      <td className="text-right text-emerald-700 font-semibold">{row.enrolled}</td>
+                      <td className="text-right font-bold text-slate-900">{row.total}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 3. Search and Filters Toolbar */}
       <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-3">
@@ -1878,7 +1969,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
             <form onSubmit={handleRegisterSubmit} className="flex flex-col gap-4 mt-4">
               {/* Learner Info */}
               <div className="text-xs font-bold uppercase text-slate-500 tracking-wider">
-                1. Learner Information
+                1. Learner Information <span className="font-normal text-slate-400">/ Taarifa za Mwanafunzi</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="form-group">
@@ -1912,7 +2003,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                 <div className="form-group">
                   <label className="form-label text-xs font-semibold">Gender</label>
                   <select
@@ -1934,6 +2025,16 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                   />
                 </div>
                 <div className="form-group">
+                  <label className="form-label text-xs font-semibold">Nationality</label>
+                  <input
+                    type="text"
+                    className="input-field text-sm"
+                    placeholder="Tanzanian"
+                    value={regForm.nationality || ''}
+                    onChange={(e) => setRegForm({ ...regForm, nationality: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
                   <label className="form-label text-xs font-semibold">Curriculum</label>
                   <select
                     className="input-field text-sm"
@@ -1946,17 +2047,44 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="form-group">
                   <label className="form-label text-xs font-semibold">Class Applied For *</label>
-                  <input
-                    type="text"
+                  <select
                     required
-                    placeholder="e.g. Cambridge Year 1, Nursery, Grade 1"
                     className="input-field text-sm"
                     value={regForm.classAppliedFor}
                     onChange={(e) => setRegForm({ ...regForm, classAppliedFor: e.target.value })}
-                  />
+                  >
+                    {classes.length > 0 ? (
+                      classes.map((cls) => {
+                        const label = cls.class_name || cls.name
+                        return (
+                          <option key={cls.id} value={label}>
+                            {label}
+                          </option>
+                        )
+                      })
+                    ) : (
+                      <>
+                        <option value="Nursery">Nursery</option>
+                        <option value="Reception">Reception</option>
+                        <option value="Cambridge Year 1">Cambridge Year 1</option>
+                        <option value="Cambridge Year 2">Cambridge Year 2</option>
+                        <option value="Cambridge Year 3">Cambridge Year 3</option>
+                        <option value="Cambridge Year 4">Cambridge Year 4</option>
+                        <option value="Cambridge Year 5">Cambridge Year 5</option>
+                        <option value="Cambridge Year 6">Cambridge Year 6</option>
+                        <option value="Cambridge Year 7">Cambridge Year 7</option>
+                        <option value="Cambridge Year 8">Cambridge Year 8</option>
+                        <option value="Cambridge Year 9">Cambridge Year 9</option>
+                        <option value="Form 1">Form 1</option>
+                        <option value="Form 2">Form 2</option>
+                        <option value="Form 3">Form 3</option>
+                        <option value="Form 4">Form 4</option>
+                      </>
+                    )}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label className="form-label text-xs font-semibold">Academic Year</label>
@@ -1967,11 +2095,46 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                     onChange={(e) => setRegForm({ ...regForm, academicYear: e.target.value })}
                   />
                 </div>
+                <div className="form-group">
+                  <label className="form-label text-xs font-semibold">Start Term</label>
+                  <select
+                    className="input-field text-sm"
+                    value={regForm.startTerm || 'Term 1'}
+                    onChange={(e) => setRegForm({ ...regForm, startTerm: e.target.value })}
+                  >
+                    <option value="Term 1">Term 1</option>
+                    <option value="Term 2">Term 2</option>
+                    <option value="Term 3">Term 3</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="form-group">
+                  <label className="form-label text-xs font-semibold">Previous School (if any)</label>
+                  <input
+                    type="text"
+                    className="input-field text-sm"
+                    placeholder="Name of previous school"
+                    value={regForm.previousSchool || ''}
+                    onChange={(e) => setRegForm({ ...regForm, previousSchool: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label text-xs font-semibold">Medical / Dietary Notes</label>
+                  <input
+                    type="text"
+                    className="input-field text-sm"
+                    placeholder="Allergies, dietary preference, or medical notes"
+                    value={regForm.medicalConditions || ''}
+                    onChange={(e) => setRegForm({ ...regForm, medicalConditions: e.target.value })}
+                  />
+                </div>
               </div>
 
               {/* Parent Info */}
               <div className="text-xs font-bold uppercase text-slate-500 tracking-wider pt-2 border-t border-slate-100">
-                2. Parent / Guardian Information
+                2. Parent / Guardian Information <span className="font-normal text-slate-400">/ Taarifa za Mzazi</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="form-group">
@@ -1985,27 +2148,40 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label text-xs font-semibold">Relationship</label>
-                  <input
-                    type="text"
+                  <label className="form-label text-xs font-semibold">Relationship to Student</label>
+                  <select
                     className="input-field text-sm"
-                    placeholder="Father, Mother, Guardian"
-                    value={regForm.parentRelationship}
+                    value={regForm.parentRelationship || 'Mother'}
                     onChange={(e) => setRegForm({ ...regForm, parentRelationship: e.target.value })}
-                  />
+                  >
+                    <option value="Mother">Mother</option>
+                    <option value="Father">Father</option>
+                    <option value="Guardian">Guardian</option>
+                    <option value="Parent">Parent</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="form-group">
-                  <label className="form-label text-xs font-semibold">Phone Number *</label>
+                  <label className="form-label text-xs font-semibold">Primary Phone *</label>
                   <input
                     type="tel"
                     required
-                    placeholder="+255..."
+                    placeholder="07XXXXXXXX or +255..."
                     className="input-field text-sm"
                     value={regForm.parentPhone}
                     onChange={(e) => setRegForm({ ...regForm, parentPhone: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label text-xs font-semibold">WhatsApp Number</label>
+                  <input
+                    type="tel"
+                    placeholder="Optional if different"
+                    className="input-field text-sm"
+                    value={regForm.parentWhatsapp || ''}
+                    onChange={(e) => setRegForm({ ...regForm, parentWhatsapp: e.target.value })}
                   />
                 </div>
                 <div className="form-group">
@@ -2021,15 +2197,51 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label text-xs font-semibold">Notes / Special Preferences</label>
-                <input
-                  type="text"
-                  className="input-field text-sm"
-                  placeholder="Transport route, fees agreement, or special notes..."
-                  value={regForm.additionalNotes}
-                  onChange={(e) => setRegForm({ ...regForm, additionalNotes: e.target.value })}
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="form-group">
+                  <label className="form-label text-xs font-semibold">Residential Address</label>
+                  <input
+                    type="text"
+                    className="input-field text-sm"
+                    placeholder="e.g. Mbweni, Kinondoni, Dar es Salaam"
+                    value={regForm.parentAddress || ''}
+                    onChange={(e) => setRegForm({ ...regForm, parentAddress: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label text-xs font-semibold">Fee Plan</label>
+                  <select
+                    className="input-field text-sm"
+                    value={regForm.feePlan || 'Standard Termly'}
+                    onChange={(e) => setRegForm({ ...regForm, feePlan: e.target.value })}
+                  >
+                    <option value="Standard Termly">Standard Termly</option>
+                    <option value="Monthly Installment">Monthly Installment</option>
+                    <option value="Annual">Annual</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                <div className="form-group">
+                  <label className="form-label text-xs font-semibold">Notes / Special Preferences</label>
+                  <input
+                    type="text"
+                    className="input-field text-sm"
+                    placeholder="Transport route, clubs, or special notes..."
+                    value={regForm.additionalNotes || ''}
+                    onChange={(e) => setRegForm({ ...regForm, additionalNotes: e.target.value })}
+                  />
+                </div>
+                <label className="flex items-center gap-2.5 p-2.5 mt-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(regForm.transportRequired)}
+                    onChange={(e) => setRegForm({ ...regForm, transportRequired: e.target.checked })}
+                    className="rounded border-slate-400 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="font-semibold">School Transport Required</span>
+                </label>
               </div>
 
               {!currentUser?.isSales && (
