@@ -1044,8 +1044,12 @@ select.input-field {
    PRINT
    ============================== */
 @media print {
-  .sidebar, .header, .sidebar-desktop, .mobile-sidebar, header {
+  .sidebar, .header, .sidebar-desktop, .mobile-sidebar, .mobile-bottom-nav, header {
     display: none !important;
+  }
+  .erp-shell, .erp-shell-body, .main-content-area {
+    height: auto !important;
+    overflow: visible !important;
   }
   .main-content-area {
     padding: 0 !important;

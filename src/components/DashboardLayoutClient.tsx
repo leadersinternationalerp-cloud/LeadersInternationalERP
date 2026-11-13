@@ -800,7 +800,7 @@ export default function DashboardLayoutClient({
   )
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', flexDirection: 'column' }}>
+    <div className="erp-shell" style={{ display: 'flex', height: '100dvh', overflow: 'hidden', flexDirection: 'column' }}>
       
       {/* Tooltip styles for collapsed sidebar */}
       <style dangerouslySetInnerHTML={{__html: `
@@ -863,14 +863,14 @@ export default function DashboardLayoutClient({
       {/* Top Navbar */}
       <header style={{ 
         height: '64px', 
+        flexShrink: 0,
         backgroundColor: 'var(--color-surface)',
         borderBottom: '1px solid var(--color-border)',
         display: 'flex',
         alignItems: 'center',
         padding: '0 1.5rem',
         justifyContent: 'space-between',
-        position: 'sticky',
-        top: 0,
+        position: 'relative',
         zIndex: 50
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -878,9 +878,31 @@ export default function DashboardLayoutClient({
           <button onClick={toggleMobile} className="btn btn-icon btn-ghost mobile-toggle" aria-label="Toggle Menu">
             {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
-          {/* Desktop collapse/expand */}
-          <button onClick={toggleCollapsed} className="btn btn-icon btn-ghost desktop-collapse-toggle" aria-label="Toggle Sidebar">
-            <Menu size={20} />
+          {/* Desktop collapse/expand with 3 dashed lines */}
+          <button
+            onClick={toggleCollapsed}
+            className="btn btn-icon btn-ghost desktop-collapse-toggle"
+            aria-label={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+            title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+            style={{
+              border: '1px solid var(--color-border)',
+              borderRadius: '0.5rem',
+              width: '36px',
+              height: '36px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--color-primary)',
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <line x1="3" y1="5" x2="6" y2="5" />
+              <line x1="9" y1="5" x2="17" y2="5" />
+              <line x1="3" y1="10" x2="6" y2="10" />
+              <line x1="9" y1="10" x2="17" y2="10" />
+              <line x1="3" y1="15" x2="6" y2="15" />
+              <line x1="9" y1="15" x2="17" y2="15" />
+            </svg>
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             <Image src="/crest.svg" alt="Leaders International School" width={38} height={38} priority style={{ height: '38px', width: 'auto' }} />
@@ -982,7 +1004,7 @@ export default function DashboardLayoutClient({
         </div>
       </header>
 
-      <div style={{ display: 'flex', flex: 1, position: 'relative' }}>
+      <div className="erp-shell-body" style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
         
         {/* Mobile Overlay */}
         {mobileOpen && (
@@ -1069,9 +1091,8 @@ export default function DashboardLayoutClient({
             transition: 'width 0.25s ease, min-width 0.25s ease, padding 0.25s ease',
             overflowY: 'auto',
             overflowX: 'hidden',
-            height: 'calc(100vh - 64px)',
-            position: 'sticky',
-            top: '64px',
+            overscrollBehavior: 'contain',
+            height: '100%',
           }}
         >
           {sidebarContent}
@@ -1084,6 +1105,9 @@ export default function DashboardLayoutClient({
             padding: '2rem', 
             backgroundColor: 'var(--color-background)',
             minWidth: 0,
+            height: '100%',
+            overflowY: 'auto',
+            overscrollBehavior: 'contain',
           }}
           className="main-content-area"
         >
