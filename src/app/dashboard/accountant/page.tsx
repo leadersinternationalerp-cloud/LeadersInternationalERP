@@ -43,6 +43,25 @@ export default async function AccountantDashboardPage() {
     feesOutstanding += (netAmount - paidAmount)
   })
 
+  // Include TZS 20,000 Admission Application Invoices in Revenue / Collections summary
+  try {
+    const { data: admInvoices } = await supabase
+      .from('admission_invoices')
+      .select('amount, status')
+    admInvoices?.forEach((inv: { amount: number; status: string }) => {
+      const amt = Number(inv.amount || 0)
+      if (inv.status === 'paid') {
+        feesBilled += amt
+        feesCollected += amt
+      } else if (inv.status === 'unpaid') {
+        feesBilled += amt
+        feesOutstanding += amt
+      }
+    })
+  } catch {
+    // Graceful if admission_invoices migration not yet applied
+  }
+
   // Pending Disbursements
   const { data: pendingAdvances } = await supabase
     .from('salary_advances')

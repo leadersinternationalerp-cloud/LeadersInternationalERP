@@ -12,10 +12,16 @@ CREATE TABLE IF NOT EXISTS public.admission_invoices (
   payment_reference text,
   paid_at timestamptz,
   paid_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  journal_entry_id uuid REFERENCES public.journal_entries(id) ON DELETE SET NULL,
   notes text,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
+
+-- Seed dedicated Admission Application Fee Revenue account in Chart of Accounts
+INSERT INTO public.chart_of_accounts (code, name, account_type, account_sub_type, normal_balance, is_system)
+VALUES ('4020', 'Admission Application Fee Revenue', 'REVENUE', 'Operating Revenue', 'CREDIT', true)
+ON CONFLICT (code) DO NOTHING;
 
 CREATE INDEX IF NOT EXISTS idx_admission_invoices_status ON public.admission_invoices(status);
 CREATE INDEX IF NOT EXISTS idx_admission_invoices_created_at ON public.admission_invoices(created_at DESC);

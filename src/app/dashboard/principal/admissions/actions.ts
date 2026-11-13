@@ -754,7 +754,32 @@ export async function markAdmissionInvoicePaidAction(input: {
     updatedInvoice = data
   }
 
+  if (!updatedInvoice) {
+    return { error: 'Failed to settle admission invoice' }
+  }
+
+  // Post double-entry credit to Revenue (4020/4000) and debit to Cash/Bank (1000/1010)
+  try {
+    const { AccountingService } = await import('@/lib/accounting/AccountingService')
+    const journalId = await AccountingService.recordAdmissionInvoicePayment({
+      invoiceId: updatedInvoice.id,
+      invoiceNo: updatedInvoice.invoice_no,
+      amount: Number(updatedInvoice.amount || 20000),
+      paymentMethod: updatedInvoice.payment_method,
+      paymentReference: updatedInvoice.payment_reference,
+      postingDate: now,
+      postedBy: session.user.id,
+    })
+    updatedInvoice = { ...updatedInvoice, journal_entry_id: journalId }
+  } catch (accErr) {
+    console.warn('[admissions/markPaid] GL journal posting warning:', accErr)
+  }
+
   revalidatePath('/dashboard/principal/admissions')
+  revalidatePath('/dashboard/accountant')
   revalidatePath('/dashboard/accountant/invoices')
+  revalidatePath('/dashboard/accountant/accounting/journals')
+  revalidatePath('/dashboard/accountant/accounting/statements')
+  revalidatePath('/dashboard/accountant/accounting/coa')
   return { ok: true, invoice: updatedInvoice }
 }

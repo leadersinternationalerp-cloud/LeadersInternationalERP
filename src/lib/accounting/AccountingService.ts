@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server';
+import { createServiceClient } from '@/utils/supabase/service';
 import { JournalStatus } from './types';
 
 export class AccountingService {
@@ -115,6 +116,111 @@ export class AccountingService {
     const supabase = await createClient();
     await supabase.from('payments').update({ journal_entry_id: journalId }).eq('id', paymentId);
     return journalId;
+  }
+
+  /**
+   * Posts a double-entry journal for a paid TZS 20,000 admission application invoice:
+   *   Dr Cash / Bank (1000 or 1010)
+   *   Cr Admission Application Fee Revenue (4020, fallback 4000)
+   */
+  static async recordAdmissionInvoicePayment(params: {
+    invoiceId: string;
+    invoiceNo: string;
+    amount: number;
+    paymentMethod?: string | null;
+    paymentReference?: string | null;
+    postingDate: string;
+    postedBy?: string | null;
+  }) {
+    const supabase = createServiceClient();
+
+    // Prevent duplicate journal posting for the same invoice
+    const { data: existingInv } = await supabase
+      .from('admission_invoices')
+      .select('journal_entry_id')
+      .eq('id', params.invoiceId)
+      .single();
+
+    if (existingInv?.journal_entry_id) {
+      return existingInv.journal_entry_id as string;
+    }
+
+    const { data: accounts, error: accErr } = await supabase
+      .from('chart_of_accounts')
+      .select('id, code')
+      .in('code', ['1000', '1010', '4020', '4000']);
+
+    if (accErr || !accounts?.length) {
+      throw new Error('Failed to resolve Chart of Accounts for admission invoice posting');
+    }
+
+    const byCode = new Map(accounts.map((a) => [a.code, a.id]));
+    const isBank = (params.paymentMethod || '').toLowerCase().includes('bank');
+    const debitAccountId = (isBank ? byCode.get('1010') : null) || byCode.get('1000') || byCode.get('1010');
+    const creditAccountId = byCode.get('4020') || byCode.get('4000');
+
+    if (!debitAccountId || !creditAccountId) {
+      throw new Error('Required Cash/Bank (1000/1010) or Revenue (4020/4000) account missing in Chart of Accounts');
+    }
+
+    const refSuffix = params.paymentReference ? ` (${params.paymentReference})` : '';
+    const desc = `Admission fee paid: ${params.invoiceNo} via ${params.paymentMethod || 'Cash'}${refSuffix}`;
+    const postingDateOnly = params.postingDate.slice(0, 10);
+
+    const { data: journal, error: journalErr } = await supabase
+      .from('journal_entries')
+      .insert({
+        reference: params.invoiceNo,
+        entry_type: 'ADMISSION_FEE',
+        description: desc,
+        posting_date: postingDateOnly,
+        status: 'POSTED' as JournalStatus,
+        created_by: params.postedBy || null,
+        posted_by: params.postedBy || null,
+        posted_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (journalErr || !journal) {
+      throw new Error(`Failed to create admission fee journal entry: ${journalErr?.message}`);
+    }
+
+    const { error: linesErr } = await supabase.from('journal_entry_lines').insert([
+      {
+        journal_id: journal.id,
+        account_id: debitAccountId,
+        description: desc,
+        debit_amount: params.amount,
+        credit_amount: 0,
+      },
+      {
+        journal_id: journal.id,
+        account_id: creditAccountId,
+        description: desc,
+        debit_amount: 0,
+        credit_amount: params.amount,
+      },
+    ]);
+
+    if (linesErr) {
+      await supabase.from('journal_entries').delete().eq('id', journal.id);
+      throw new Error(`Failed to create admission fee journal lines: ${linesErr.message}`);
+    }
+
+    await supabase
+      .from('admission_invoices')
+      .update({ journal_entry_id: journal.id })
+      .eq('id', params.invoiceId);
+
+    await supabase.from('audit_logs').insert({
+      action: 'POST_JOURNAL',
+      entity: 'journal_entries',
+      entity_id: journal.id,
+      details: { reference: params.invoiceNo, entry_type: 'ADMISSION_FEE', total: params.amount },
+    });
+
+    return journal.id as string;
   }
 
   static async recordExpense(expenseId: string, amount: number, description: string, date: string, category: string) {
