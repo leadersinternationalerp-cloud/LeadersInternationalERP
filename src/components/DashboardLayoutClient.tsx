@@ -10,7 +10,7 @@ import {
   UsersRound, Scale, Plug, Fingerprint, Package, Bus, School,
   ClipboardCheck, PenLine, Baby, Puzzle, Layers, Sparkles,
   CreditCard, HandCoins, ListTree, BookCopy, Landmark, Building2,
-  HeartHandshake, Umbrella, Banknote, ChevronLeft, ChevronRight
+  HeartHandshake, Umbrella, Banknote, ChevronDown, Home
 } from 'lucide-react'
 import PwaInstallPrompt from '@/components/PwaInstallPrompt'
 
@@ -48,6 +48,13 @@ export default function DashboardLayoutClient({
     hr: true,
     integration: true,
   })
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    accountingSuite: false,
+    earlyYears: false,
+    quizzes: false,
+    academicSetup: false,
+    selfService: false,
+  })
 
   const toggleMobile = () => setMobileOpen(!mobileOpen)
   const toggleCollapsed = () => setCollapsed(!collapsed)
@@ -57,6 +64,13 @@ export default function DashboardLayoutClient({
     setExpandedSections(prev => ({
       ...prev,
       [section]: !prev[section]
+    }))
+  }
+
+  const toggleGroup = (group: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [group]: !prev[group]
     }))
   }
 
@@ -88,7 +102,7 @@ export default function DashboardLayoutClient({
     return false
   }
 
-  const sidebarWidth = collapsed ? '68px' : '240px'
+  const sidebarWidth = collapsed ? '68px' : '256px'
 
   const NavLink = ({ href, icon: Icon, children: label }: { href: string; icon: any; children: React.ReactNode }) => {
     const active = isActive(href)
@@ -142,18 +156,17 @@ export default function DashboardLayoutClient({
           width: '100%',
           background: 'none',
           border: 'none',
-          color: 'var(--color-text-muted)',
+          color: 'rgba(148, 163, 184, 0.9)',
           cursor: 'pointer',
           outline: 'none',
-          opacity: collapsed ? 0.6 : 0.8,
           padding: collapsed ? '0.35rem 0' : '0.35rem 0.85rem',
-          marginTop: collapsed ? '0.5rem' : '0.85rem',
+          marginTop: collapsed ? '0.5rem' : '0.75rem',
           fontSize: collapsed ? '0.55rem' : '0.68rem',
           fontWeight: 700,
           textTransform: 'uppercase',
-          letterSpacing: '0.05em',
+          letterSpacing: '0.07em',
           transition: 'all 0.2s ease',
-          borderBottom: collapsed ? '1px solid rgba(100, 116, 139, 0.2)' : 'none',
+          borderBottom: collapsed ? '1px solid rgba(255, 255, 255, 0.12)' : 'none',
           paddingBottom: collapsed ? '0.35rem' : '0.25rem',
           textAlign: 'left'
         }}
@@ -162,17 +175,63 @@ export default function DashboardLayoutClient({
           {collapsed ? label.substring(0, 3).toUpperCase() : label}
         </span>
         {!collapsed && (
-          <span style={{ 
-            display: 'inline-flex',
-            transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', 
-            transition: 'transform 0.2s ease',
-            fontSize: '0.6rem',
-            opacity: 0.7
-          }}>
-            ▼
-          </span>
+          <ChevronDown
+            size={13}
+            style={{
+              transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+              transition: 'transform 0.2s ease',
+              opacity: 0.75,
+            }}
+          />
         )}
       </button>
+    )
+  }
+
+  const NavGroup = ({
+    groupKey,
+    icon: Icon,
+    label,
+    activePaths = [],
+    children: subLinks,
+  }: {
+    groupKey: string
+    icon: any
+    label: string
+    activePaths?: string[]
+    children: React.ReactNode
+  }) => {
+    const hasActive = activePaths.some((p) => isActive(p))
+    const isExpanded = expandedGroups[groupKey] || hasActive
+
+    if (collapsed) {
+      return <>{subLinks}</>
+    }
+
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => toggleGroup(groupKey)}
+          className={`nav-group-trigger ${hasActive ? 'has-active' : ''}`}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span className="nav-icon" style={{ color: '#f7b239', display: 'inline-flex', width: '1.25rem', justifyContent: 'center' }}>
+              {Icon && <Icon size={18} />}
+            </span>
+            <span>{label}</span>
+          </span>
+          <ChevronDown
+            size={15}
+            style={{
+              transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+              transition: 'transform 0.2s ease',
+              opacity: 0.75,
+            }}
+          />
+        </button>
+        {isExpanded && <div className="nav-sublist">{subLinks}</div>}
+      </div>
     )
   }
 
@@ -353,19 +412,20 @@ export default function DashboardLayoutClient({
               )}
 
               {(userRoles.includes('System Admin') || userRoles.includes('Accountant')) && (
-                <>
-                  <div
-                    style={{
-                      fontSize: '0.65rem',
-                      fontWeight: 'bold',
-                      color: 'rgba(255,255,255,0.4)',
-                      margin: '0.5rem 0 0.2rem 0.85rem',
-                      textTransform: 'uppercase',
-                      display: collapsed ? 'none' : 'block',
-                    }}
-                  >
-                    Accounting Suite
-                  </div>
+                <NavGroup
+                  groupKey="accountingSuite"
+                  icon={Landmark}
+                  label="Accounting Suite"
+                  activePaths={[
+                    '/dashboard/accountant/accounting/statements',
+                    '/dashboard/accountant/accounting/coa',
+                    '/dashboard/accountant/accounting/journals',
+                    '/dashboard/accountant/accounting/reconciliation',
+                    '/dashboard/accountant/accounting/bills',
+                    '/dashboard/accountant/accounting/deposits',
+                    '/dashboard/accountant/accounting/assets',
+                  ]}
+                >
                   <NavLink href="/dashboard/accountant/accounting/statements" icon={FileSpreadsheet}>
                     Financial Statements
                   </NavLink>
@@ -387,7 +447,7 @@ export default function DashboardLayoutClient({
                   <NavLink href="/dashboard/accountant/accounting/assets" icon={Building2}>
                     Fixed Assets
                   </NavLink>
-                </>
+                </NavGroup>
               )}
             </div>
           )}
@@ -427,7 +487,16 @@ export default function DashboardLayoutClient({
               )}
 
               {userRoles.includes('System Admin') && (
-                <>
+                <NavGroup
+                  groupKey="academicSetup"
+                  icon={Settings}
+                  label="Academic Setup"
+                  activePaths={[
+                    '/dashboard/admin/syllabus',
+                    '/dashboard/admin/subjects',
+                    '/dashboard/admin/teacher-assignments',
+                  ]}
+                >
                   <NavLink href="/dashboard/admin/syllabus" icon={Settings}>
                     Syllabus Setup
                   </NavLink>
@@ -437,7 +506,7 @@ export default function DashboardLayoutClient({
                   <NavLink href="/dashboard/admin/teacher-assignments" icon={Settings}>
                     Teacher Assignments
                   </NavLink>
-                </>
+                </NavGroup>
               )}
 
               {(userRoles.includes('System Admin') || 
@@ -487,21 +556,42 @@ export default function DashboardLayoutClient({
                   <NavLink href="/dashboard/teacher/lesson-plans" icon={BookOpen}>
                     Lesson Plans
                   </NavLink>
-                  <NavLink href="/dashboard/teacher/early-years" icon={Baby}>
-                    Early Years Observations
-                  </NavLink>
-                  <NavLink href="/dashboard/teacher/early-years/reports" icon={FileSpreadsheet}>
-                    Early Years Reports
-                  </NavLink>
-                  <NavLink href="/dashboard/teacher/class-activities" icon={Puzzle}>
-                    Class Activities
-                  </NavLink>
-                  <NavLink href="/dashboard/teacher/quizzes/bank" icon={Layers}>
-                    Quiz Bank
-                  </NavLink>
-                  <NavLink href="/dashboard/teacher/quizzes/jobs" icon={Sparkles}>
-                    Quiz Print Jobs
-                  </NavLink>
+                  <NavGroup
+                    groupKey="earlyYears"
+                    icon={Baby}
+                    label="Early Years"
+                    activePaths={[
+                      '/dashboard/teacher/early-years',
+                      '/dashboard/teacher/early-years/reports',
+                    ]}
+                  >
+                    <NavLink href="/dashboard/teacher/early-years" icon={Baby}>
+                      Early Years Observations
+                    </NavLink>
+                    <NavLink href="/dashboard/teacher/early-years/reports" icon={FileSpreadsheet}>
+                      Early Years Reports
+                    </NavLink>
+                  </NavGroup>
+                  <NavGroup
+                    groupKey="quizzes"
+                    icon={Puzzle}
+                    label="Quizzes & Activities"
+                    activePaths={[
+                      '/dashboard/teacher/class-activities',
+                      '/dashboard/teacher/quizzes/bank',
+                      '/dashboard/teacher/quizzes/jobs',
+                    ]}
+                  >
+                    <NavLink href="/dashboard/teacher/class-activities" icon={Puzzle}>
+                      Class Activities
+                    </NavLink>
+                    <NavLink href="/dashboard/teacher/quizzes/bank" icon={Layers}>
+                      Quiz Bank
+                    </NavLink>
+                    <NavLink href="/dashboard/teacher/quizzes/jobs" icon={Sparkles}>
+                      Quiz Print Jobs
+                    </NavLink>
+                  </NavGroup>
                   <NavLink href="/dashboard/teacher/timetable" icon={CalendarDays}>
                     My Timetable
                   </NavLink>
@@ -625,19 +715,16 @@ export default function DashboardLayoutClient({
                 userRoles.includes('Principal') || 
                 userRoles.includes('Director') || 
                 userRoles.includes('System Admin')) && (
-                <>
-                  <div
-                    style={{
-                      fontSize: '0.65rem',
-                      fontWeight: 'bold',
-                      color: 'rgba(255,255,255,0.4)',
-                      margin: '0.5rem 0 0.2rem 0.85rem',
-                      textTransform: 'uppercase',
-                      display: collapsed ? 'none' : 'block',
-                    }}
-                  >
-                    Self Service
-                  </div>
+                <NavGroup
+                  groupKey="selfService"
+                  icon={Umbrella}
+                  label="Self Service"
+                  activePaths={[
+                    '/dashboard/staff/self-service/leave',
+                    '/dashboard/staff/self-service/advances',
+                    '/dashboard/staff/self-service/payslips',
+                  ]}
+                >
                   <NavLink href="/dashboard/staff/self-service/leave" icon={Umbrella}>
                     My HR Dashboard
                   </NavLink>
@@ -650,11 +737,21 @@ export default function DashboardLayoutClient({
                   <NavLink href="/dashboard/staff/self-service/payslips" icon={Banknote}>
                     My Payslips
                   </NavLink>
-                </>
+                </NavGroup>
               )}
             </div>
           )}
         </>
+      )}
+
+      {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
+        <div className="sidebar-setup-divider">
+          {!collapsed && (
+            <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(247, 178, 57, 0.85)', letterSpacing: '0.12em', padding: '0 0.85rem 0.15rem', textTransform: 'uppercase' }}>
+              Setup
+            </div>
+          )}
+        </div>
       )}
 
       {/* 5. SYSTEM SETTINGS CLUSTER */}
@@ -898,15 +995,13 @@ export default function DashboardLayoutClient({
 
         {/* Mobile Sidebar (slide-in overlay — full expanded) */}
         <aside
-          className="mobile-sidebar"
+          className="mobile-sidebar erp-sidebar"
           style={{
             width: '260px',
-            backgroundColor: 'var(--color-surface)',
-            borderRight: '1px solid var(--color-border)',
-            padding: '1.5rem 1rem',
+            padding: '1rem 0.85rem 5rem',
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.5rem',
+            gap: '0.4rem',
             position: 'fixed',
             top: '64px',
             bottom: 0,
@@ -917,21 +1012,60 @@ export default function DashboardLayoutClient({
             overflowY: 'auto'
           }}
         >
+          {/* Compact Mobile Drawer User Card */}
+          <Link
+            href="/dashboard/profile"
+            onClick={() => setMobileOpen(false)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '0.75rem',
+              marginBottom: '0.5rem',
+              borderRadius: '0.75rem',
+              background: 'rgba(255, 255, 255, 0.07)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              textDecoration: 'none',
+              color: '#ffffff',
+            }}
+          >
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '9999px',
+              background: 'linear-gradient(135deg, #f7b239, #d97706)',
+              color: '#06213d',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              flexShrink: 0,
+            }}>
+              {profile?.first_name?.charAt(0) || 'U'}{profile?.last_name?.charAt(0) || ''}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}` : 'Staff User'}
+              </div>
+              <div style={{ fontSize: '0.7rem', color: '#f7b239', fontWeight: 600 }}>
+                {userRoles[0] || profile?.role || 'Staff'}
+              </div>
+            </div>
+          </Link>
           {sidebarContent}
         </aside>
 
         {/* Desktop Sidebar (always visible, collapsible) */}
         <aside
-          className={`sidebar-desktop ${collapsed ? 'sidebar-collapsed' : ''}`}
+          className={`sidebar-desktop erp-sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}
           style={{
             width: sidebarWidth,
             minWidth: sidebarWidth,
-            backgroundColor: 'var(--color-surface)',
-            borderRight: '1px solid var(--color-border)',
-            padding: collapsed ? '1rem 0.5rem' : '1.5rem 1rem',
+            padding: collapsed ? '1rem 0.5rem' : '1.25rem 0.85rem',
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.5rem',
+            gap: '0.4rem',
             transition: 'width 0.25s ease, min-width 0.25s ease, padding 0.25s ease',
             overflowY: 'auto',
             overflowX: 'hidden',
@@ -956,6 +1090,99 @@ export default function DashboardLayoutClient({
           {children}
         </main>
       </div>
+      {/* Mobile Bottom Navigation Bar */}
+      <nav className="mobile-bottom-nav" aria-label="Mobile Quick Navigation">
+        <Link
+          href="/dashboard"
+          className={`mobile-bottom-nav-item ${pathname === '/dashboard' ? 'active' : ''}`}
+        >
+          <Home size={20} />
+          <span>Home</span>
+        </Link>
+
+        {userRoles.includes('Parent') ? (
+          <Link
+            href="/dashboard/parent/students"
+            className={`mobile-bottom-nav-item ${isActive('/dashboard/parent/students') ? 'active' : ''}`}
+          >
+            <Users size={20} />
+            <span>Children</span>
+          </Link>
+        ) : userRoles.includes('Student') ? (
+          <Link
+            href="/dashboard/student/report-card"
+            className={`mobile-bottom-nav-item ${isActive('/dashboard/student/report-card') ? 'active' : ''}`}
+          >
+            <FileSpreadsheet size={20} />
+            <span>Reports</span>
+          </Link>
+        ) : userRoles.includes('Accountant') ? (
+          <Link
+            href="/dashboard/accountant/payments"
+            className={`mobile-bottom-nav-item ${isActive('/dashboard/accountant/payments') ? 'active' : ''}`}
+          >
+            <CreditCard size={20} />
+            <span>Payments</span>
+          </Link>
+        ) : userRoles.includes('Teacher') ? (
+          <Link
+            href="/dashboard/teacher/attendance"
+            className={`mobile-bottom-nav-item ${isActive('/dashboard/teacher/attendance') ? 'active' : ''}`}
+          >
+            <ClipboardCheck size={20} />
+            <span>Attendance</span>
+          </Link>
+        ) : (
+          <Link
+            href="/dashboard/students"
+            className={`mobile-bottom-nav-item ${isActive('/dashboard/students') ? 'active' : ''}`}
+          >
+            <Users size={20} />
+            <span>Students</span>
+          </Link>
+        )}
+
+        <Link
+          href="/dashboard/notifications"
+          className={`mobile-bottom-nav-item ${isActive('/dashboard/notifications') ? 'active' : ''}`}
+        >
+          <div style={{ position: 'relative', display: 'inline-flex' }}>
+            <Bell size={20} />
+            {unreadCount > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '-4px',
+                right: '-6px',
+                backgroundColor: '#e11d48',
+                color: '#fff',
+                borderRadius: '9999px',
+                fontSize: '9px',
+                fontWeight: 700,
+                minWidth: '15px',
+                height: '15px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0 3px',
+              }}>
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </div>
+          <span>Alerts</span>
+        </Link>
+
+        <button
+          type="button"
+          onClick={toggleMobile}
+          className={`mobile-bottom-nav-item ${mobileOpen ? 'active' : ''}`}
+          aria-label="Open Full Menu"
+        >
+          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+          <span>Menu</span>
+        </button>
+      </nav>
+
       <PwaInstallPrompt />
     </div>
   )
