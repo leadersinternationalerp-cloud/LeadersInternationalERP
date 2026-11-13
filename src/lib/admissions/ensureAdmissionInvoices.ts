@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
  * Ensures every existing record in `admission_applications` has a persisted
- * TZS 20,000 invoice row in `admission_invoices`.
+ * TZS 30,000 invoice row in `admission_invoices`.
  */
 export async function ensureMissingAdmissionInvoices(supabase: SupabaseClient) {
   try {
@@ -21,7 +21,7 @@ export async function ensureMissingAdmissionInvoices(supabase: SupabaseClient) {
       .map((a: { id: string; application_no: string }) => ({
         application_id: a.id,
         invoice_no: `INV-${a.application_no}`,
-        amount: 20000,
+        amount: 30000,
         currency: 'TZS',
         status: 'unpaid',
       }))

@@ -56,7 +56,7 @@ export default async function InvoicesPage() {
     }
   })
 
-  // Backfill & fetch admission form invoices (TZS 20,000)
+  // Backfill & fetch admission form invoices (TZS 30,000)
   let admissionInvoices: any[] = []
   try {
     await ensureMissingAdmissionInvoices(supabase)

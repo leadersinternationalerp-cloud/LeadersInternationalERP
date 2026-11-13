@@ -119,7 +119,7 @@ export class AccountingService {
   }
 
   /**
-   * Posts a double-entry journal for a paid TZS 20,000 admission application invoice:
+   * Posts a double-entry journal for a paid TZS 30,000 admission application invoice:
    *   Dr Cash / Bank (1000 or 1010)
    *   Cr Admission Application Fee Revenue (4020, fallback 4000)
    */

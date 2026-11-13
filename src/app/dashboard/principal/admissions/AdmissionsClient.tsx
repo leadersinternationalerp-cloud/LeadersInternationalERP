@@ -602,7 +602,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
         setStatusMessage({
           text: res.enrolled
             ? `✓ Learner "${res.application.first_name} ${res.application.last_name}" registered & enrolled! Student ID: ${res.student_id} • Attributed to: ${attributionLabel}.`
-            : `✓ Learner "${res.application.first_name} ${res.application.last_name}" registered! Attributed to: ${attributionLabel}. Ref: ${res.application.application_no} • TZS 20,000 Invoice ready.`,
+            : `✓ Learner "${res.application.first_name} ${res.application.last_name}" registered! Attributed to: ${attributionLabel}. Ref: ${res.application.application_no} • TZS 30,000 Invoice ready.`,
           type: 'success',
           invoiceApp: res.application,
         })
@@ -651,7 +651,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
         year: 'numeric',
       }),
       status: inv?.status || 'unpaid',
-      amount: Number(inv?.amount || 20000),
+      amount: Number(inv?.amount || 30000),
       studentName: [app.first_name, app.middle_name, app.last_name].filter(Boolean).join(' '),
       parentName: app.parent_name,
       parentPhone: app.parent_phone,
@@ -683,7 +683,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
           )
         )
         setStatusMessage({
-          text: `✓ Admission Invoice ${res.invoice.invoice_no} (TZS 20,000) marked as PAID via ${payMethod}.`,
+          text: `✓ Admission Invoice ${res.invoice.invoice_no} (TZS ${Number(res.invoice.amount || 30000).toLocaleString('en-US')}) marked as PAID via ${payMethod}.`,
           type: 'success',
           invoiceApp: { ...payingInvoiceApp, admission_invoices: [res.invoice] },
         })
@@ -815,7 +815,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-xs transition-colors cursor-pointer"
               >
                 <Download size={13} />
-                <span>Download 20,000 TZS Invoice (PDF)</span>
+                <span>Download 30,000 TZS Invoice (PDF)</span>
               </button>
             )}
           </div>
@@ -1205,7 +1205,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                                 title={inv?.invoice_no || `INV-${app.application_no}`}
                               >
                                 <Receipt size={11} />
-                                <span>20,000 TZS · {isPaid ? 'Paid' : 'Unpaid'}</span>
+                                <span>{Number(inv?.amount || 30000).toLocaleString('en-US')} TZS · {isPaid ? 'Paid' : 'Unpaid'}</span>
                               </span>
                             )
                           })()}
@@ -1215,15 +1215,15 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                       {/* Actions */}
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
                         <div className="inline-flex items-center justify-end gap-1.5">
-                          {/* Download 20,000 TZS Application Invoice */}
+                          {/* Download 30,000 TZS Application Invoice */}
                           <button
                             type="button"
                             onClick={() => triggerAppInvoiceDownload(app)}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 transition-colors cursor-pointer"
-                            title="Download 20,000 TZS Application Invoice PDF"
+                            title="Download 30,000 TZS Application Invoice PDF"
                           >
                             <Receipt size={13} />
-                            <span>20k Inv</span>
+                            <span>30k Inv</span>
                           </button>
 
                           {/* Mark Application Invoice Paid */}
@@ -1236,7 +1236,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                                 setPayReference('')
                               }}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-all cursor-pointer"
-                              title="Mark 20,000 TZS Application Invoice as Paid"
+                              title="Mark 30,000 TZS Application Invoice as Paid"
                             >
                               <CheckCircle2 size={13} />
                               <span>Mark Paid</span>
@@ -2435,7 +2435,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                   className="btn btn-primary text-sm inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700"
                 >
                   <UserPlus size={16} />
-                  <span>{isPending ? 'Submitting & Generating Invoice...' : 'Submit & Pay (TZS 20,000 Invoice)'}</span>
+                  <span>{isPending ? 'Submitting & Generating Invoice...' : 'Submit & Pay (TZS 30,000 Invoice)'}</span>
                 </button>
               </div>
             </form>
@@ -2507,7 +2507,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
         </div>
       )}
 
-      {/* 8. Mark 20,000 TZS Application Invoice Paid Modal */}
+      {/* 8. Mark 30,000 TZS Application Invoice Paid Modal */}
       {payingInvoiceApp && (
         <div
           className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
@@ -2530,7 +2530,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                 <p className="text-xs text-slate-500 m-0 mt-0.5">
                   {payingInvoiceApp.first_name} {payingInvoiceApp.last_name} ·{' '}
                   {payingInvoiceApp.admission_invoices?.[0]?.invoice_no || `INV-${payingInvoiceApp.application_no}`} ·{' '}
-                  <strong>TZS 20,000</strong>
+                  <strong>TZS 30,000</strong>
                 </p>
               </div>
               <button
@@ -2584,7 +2584,7 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
                   className="btn btn-primary text-sm inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700"
                 >
                   <CheckCircle2 size={15} />
-                  <span>{isPending ? 'Saving...' : 'Confirm Paid (TZS 20,000)'}</span>
+                  <span>{isPending ? 'Saving...' : 'Confirm Paid (TZS 30,000)'}</span>
                 </button>
               </div>
             </form>

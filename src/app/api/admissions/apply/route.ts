@@ -250,7 +250,7 @@ export const POST = route(
       const { error: invErr } = await supabase.from('admission_invoices').insert({
         application_id: insertedApp.id,
         invoice_no: `INV-${applicationNo}`,
-        amount: 20000,
+        amount: 30000,
         currency: 'TZS',
         status: 'unpaid',
       })

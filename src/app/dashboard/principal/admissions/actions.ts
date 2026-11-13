@@ -625,14 +625,14 @@ export async function registerLearnerAction(payload: RegisterLearnerInput) {
     return { error: error.message }
   }
 
-  // Persist TZS 20,000 application form invoice
+  // Persist TZS 30,000 application form invoice
   let createdInvoice: any = null
   const { data: invRow, error: invError } = await supabase
     .from('admission_invoices')
     .insert({
       application_id: data.id,
       invoice_no: `INV-${applicationNo}`,
-      amount: 20000,
+      amount: 30000,
       currency: 'TZS',
       status: 'unpaid',
     })
@@ -735,7 +735,7 @@ export async function markAdmissionInvoicePaidAction(input: {
         {
           application_id: input.applicationId,
           invoice_no: invoiceNo,
-          amount: 20000,
+          amount: 30000,
           currency: 'TZS',
           status: 'paid',
           payment_method: input.paymentMethod || 'Cash',
@@ -764,7 +764,7 @@ export async function markAdmissionInvoicePaidAction(input: {
     const journalId = await AccountingService.recordAdmissionInvoicePayment({
       invoiceId: updatedInvoice.id,
       invoiceNo: updatedInvoice.invoice_no,
-      amount: Number(updatedInvoice.amount || 20000),
+      amount: Number(updatedInvoice.amount || 30000),
       paymentMethod: updatedInvoice.payment_method,
       paymentReference: updatedInvoice.payment_reference,
       postingDate: now,

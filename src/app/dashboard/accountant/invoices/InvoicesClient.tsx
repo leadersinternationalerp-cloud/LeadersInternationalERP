@@ -61,7 +61,7 @@ export default function InvoicesClient({
         year: 'numeric',
       }),
       status: inv.status || 'unpaid',
-      amount: Number(inv.amount || 20000),
+      amount: Number(inv.amount || 30000),
       studentName: [app.first_name, app.middle_name, app.last_name].filter(Boolean).join(' ') || 'Applicant',
       parentName: app.parent_name || 'Parent / Guardian',
       parentPhone: app.parent_phone || '-',
@@ -168,7 +168,7 @@ export default function InvoicesClient({
           }}
         >
           <Receipt size={15} />
-          <span>Admission Form Invoices (TZS 20,000)</span>
+          <span>Admission Form Invoices (TZS 30,000)</span>
           {unpaidAdmCount > 0 && (
             <span
               style={{
@@ -437,7 +437,7 @@ export default function InvoicesClient({
                         </div>
                       </td>
                       <td style={{ padding: '1rem 1.25rem', fontWeight: 700 }}>
-                        {formatCurrency(Number(inv.amount || 20000))}
+                        {formatCurrency(Number(inv.amount || 30000))}
                       </td>
                       <td style={{ padding: '1rem 1.25rem' }}>
                         <span
@@ -575,7 +575,7 @@ export default function InvoicesClient({
                   Cancel
                 </button>
                 <button type="submit" disabled={isPending} className="btn btn-primary" style={{ backgroundColor: '#059669' }}>
-                  {isPending ? 'Saving...' : 'Confirm Paid (TZS 20,000)'}
+                  {isPending ? 'Saving...' : 'Confirm Paid (TZS 30,000)'}
                 </button>
               </div>
             </form>

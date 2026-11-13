@@ -43,7 +43,7 @@ export default async function AccountantDashboardPage() {
     feesOutstanding += (netAmount - paidAmount)
   })
 
-  // Include TZS 20,000 Admission Application Invoices in Revenue / Collections summary
+  // Include TZS 30,000 Admission Application Invoices in Revenue / Collections summary
   try {
     const { data: admInvoices } = await supabase
       .from('admission_invoices')

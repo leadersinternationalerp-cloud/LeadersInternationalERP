@@ -1,6 +1,6 @@
 /**
  * Zero-dependency client-side A5 PDF 1.4 generator (with embedded school logo)
- * for the TZS 20,000 Leaders International School Admission Application Form Invoice.
+ * for the TZS 30,000 Leaders International School Admission Application Form Invoice.
  */
 
 export interface ApplicationInvoicePdfData {
@@ -107,7 +107,7 @@ export async function buildApplicationInvoicePdf(data: ApplicationInvoicePdfData
     cmds.push(`BT ${font} ${size} Tf ${rgb} rg ${x} ${y} Td (${pdfEscape(str)}) Tj ET`)
   }
 
-  const amount = data.amount ?? 20000
+  const amount = data.amount ?? 30000
   const amountLabel = `TZS ${amount.toLocaleString('en-US')}`
 
   // Header band (Navy #00264b) + Gold accent bar
