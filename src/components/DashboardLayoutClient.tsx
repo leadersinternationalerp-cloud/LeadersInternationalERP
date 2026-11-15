@@ -341,6 +341,14 @@ export default function DashboardLayoutClient({
                 </NavLink>
               )}
 
+              {(userRoles.includes('System Admin') ||
+                userRoles.includes('Director') ||
+                userRoles.includes('Principal')) && (
+                <NavLink href="/dashboard/principal" icon={School}>
+                  Principal Dashboard
+                </NavLink>
+              )}
+
               {(userRoles.includes('System Admin') || userRoles.includes('Director')) && (
                 <NavLink href="/dashboard/director/applications" icon={BookOpen}>
                   Self-Service Inbox

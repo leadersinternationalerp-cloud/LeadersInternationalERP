@@ -194,7 +194,10 @@ export default async function DashboardPage() {
                 Review weekly lesson plans submitted by instructors, view generated class academic report cards, and endorse staff leave/advance workflows.
               </p>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <Link href="/dashboard/principal/lesson-plans" className="btn btn-primary btn-sm" style={{ textDecoration: 'none' }}>
+                <Link href="/dashboard/principal" className="btn btn-primary btn-sm" style={{ textDecoration: 'none' }}>
+                  <School size={14} /> Principal Dashboard
+                </Link>
+                <Link href="/dashboard/principal/lesson-plans" className="btn btn-secondary btn-sm" style={{ textDecoration: 'none' }}>
                   <BookOpen size={14} /> Review Lesson Plans
                 </Link>
                 <Link href="/dashboard/principal/academic-reports" className="btn btn-secondary btn-sm" style={{ textDecoration: 'none' }}>
