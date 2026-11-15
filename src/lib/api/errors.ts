@@ -46,7 +46,17 @@ export class ApiError extends Error {
   static notFound(message = 'Resource not found') {
     return new ApiError('NOT_FOUND', message)
   }
+
+  static rateLimited(message = 'Too many requests, please try again later') {
+    return new ApiError('RATE_LIMITED', message)
+  }
 }
+
+export const forbidden = (message = 'You do not have access to this resource') =>
+  new ApiError('FORBIDDEN', message)
+
+export const notFound = (message = 'Resource not found') =>
+  new ApiError('NOT_FOUND', message)
 
 export const badRequest = (
   dOrMsg?: Record<string, unknown> | string,

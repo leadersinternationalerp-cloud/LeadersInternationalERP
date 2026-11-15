@@ -1,24 +1,17 @@
-import { normalizeRoles } from '@/lib/auth/roles'
-import { createClient } from '@/utils/supabase/server'
+import { getSessionUser } from '@/lib/auth/session'
+import { getCachedGradingScale } from '@/lib/cache/referenceData'
 import { getWingContext } from '@/lib/wingServer'
 import { matchesWingFilter } from '@/lib/wing'
 import DeanMarksClient from './DeanMarksClient'
 import Link from 'next/link'
 
-export default async function DeanMarksOverviewPage() {
-  const supabase = await createClient()
+export default async function DeanMarksOverviewPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ term?: string; class_id?: string; subject_id?: string }>
+}) {
+  const { user, profile, roles: userRoles, supabase } = await getSessionUser()
 
-  // Verify access
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user?.id)
-    .single()
-
-  const userRoles = normalizeRoles(profile)
   const isAuthorized =
     userRoles.includes('Dean') ||
     userRoles.includes('Principal') ||
@@ -36,8 +29,10 @@ export default async function DeanMarksOverviewPage() {
   const wingContext = await getWingContext(user.id, profile)
   const lockedWing = wingContext.assignedWing !== 'Both' ? wingContext.assignedWing : null
 
-  // Fetch marks with joins
-  const { data: marksData, error } = await supabase
+  const params = searchParams ? await searchParams : {}
+
+  // Fetch marks with joins and bounded limit
+  let marksQuery = supabase
     .from('marks')
     .select(`
       id,
@@ -60,6 +55,16 @@ export default async function DeanMarksOverviewPage() {
       )
     `)
     .order('term', { ascending: false })
+    .limit(1000)
+
+  if (params?.term) marksQuery = marksQuery.eq('term', params.term)
+  if (params?.class_id) marksQuery = marksQuery.eq('class_id', params.class_id)
+  if (params?.subject_id) marksQuery = marksQuery.eq('subject_id', params.subject_id)
+
+  const [{ data: marksData, error }, gradingScaleValue] = await Promise.all([
+    marksQuery,
+    getCachedGradingScale(),
+  ])
 
   if (error) {
     console.error('Error fetching marks:', error)
@@ -70,13 +75,6 @@ export default async function DeanMarksOverviewPage() {
         matchesWingFilter(m.classes || m.students || {}, lockedWing)
       )
     : ((marksData as any[]) || [])
-
-  // Fetch system settings for grading scale
-  const { data: settingData } = await supabase
-    .from('system_settings')
-    .select('value')
-    .eq('key', 'grading_scale')
-    .maybeSingle()
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -131,7 +129,7 @@ export default async function DeanMarksOverviewPage() {
 
       <DeanMarksClient
         marks={scopedMarks}
-        initialGradingScale={settingData?.value}
+        initialGradingScale={gradingScaleValue}
         initialWingFilter={wingContext.activeWingFilter}
         lockedWing={lockedWing}
       />

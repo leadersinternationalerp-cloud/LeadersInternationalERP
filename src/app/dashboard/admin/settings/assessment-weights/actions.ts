@@ -2,6 +2,7 @@
 import { normalizeRoles } from '@/lib/auth/roles'
 
 import { createClient } from '@/utils/supabase/server'
+import { invalidateReferenceDataCache } from '@/lib/cache/referenceData'
 import { revalidatePath } from 'next/cache'
 import { logAuditAction } from '@/utils/audit'
 
@@ -92,7 +93,8 @@ export async function saveWeightsAction(weights: {
       })
     if (settingsErr) throw settingsErr
 
-    // 6. Log audit action
+    // 6. Log audit action & invalidate cache
+    await invalidateReferenceDataCache('weights')
     await logAuditAction('Update Assessment Weights', 'assessment_weights', { weights })
 
     // Revalidate paths

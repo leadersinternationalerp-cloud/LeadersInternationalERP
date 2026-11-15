@@ -12,6 +12,9 @@ if (supabaseUrl) {
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ['pdfkit'],
+  experimental: {
+    optimizePackageImports: ['lucide-react'],
+  },
   images: {
     remotePatterns: [
       {

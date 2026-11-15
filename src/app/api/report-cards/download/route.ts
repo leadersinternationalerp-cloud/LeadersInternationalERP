@@ -4,6 +4,7 @@ import { assertStudentInScope } from '@/lib/api/scope'
 import { badRequest, ApiError } from '@/lib/api/errors'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { getCachedAssessmentWeights, getCachedGradingScale } from '@/lib/cache/referenceData'
 import { parseGradingLevels, getGradeForPercentage, parseMarkScore } from '@/utils/grading'
 import { generateSmartkidzReportPdf, ReportCardOptions, ReportSubjectMark, computeWeightedOverall } from '@/lib/reportCardPdf'
 
@@ -158,19 +159,12 @@ export const GET = route(
     const termName = term.term_name || term.name || 'Term 1'
     const academicYear = term.academic_year || '2026-2027'
 
-    // Load grading scale settings
-    const { data: systemSettings } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'grading_scale')
-      .single()
-    const gradingLevels = parseGradingLevels(systemSettings?.value)
-
-    // Fetch assessment weights from table
-    const { data: dbWeights } = await supabase
-      .from('assessment_weights')
-      .select('assessment_type, weight, is_active, display_order')
-      .order('display_order', { ascending: true })
+    // Load grading scale settings and assessment weights via shared cache
+    const [cachedGradingScale, dbWeights] = await Promise.all([
+      getCachedGradingScale(),
+      getCachedAssessmentWeights(),
+    ])
+    const gradingLevels = parseGradingLevels(cachedGradingScale)
 
     let allAssessmentConfigs: any[] = []
     if (dbWeights && dbWeights.length > 0) {
@@ -181,29 +175,14 @@ export const GET = route(
         display_order: w.display_order
       }))
     } else {
-      const { data: sysSetting } = await supabase
-        .from('system_settings')
-        .select('value')
-        .eq('key', 'assessment_weights')
-        .maybeSingle()
-
-      if (sysSetting?.value && Array.isArray(sysSetting.value)) {
-        allAssessmentConfigs = sysSetting.value.map((w: any) => ({
-          type: w.type || w.assessment_type,
-          weight: Number(w.weight),
-          is_active: w.is_active !== false,
-          display_order: w.display_order
-        }))
-      } else {
-        // Fallback default seed
-        allAssessmentConfigs = [
-          { type: 'QUIZZES', weight: 20, is_active: true, display_order: 0 },
-          { type: 'Test 1', weight: 20, is_active: true, display_order: 1 },
-          { type: 'Test 2', weight: 20, is_active: true, display_order: 2 },
-          { type: 'Mid-Term', weight: 20, is_active: true, display_order: 3 },
-          { type: 'Terminal', weight: 40, is_active: true, display_order: 4 }
-        ]
-      }
+      // Fallback default seed
+      allAssessmentConfigs = [
+        { type: 'QUIZZES', weight: 20, is_active: true, display_order: 0 },
+        { type: 'Test 1', weight: 20, is_active: true, display_order: 1 },
+        { type: 'Test 2', weight: 20, is_active: true, display_order: 2 },
+        { type: 'Mid-Term', weight: 20, is_active: true, display_order: 3 },
+        { type: 'Terminal', weight: 40, is_active: true, display_order: 4 }
+      ]
     }
 
     let assessmentConfigs: any[] = []

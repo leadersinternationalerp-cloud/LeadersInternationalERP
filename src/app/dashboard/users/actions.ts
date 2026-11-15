@@ -5,6 +5,7 @@ import { encodeRolesWithWing, isCrossWingRole, type UserWingAssignment } from '@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/utils/supabase/server'
+import { invalidateUserAuthCache } from '@/lib/auth/session'
 import { logAuditAction } from '@/utils/audit'
 import { type FormState } from './CreateUserForm'
 
@@ -132,6 +133,7 @@ export async function createUserAction(prevState: FormState, formData: FormData)
       wing,
     })
 
+    await invalidateUserAuthCache(authData.user.id)
     revalidatePath('/dashboard/users')
     return { success: true, error: null }
   } catch (error: any) {
@@ -257,6 +259,7 @@ export async function updateUserAction(
       email,
     })
 
+    await invalidateUserAuthCache(userId)
     revalidatePath('/dashboard/users')
     return { success: true, error: null }
   } catch (error: any) {
@@ -324,6 +327,7 @@ export async function toggleUserStatusAction(
       is_active: active,
     })
 
+    await invalidateUserAuthCache(userId)
     revalidatePath('/dashboard/users')
     return { success: true, error: null }
   } catch (error: any) {
@@ -409,6 +413,7 @@ export async function resetUserPasswordAction(
 
     await logAuditAction('RESET_USER_PASSWORD', 'profiles', { targetUserId: userId })
 
+    await invalidateUserAuthCache(userId)
     revalidatePath('/dashboard/users')
     return { success: true, error: null }
   } catch (error: any) {

@@ -1,5 +1,9 @@
-import { normalizeRoles } from '@/lib/auth/roles'
-import { createClient } from '@/utils/supabase/server'
+import { getSessionUser } from '@/lib/auth/session'
+import {
+  getCachedAssessmentWeights,
+  getCachedGradingScale,
+  getCachedTerms,
+} from '@/lib/cache/referenceData'
 import Link from 'next/link'
 import { getWingContext } from '@/lib/wingServer'
 import { matchesWingFilter } from '@/lib/wing'
@@ -51,18 +55,7 @@ export default async function TeacherMarksPage({
     term?: string
   }>
 }) {
-  const supabase = await createClient()
-
-  // Verify access
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user?.id)
-    .single()
-  const userRoles = normalizeRoles(profile)
+  const { user, profile, roles: userRoles, supabase } = await getSessionUser()
   const wingContext = await getWingContext(user?.id, profile)
   const lockedWing = wingContext.assignedWing !== 'Both' ? wingContext.assignedWing : null
 
@@ -123,11 +116,12 @@ export default async function TeacherMarksPage({
     a.name.localeCompare(b.name)
   )
 
-  // Fetch configured Assessment Types from assessment_weights
-  const { data: dbWeights } = await supabase
-    .from('assessment_weights')
-    .select('assessment_type, weight, is_active, display_order')
-    .order('display_order', { ascending: true })
+  // Fetch configured Assessment Types, Terms, and Grading Scale via shared cache
+  const [dbWeights, dbTerms, cachedGradingValue] = await Promise.all([
+    getCachedAssessmentWeights(),
+    getCachedTerms(),
+    getCachedGradingScale(),
+  ])
 
   let assessmentOptions: AssessmentTypeOption[] = []
   if (dbWeights && dbWeights.length > 0) {
@@ -153,13 +147,6 @@ export default async function TeacherMarksPage({
       { name: 'Terminal', weight: 40, is_active: true },
     ]
   }
-
-  // Fetch Terms from DB
-  const { data: dbTerms } = await supabase
-    .from('terms')
-    .select('name, term_name, academic_year, is_current, created_at')
-    .order('is_current', { ascending: false })
-    .order('created_at', { ascending: true })
 
   const termOptionsMap = new Map<string, TermOptionItem>()
   ;(dbTerms || []).forEach((t: any) => {
@@ -238,29 +225,31 @@ export default async function TeacherMarksPage({
     }
   }
 
-  // Fetch system settings for grading scale
-  const { data: settingData } = await supabase
-    .from('system_settings')
-    .select('value')
-    .eq('key', 'grading_scale')
-    .maybeSingle()
-
-  const gradingLevels = parseGradingLevels(settingData?.value)
+  const gradingLevels = parseGradingLevels(cachedGradingValue)
 
   // Fetch students in selected class
   let classStudents: StudentRecord[] = []
   let existingMarks: MarkRecord[] = []
 
   if (selectedClassId) {
-    const { data: students } = await supabase
-      .from('students')
-      .select(`
-        id,
-        student_id,
-        grade_level,
-        profiles (first_name, last_name)
-      `)
-      .eq('class_id', selectedClassId)
+    const [{ data: students }, { data: marksLogs }] = await Promise.all([
+      supabase
+        .from('students')
+        .select(`
+          id,
+          student_id,
+          grade_level,
+          profiles (first_name, last_name)
+        `)
+        .eq('class_id', selectedClassId),
+      supabase
+        .from('marks')
+        .select('student_id, score, raw_score, out_of, remarks, grading_scale, is_locked, is_released')
+        .eq('class_id', selectedClassId)
+        .eq('subject_id', selectedSubjectId)
+        .eq('assessment_type', selectedAssessmentType)
+        .eq('term', selectedTerm),
+    ])
 
     const rawStudents = ((students as unknown as any[]) || []).map((s) => {
       const prof = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles
@@ -280,15 +269,6 @@ export default async function TeacherMarksPage({
       const nameB = `${b.profiles.first_name} ${b.profiles.last_name}`.trim()
       return nameA.localeCompare(nameB)
     })
-
-    // Fetch existing marks
-    const { data: marksLogs } = await supabase
-      .from('marks')
-      .select('*')
-      .eq('class_id', selectedClassId)
-      .eq('subject_id', selectedSubjectId)
-      .eq('assessment_type', selectedAssessmentType)
-      .eq('term', selectedTerm)
 
     existingMarks = (marksLogs as unknown as MarkRecord[]) || []
   }

@@ -27,19 +27,23 @@ export default async function InvoicesPage() {
   }
 
   const supabase = createServiceClient()
-  const { data: myProfile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', session.user.id)
-    .maybeSingle()
-  const wingContext = await getWingContext(session.user.id, myProfile)
+  const wingContext = await getWingContext(session.user.id, session.profile)
   const lockedWing = wingContext.assignedWing !== 'Both' ? wingContext.assignedWing : null
 
-  // Fetch all invoices joining students, profiles, and payments
+  // Fetch bounded invoices joining students, profiles, and payments
   const { data: invoicesRaw } = await supabase
     .from('invoices')
     .select(`
-      *,
+      id,
+      student_id,
+      academic_year,
+      term,
+      total_amount,
+      net_amount,
+      discount_amount,
+      due_date,
+      status,
+      created_at,
       students:student_id (
         id,
         student_id,
@@ -55,6 +59,7 @@ export default async function InvoicesPage() {
       )
     `)
     .order('created_at', { ascending: false })
+    .limit(500)
 
   const allInvoices = (invoicesRaw || []).map((inv) => {
     const paid = (inv.payments || []).reduce((sum: number, p: any) => sum + Number(p.amount), 0)
@@ -66,7 +71,10 @@ export default async function InvoicesPage() {
   })
 
   const invoices = lockedWing
-    ? allInvoices.filter((inv) => matchesWingFilter(inv.students || {}, lockedWing))
+    ? allInvoices.filter((inv) => {
+        const studentRow = Array.isArray(inv.students) ? inv.students[0] : inv.students
+        return matchesWingFilter(studentRow || {}, lockedWing)
+      })
     : allInvoices
 
   // Backfill & fetch admission form invoices (TZS 30,000)

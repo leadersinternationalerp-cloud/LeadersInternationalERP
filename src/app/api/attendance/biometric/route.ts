@@ -1,125 +1,236 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
-import { createServiceClient } from '@/utils/supabase/service'
-import { route, parseJson, apiHeaders } from '@/lib/api/handler'
-import { ApiError } from '@/lib/api/errors'
+import { enforceRateLimit } from '@/lib/api/rate-limit'
+import { buildCacheKey, getCache, setCache } from '@/lib/cache/redisCache'
+import { logStructuredSecurityEvent } from '@/lib/monitoring/logger'
 
-export const POST = route(
-  async ({ req, requestId }) => {
-    const deviceId = req.headers.get('x-device-id')
-    const apiKey = req.headers.get('x-api-key') || req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+const MAX_TIMESTAMP_DRIFT_MS = 5 * 60 * 1000 // ±5 minutes replay window
 
-    const envKey = process.env.BIOMETRIC_API_KEY
-    const serviceClient = createServiceClient()
+function safeCompareStrings(a: string, b: string): boolean {
+  const bufA = Buffer.from(a)
+  const bufB = Buffer.from(b)
+  if (bufA.length !== bufB.length) return false
+  return crypto.timingSafeEqual(bufA, bufB)
+}
 
-    // 1. Authenticate device
-    let isAuthorized = false
+export function computeBiometricHmac(
+  rawBody: string,
+  timestampHeader: string,
+  secret: string
+): string {
+  return crypto
+    .createHmac('sha256', secret)
+    .update(`${timestampHeader}.${rawBody}`)
+    .digest('hex')
+}
 
-    if (deviceId && apiKey) {
-      const { data: device } = await serviceClient
-        .from('biometric_devices')
-        .select('*')
-        .eq('id', deviceId)
-        .maybeSingle()
+export async function POST(request: Request) {
+  try {
+    const ip =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'biometric-device'
+    await enforceRateLimit(`biometric:${ip}`, 120, 60_000)
 
-      if (device) {
-        if (device.is_active === false) {
-          throw new ApiError('FORBIDDEN', 'Biometric device is inactive')
-        }
+    // 1. Authenticate Device via API Key & optional HMAC Signature
+    const apiKey = request.headers.get('x-api-key')
+    const validApiKey = process.env.BIOMETRIC_API_KEY
+    const hmacSecret = process.env.BIOMETRIC_WEBHOOK_SECRET || validApiKey
 
-        if (device.api_key_hash) {
-          const providedHash = crypto.createHash('sha256').update(apiKey).digest('hex')
-          if (
-            providedHash.length === device.api_key_hash.length &&
-            crypto.timingSafeEqual(Buffer.from(providedHash), Buffer.from(device.api_key_hash))
-          ) {
-            isAuthorized = true
-          }
-        } else if (envKey && apiKey === envKey) {
-          isAuthorized = true
-        }
-
-        if (isAuthorized) {
-          await serviceClient
-            .from('biometric_devices')
-            .update({ last_seen_at: new Date().toISOString() })
-            .eq('id', deviceId)
-        }
-      }
+    if (!validApiKey) {
+      return NextResponse.json(
+        { error: 'Biometric webhook is not configured on the server.' },
+        { status: 503 }
+      )
     }
 
-    if (!isAuthorized && envKey && apiKey === envKey) {
-      isAuthorized = true
-    }
-
-    if (!isAuthorized) {
-      throw new ApiError('UNAUTHENTICATED', 'Invalid device credentials or API key')
-    }
-
-    // 2. Parse payload
-    const body = await parseJson<{
-      biometric_id?: string
-      timestamp?: string
-      device_id?: string
-    }>(req)
-
-    const { biometric_id, timestamp, device_id: bodyDeviceId } = body
-    if (!biometric_id || !timestamp) {
-      throw new ApiError('VALIDATION_FAILED', 'Missing required fields: biometric_id, timestamp')
-    }
-
-    // 3. Resolve student
-    const { data: studentData, error: studentError } = await serviceClient
-      .from('students')
-      .select('id, class_id')
-      .eq('biometric_id', biometric_id)
-      .maybeSingle()
-
-    if (studentError || !studentData?.class_id) {
-      throw new ApiError('NOT_FOUND', 'Unknown biometric ID', { code: 'UNKNOWN_BIOMETRIC_ID' })
-    }
-
-    const date = new Date(timestamp).toISOString().split('T')[0]
-    const activeDeviceId = deviceId || bodyDeviceId || 'unknown'
-
-    // 4. Record attendance
-    await serviceClient.from('attendance').upsert(
-      {
-        student_id: studentData.id,
-        class_id: studentData.class_id,
-        date,
-        status: 'Present',
-      },
-      { onConflict: 'student_id,date' }
-    )
-
-    // 5. Log punch
-    try {
-      await serviceClient.from('biometric_logs').insert({
-        device_id: activeDeviceId,
-        biometric_id,
-        timestamp,
-        student_id: studentData.id,
+    if (!apiKey || !safeCompareStrings(apiKey, validApiKey)) {
+      logStructuredSecurityEvent('BIOMETRIC_INVALID_API_KEY', {
+        route: '/api/attendance/biometric',
+        method: 'POST',
+        statusCode: 401,
+        metadata: { ip },
       })
-    } catch {
-      // Ignore dedupe collision on logs
+      return NextResponse.json({ error: 'Unauthorized device' }, { status: 401 })
     }
 
-    return NextResponse.json(
+    const rawBody = await request.text()
+    let body: any
+    try {
+      body = JSON.parse(rawBody)
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 })
+    }
+
+    const { student_code, timestamp, device_id } = body
+
+    if (!student_code || !timestamp) {
+      return NextResponse.json(
+        { error: 'Missing required fields: student_code, timestamp' },
+        { status: 400 }
+      )
+    }
+
+    // 2. Validate timestamp freshness (±5 minutes) to prevent replay attacks
+    const parsedTimeMs = new Date(timestamp).getTime()
+    if (Number.isNaN(parsedTimeMs)) {
+      return NextResponse.json(
+        { error: 'Invalid ISO timestamp format' },
+        { status: 400 }
+      )
+    }
+
+    const driftMs = Math.abs(Date.now() - parsedTimeMs)
+    if (driftMs > MAX_TIMESTAMP_DRIFT_MS) {
+      logStructuredSecurityEvent('BIOMETRIC_TIMESTAMP_DRIFT_REJECTED', {
+        route: '/api/attendance/biometric',
+        method: 'POST',
+        statusCode: 401,
+        metadata: { ip, device_id, driftMs },
+      })
+      return NextResponse.json(
+        { error: 'Stale or future biometric timestamp rejected (exceeds 5m window)' },
+        { status: 401 }
+      )
+    }
+
+    // 3. Verify HMAC-SHA256 signature if provided or if required by BIOMETRIC_REQUIRE_HMAC
+    const signatureHeader =
+      request.headers.get('x-biometric-signature') ||
+      request.headers.get('x-signature')
+    const requireHmac = process.env.BIOMETRIC_REQUIRE_HMAC === 'true'
+
+    if ( (requireHmac || signatureHeader) && hmacSecret ) {
+      if (!signatureHeader) {
+        logStructuredSecurityEvent('BIOMETRIC_MISSING_HMAC', {
+          route: '/api/attendance/biometric',
+          method: 'POST',
+          statusCode: 401,
+          metadata: { ip, device_id },
+        })
+        return NextResponse.json(
+          { error: 'Missing HMAC signature header' },
+          { status: 401 }
+        )
+      }
+      const headerTimestamp = request.headers.get('x-timestamp') || String(timestamp)
+      const expectedSig = computeBiometricHmac(rawBody, headerTimestamp, hmacSecret)
+      const normalizedActual = signatureHeader.replace(/^sha256=/i, '').trim()
+      if (!safeCompareStrings(normalizedActual, expectedSig)) {
+        logStructuredSecurityEvent('BIOMETRIC_INVALID_HMAC', {
+          route: '/api/attendance/biometric',
+          method: 'POST',
+          statusCode: 401,
+          metadata: { ip, device_id },
+        })
+        return NextResponse.json(
+          { error: 'Invalid biometric HMAC signature' },
+          { status: 401 }
+        )
+      }
+    }
+
+    // 4. Replay deduplication check within the 5-minute window
+    const replayKey = buildCacheKey('biometric:replay', [
+      String(device_id || 'default'),
+      String(student_code),
+      String(timestamp),
+    ])
+    const alreadyProcessed = await getCache<boolean>(replayKey)
+    if (alreadyProcessed) {
+      return NextResponse.json(
+        { error: 'Duplicate biometric event replay detected' },
+        { status: 409 }
+      )
+    }
+    await setCache(replayKey, true, 300)
+
+    // 5. Initialize Supabase Service Role Client (bypasses RLS for webhook)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return NextResponse.json(
+        { error: 'Server configuration error: Missing Supabase Service Role Key' },
+        { status: 500 }
+      )
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // 6. Lookup Student by student_id or admission_number
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('id, class_id, grade_level, section')
+      .or(`student_id.eq.${student_code},admission_number.eq.${student_code}`)
+      .single()
+
+    if (studentError || !student) {
+      return NextResponse.json(
+        { error: `Student not found for code: ${student_code}` },
+        { status: 404 }
+      )
+    }
+
+    // 7. Determine Class ID if not directly linked on student
+    let classId = student.class_id
+    if (!classId) {
+      const { data: classObj } = await supabase
+        .from('classes')
+        .select('id')
+        .eq('name', student.grade_level)
+        .eq('section', student.section || 'A')
+        .single()
+
+      if (classObj) {
+        classId = classObj.id
+      } else {
+        return NextResponse.json(
+          { error: `Could not resolve class for student ${student_code}` },
+          { status: 400 }
+        )
+      }
+    }
+
+    // 8. Calculate Attendance Status based on Time of Day (8:00 AM cutoff)
+    const punchTime = new Date(timestamp)
+    const punchDate = punchTime.toISOString().split('T')[0]
+    const hours = punchTime.getHours()
+    const minutes = punchTime.getMinutes()
+
+    let status = 'Present'
+    if (hours > 8 || (hours === 8 && minutes > 0)) {
+      status = 'Late'
+    }
+
+    // 9. Upsert Attendance Record
+    const { error: attendanceError } = await supabase.from('attendance').upsert(
       {
-        data: {
-          student_id: studentData.id,
-          class_id: studentData.class_id,
-          status: 'Present',
-          date,
-        },
-        meta: { requestId },
+        student_id: student.id,
+        class_id: classId,
+        date: punchDate,
+        status,
+        remarks: `Biometric Check-in (${punchTime.toLocaleTimeString()}) via Device ${device_id || 'Unknown'}`,
       },
       {
-        status: 202,
-        headers: apiHeaders(requestId),
+        onConflict: 'student_id,class_id,date',
       }
     )
-  },
-  { requireAuth: false }
-)
+
+    if (attendanceError) {
+      throw attendanceError
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Attendance recorded as ${status} for ${student_code} on ${punchDate}`,
+    })
+  } catch (err: any) {
+    if (err?.code === 'RATE_LIMITED' || err?.status === 429) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    }
+    return NextResponse.json(
+      { error: err.message || 'Internal Server Error' },
+      { status: 500 }
+    )
+  }
+}

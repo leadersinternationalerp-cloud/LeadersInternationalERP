@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { getAllowedRolesForPath } from '@/lib/auth/route-acl'
 import { normalizeRoles, hasAnyRole } from '@/lib/auth/roles'
+import { buildCacheKey, CACHE_TTL, getOrSetCache } from '@/lib/cache/redisCache'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -28,8 +29,7 @@ export async function updateSession(request: NextRequest) {
     const isExemptApi =
       pathname === '/api/attendance/biometric' ||
       pathname === '/api/health' ||
-      pathname === '/api/admissions/apply' ||
-      pathname === '/api/admin/go-live-setup'
+      pathname === '/api/admissions/apply'
 
     if (isExemptApi) {
       return supabaseResponse
@@ -78,8 +78,7 @@ export async function updateSession(request: NextRequest) {
     const isExemptApi =
       pathname === '/api/attendance/biometric' ||
       pathname === '/api/health' ||
-      pathname === '/api/admissions/apply' ||
-      pathname === '/api/admin/go-live-setup'
+      pathname === '/api/admissions/apply'
     if (!isExemptApi && !user) {
       return NextResponse.json(
         { error: { code: 'UNAUTHENTICATED', message: 'Sign in required' } },
@@ -100,11 +99,18 @@ export async function updateSession(request: NextRequest) {
   if (user && pathname.startsWith('/dashboard')) {
     const allowedRoles = getAllowedRolesForPath(pathname)
     if (allowedRoles || pathname === '/dashboard') {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role, roles')
-        .eq('id', user.id)
-        .single()
+      const profile = await getOrSetCache(
+        buildCacheKey('auth:roles', [user.id]),
+        CACHE_TTL.AUTH_PROFILE,
+        async () => {
+          const { data } = await supabase
+            .from('profiles')
+            .select('role, roles, is_active')
+            .eq('id', user.id)
+            .single()
+          return data
+        }
+      )
 
       const roles = normalizeRoles(profile)
       const isSalesOnly = roles.length === 1 && roles[0] === 'Sales'

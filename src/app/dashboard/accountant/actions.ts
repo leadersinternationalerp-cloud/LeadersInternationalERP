@@ -8,6 +8,7 @@ import { AccountingService } from '@/lib/accounting/AccountingService'
 import { isCurrentOrPast } from '@/utils/billing'
 import { getOfficial2027FeeRows } from '@/lib/finance/feeStructureHelper'
 import { createServiceClient } from '@/utils/supabase/service'
+import { buildCacheKey, CACHE_TTL, getCache, getOrSetCache, setCache } from '@/lib/cache/redisCache'
 
 // Save Fee Structure
 export async function saveFeeStructureAction(formData: FormData) {
@@ -457,40 +458,51 @@ export async function saveExpenseAction(formData: FormData) {
   return { success: true }
 }
 
-// Get the current active term and academic year
+// Get the current active term and academic year (cached via TERMS TTL)
 export async function getCurrentTermAndYear() {
-  const supabase = await createClient()
-  const { data: activeTerm } = await supabase
-    .from('terms')
-    .select('name, academic_year_id, academic_years(name)')
-    .eq('is_current', true)
-    .maybeSingle()
-
-  const termName = activeTerm?.name || 'Term 3'
-  let academicYearName = '2025-2026'
-
-  const joinedYear: any = activeTerm?.academic_years
-  const resolvedYear = Array.isArray(joinedYear) ? joinedYear[0]?.name : joinedYear?.name
-
-  if (resolvedYear) {
-    academicYearName = resolvedYear
-  } else if (activeTerm?.academic_year_id) {
-    const { data: activeYear } = await supabase
-      .from('academic_years')
-      .select('name')
-      .eq('id', activeTerm.academic_year_id)
+  return getOrSetCache(buildCacheKey('academic:current_term_year'), CACHE_TTL.ACTIVE_TERM, async () => {
+    const supabase = await createClient()
+    const { data: activeTerm } = await supabase
+      .from('terms')
+      .select('name, academic_year_id, academic_years(name)')
+      .eq('is_current', true)
       .maybeSingle()
-    if (activeYear) {
-      academicYearName = activeYear.name
-    }
-  }
 
-  return { termName, academicYearName }
+    const termName = activeTerm?.name || 'Term 3'
+    let academicYearName = '2025-2026'
+
+    const joinedYear: any = activeTerm?.academic_years
+    const resolvedYear = Array.isArray(joinedYear) ? joinedYear[0]?.name : joinedYear?.name
+
+    if (resolvedYear) {
+      academicYearName = resolvedYear
+    } else if (activeTerm?.academic_year_id) {
+      const { data: activeYear } = await supabase
+        .from('academic_years')
+        .select('name')
+        .eq('id', activeTerm.academic_year_id)
+        .maybeSingle()
+      if (activeYear) {
+        academicYearName = activeYear.name
+      }
+    }
+
+    return { termName, academicYearName }
+  })
 }
 
 
 // Automatically scan and generate invoices for any missing past or current term fee structures
-export async function autoGenerateMissingInvoices() {
+export async function autoGenerateMissingInvoices(force = false) {
+  const cooldownKey = buildCacheKey('finance:auto_generate_invoices_cooldown')
+  if (!force) {
+    const recentlyRan = await getCache<boolean>(cooldownKey)
+    if (recentlyRan) {
+      return { success: true, skipped: true }
+    }
+  }
+  await setCache(cooldownKey, true, 600)
+
   const supabase = await createClient()
 
   // 1. Resolve current active term and academic year

@@ -1,4 +1,5 @@
 import { normalizeRoles } from '@/lib/auth/roles'
+import { resolveUserProfileAndWing } from '@/lib/auth/session'
 import { getWingContext } from '@/lib/wingServer'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
@@ -17,12 +18,8 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  // Fetch user profile
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  // Fetch user profile and wing context via shared request-scoped + TTL cache
+  const { profile, roles: resolvedRoles } = await resolveUserProfileAndWing(user.id)
 
   if (profile && !profile.is_active) {
     return (
@@ -43,25 +40,25 @@ export default async function DashboardLayout({
   }
 
   // Roles
-  const userRoles = normalizeRoles(profile).length > 0 ? normalizeRoles(profile) : (user?.email === 'admin@leaders.ac.tz' ? ['System Admin'] : [])
+  const userRoles = resolvedRoles.length > 0 ? resolvedRoles : (user?.email === 'admin@leaders.ac.tz' ? ['System Admin'] : normalizeRoles(profile))
 
   // Wing Context
   const wingContext = await getWingContext(user.id, profile)
 
-  // Fetch unread notifications count
-  const { count: unreadCount } = await supabase
-    .from('notifications')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .eq('is_read', false)
-
-  // Fetch 5 most recent notifications
-  const { data: recentNotifications } = await supabase
-    .from('notifications')
-    .select('id, title, message, is_read, created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(5)
+  // Fetch unread notifications count and 5 most recent notifications in parallel
+  const [{ count: unreadCount }, { data: recentNotifications }] = await Promise.all([
+    supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('is_read', false),
+    supabase
+      .from('notifications')
+      .select('id, title, message, is_read, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5),
+  ])
 
   return (
     <>

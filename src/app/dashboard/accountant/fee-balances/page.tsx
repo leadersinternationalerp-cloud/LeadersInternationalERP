@@ -1,44 +1,48 @@
-import { createClient } from '@/utils/supabase/server'
-import { autoGenerateMissingInvoices, getCurrentTermAndYear } from '../actions'
+import { getSessionUser } from '@/lib/auth/session'
+import { getCurrentTermAndYear } from '../actions'
 import { isCurrentOrPast } from '@/utils/billing'
 import { getWingContext } from '@/lib/wingServer'
 import { inferWing, matchesWingFilter } from '@/lib/wing'
 import { WingBadge } from '@/components/WingFilterBar'
 
 export default async function FeeBalancesPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  const { data: profile } = user
-    ? await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
-    : { data: null }
+  const { user, profile, supabase } = await getSessionUser()
   const wingContext = await getWingContext(user?.id, profile)
 
-  // 1. Trigger auto-generation of missing invoices for current & past terms
-  await autoGenerateMissingInvoices()
-
-  // 2. Fetch current active term and year
-  const { termName: currentTerm, academicYearName: currentYear } = await getCurrentTermAndYear()
-
-  // 3. Fetch all invoices with students, profiles, and payments
-  const { data: invoices } = await supabase
-    .from('invoices')
-    .select(`
-      *,
-      student:student_id (
+  // 1. Fetch current active term and year & unpaid/partial invoices in parallel
+  const [{ termName: currentTerm, academicYearName: currentYear }, { data: invoices }] = await Promise.all([
+    getCurrentTermAndYear(),
+    supabase
+      .from('invoices')
+      .select(`
         id,
         student_id,
-        admission_number,
-        grade_level,
-        profiles (
-          first_name,
-          last_name
+        academic_year,
+        term,
+        total_amount,
+        net_amount,
+        discount_amount,
+        due_date,
+        status,
+        created_at,
+        student:student_id (
+          id,
+          student_id,
+          admission_number,
+          grade_level,
+          profiles (
+            first_name,
+            last_name
+          )
+        ),
+        payments (
+          amount
         )
-      ),
-      payments (
-        amount
-      )
-    `)
-    .order('due_date', { ascending: true })
+      `)
+      .neq('status', 'Paid')
+      .order('due_date', { ascending: true })
+      .limit(1000),
+  ])
 
   // Calculate aging
   const today = new Date()

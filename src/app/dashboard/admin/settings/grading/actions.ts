@@ -1,6 +1,7 @@
 'use server'
 
 import { normalizeRoles } from '@/lib/auth/roles'
+import { invalidateReferenceDataCache } from '@/lib/cache/referenceData'
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
@@ -41,6 +42,7 @@ export async function saveGradingConfigAction(config: any) {
     return { error: `Failed to save grading scale: ${error.message}` }
   }
 
+  await invalidateReferenceDataCache('grading')
   revalidatePath('/dashboard/admin/settings/grading')
   revalidatePath('/dashboard/teacher/marks')
   revalidatePath('/dashboard/dean/marks-overview')

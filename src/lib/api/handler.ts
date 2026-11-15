@@ -3,6 +3,7 @@ import { getApiUser, type ApiUser } from '@/lib/auth/session'
 import { hasAny, type Role } from '@/lib/auth/roles'
 import { ApiError, STATUS } from './errors'
 import { enforceRateLimit } from './rate-limit'
+import { logSlowRequest, logStructuredError } from '@/lib/monitoring/logger'
 
 export type Ctx = {
   user: ApiUser
@@ -97,8 +98,12 @@ export function route(
 ) {
   return async (req: NextRequest): Promise<Response> => {
     const requestId = crypto.randomUUID()
+    const startedAt = Date.now()
+    const pathname = req.nextUrl?.pathname || new URL(req.url).pathname
+    let resolvedUser: ApiUser | null = null
     try {
       const user = await getApiUser()
+      resolvedUser = user
       if ((opts.requireAuth ?? true) && !user) {
         throw new ApiError('UNAUTHENTICATED', 'Sign in required')
       }
@@ -113,12 +118,31 @@ export function route(
         await enforceRateLimit(opts.rateLimit, identifier)
       }
 
-      return await handler({ user: user as ApiUser, req, requestId })
+      const res = await handler({ user: user as ApiUser, req, requestId })
+      logSlowRequest({
+        requestId,
+        route: pathname,
+        method: req.method,
+        userId: resolvedUser?.id,
+        wing: resolvedUser?.wing,
+        durationMs: Date.now() - startedAt,
+        statusCode: res.status,
+      })
+      return res
     } catch (e: unknown) {
+      const durationMs = Date.now() - startedAt
       if (e instanceof ApiError) {
         return errorResponse(e, requestId)
       }
-      console.error(`[api:${requestId}]`, e)
+      logStructuredError('API_UNHANDLED_EXCEPTION', e, {
+        requestId,
+        route: pathname,
+        method: req.method,
+        userId: resolvedUser?.id,
+        wing: resolvedUser?.wing,
+        durationMs,
+        statusCode: 500,
+      })
       return errorResponse(new ApiError('INTERNAL', 'Something went wrong'), requestId)
     }
   }

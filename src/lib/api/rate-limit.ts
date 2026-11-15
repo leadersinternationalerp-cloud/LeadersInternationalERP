@@ -1,46 +1,78 @@
-import { createServiceClient } from '@/utils/supabase/service'
 import { ApiError } from './errors'
 
-const memoryStore = new Map<string, { count: number; expiresAt: number }>()
+export type RateLimitConfig = {
+  key: string
+  max: number
+  windowMs: number
+}
 
-export async function enforceRateLimit(
-  config: { key: string; max: number; windowMs: number },
-  identifier: string
-): Promise<void> {
-  const rateLimitKey = `${config.key}:${identifier}`
-  const now = Date.now()
+interface RateLimitBucket {
+  count: number
+  resetAt: number
+}
 
-  // 1. Try DB-backed rate limiting if table exists
-  try {
-    const supabase = createServiceClient()
-    const windowStart = new Date(now - (now % config.windowMs)).toISOString()
-    const dbKey = `${rateLimitKey}:${windowStart}`
+const MAX_RATE_LIMIT_BUCKETS = 5000
+const rateLimitStore = new Map<string, RateLimitBucket>()
 
-    const { data, error } = await supabase.rpc('increment_rate_limit', {
-      p_key: dbKey,
-      p_window_start: windowStart,
-    })
-
-    if (!error && typeof data === 'number') {
-      if (data > config.max) {
-        throw new ApiError('RATE_LIMITED', 'Rate limit exceeded. Please try again later.')
-      }
-      return
+function pruneExpiredBuckets(now: number) {
+  if (rateLimitStore.size < MAX_RATE_LIMIT_BUCKETS) return
+  for (const [k, bucket] of rateLimitStore.entries()) {
+    if (bucket.resetAt <= now) {
+      rateLimitStore.delete(k)
     }
-  } catch (e) {
-    if (e instanceof ApiError) throw e
-    // Fall back to memoryStore
+  }
+  while (rateLimitStore.size >= MAX_RATE_LIMIT_BUCKETS) {
+    const oldestKey = rateLimitStore.keys().next().value
+    if (!oldestKey) break
+    rateLimitStore.delete(oldestKey)
+  }
+}
+
+/**
+ * High-performance in-memory sliding/fixed-window rate limiter (<1ms overhead).
+ * Eliminates the blocking HTTPS round trip to Supabase RPC on every API call.
+ * Supports both (cfg, identifier) and (key, max, windowMs) signatures.
+ */
+export async function enforceRateLimit(
+  cfgOrKey: RateLimitConfig | string,
+  identifierOrMax: string | number,
+  maybeWindowMs?: number
+) {
+  let bucketKey: string
+  let max: number
+  let windowMs: number
+
+  if (typeof cfgOrKey === 'string') {
+    bucketKey = cfgOrKey
+    max = Number(identifierOrMax)
+    windowMs = Number(maybeWindowMs || 60_000)
+  } else {
+    bucketKey = `${cfgOrKey.key}:${identifierOrMax}`
+    max = cfgOrKey.max
+    windowMs = cfgOrKey.windowMs
   }
 
-  // 2. Fallback memory rate limiter
-  const entry = memoryStore.get(rateLimitKey)
-  if (!entry || entry.expiresAt <= now) {
-    memoryStore.set(rateLimitKey, { count: 1, expiresAt: now + config.windowMs })
+  const now = Date.now()
+  pruneExpiredBuckets(now)
+
+  const windowBucket = Math.floor(now / windowMs)
+  const compositeKey = `${bucketKey}:${windowBucket}`
+
+  const existing = rateLimitStore.get(compositeKey)
+  if (!existing || existing.resetAt <= now) {
+    rateLimitStore.set(compositeKey, {
+      count: 1,
+      resetAt: (windowBucket + 1) * windowMs,
+    })
     return
   }
 
-  entry.count += 1
-  if (entry.count > config.max) {
-    throw new ApiError('RATE_LIMITED', 'Rate limit exceeded. Please try again later.')
+  existing.count += 1
+  if (existing.count > max) {
+    throw new ApiError('RATE_LIMITED', 'Too many requests, please try again later')
   }
+}
+
+export function resetRateLimitForTests() {
+  rateLimitStore.clear()
 }
