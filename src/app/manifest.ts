@@ -27,7 +27,7 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: '/screenshots/dashboard-narrow.png', sizes: '390x844', type: 'image/png', form_factor: 'narrow' },
     ],
     shortcuts: [
-      { name: 'Dashboard', url: '/dashboard', icons: [{ src: '/icon-192x192.png', sizes: '192x192' }] },
+      { name: 'Home', url: '/dashboard', icons: [{ src: '/icon-192x192.png', sizes: '192x192' }] },
       { name: 'Notifications', url: '/dashboard/notifications', icons: [{ src: '/icon-192x192.png', sizes: '192x192' }] },
       { name: 'My payments', url: '/dashboard/parent/fees', icons: [{ src: '/icon-192x192.png', sizes: '192x192' }] },
     ],

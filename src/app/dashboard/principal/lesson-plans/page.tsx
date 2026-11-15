@@ -128,7 +128,7 @@ export default async function LessonPlanReportPage({
 
           <Link href="/dashboard/principal" className="btn btn-secondary" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.9rem', fontSize: '0.85rem' }}>
             <ArrowLeft size={16} />
-            <span>Dashboard</span>
+            <span>Home</span>
           </Link>
         </div>
       </div>

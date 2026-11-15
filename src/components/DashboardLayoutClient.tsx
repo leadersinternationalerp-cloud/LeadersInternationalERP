@@ -121,7 +121,7 @@ export default function DashboardLayoutClient({
     if (pathname.includes('/students')) return 'Students List & Bio Data'
     if (pathname.includes('/profile')) return 'My Profile'
     if (pathname.includes('/settings')) return 'Settings'
-    return 'Dashboard Overview'
+    return 'Home'
   }
 
   // Helper for active styling (supports instant optimistic active highlight on click)
@@ -298,8 +298,8 @@ export default function DashboardLayoutClient({
                 userRoles.includes('Dean') || 
                 userRoles.includes('Head of Section') || 
                 userRoles.includes('Accountant')) && (
-                <NavLink href="/dashboard" icon={LayoutDashboard}>
-                  Dashboard Overview
+                <NavLink href="/dashboard" icon={Home}>
+                  Home
                 </NavLink>
               )}
 

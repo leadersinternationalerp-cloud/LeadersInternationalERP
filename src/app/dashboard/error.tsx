@@ -38,7 +38,7 @@ export default function DashboardError({
             className="btn btn-secondary flex items-center gap-2"
           >
             <Home className="w-4 h-4" />
-            Dashboard
+            Home
           </Link>
         </div>
       </div>
