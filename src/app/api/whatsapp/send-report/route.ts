@@ -14,9 +14,10 @@ export const POST = route(
       termId?: string
       type?: 'PRIMARY' | 'EARLY_YEARS'
       showRank?: boolean
+      assessments?: string
     }>(req)
 
-    const { studentId, termId, type = 'PRIMARY', showRank = true } = body
+    const { studentId, termId, type = 'PRIMARY', showRank = true, assessments } = body
 
     if (!studentId || !termId) {
       throw badRequest({ fields: 'Missing studentId or termId' })
@@ -87,10 +88,11 @@ export const POST = route(
         const termName = term?.name || term?.term_name || 'Term'
 
         const origin = new URL(req.url).origin
+        const assessmentsQuery = assessments ? `&assessments=${encodeURIComponent(assessments)}` : ''
         const endpoint =
           type === 'EARLY_YEARS'
             ? `${origin}/api/early-years/report?student_id=${sId}&term_id=${termId}&download=true`
-            : `${origin}/api/report-cards/download?student_id=${sId}&term_id=${termId}&show_rank=${showRank}&download=true`
+            : `${origin}/api/report-cards/download?student_id=${sId}&term_id=${termId}&show_rank=${showRank}${assessmentsQuery}&download=true`
 
         const response = await fetch(endpoint, {
           headers: {

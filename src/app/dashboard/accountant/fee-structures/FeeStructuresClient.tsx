@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { Info, Printer, FileDown, MessageSquare, Pencil, RefreshCw, X } from 'lucide-react'
 import { saveFeeStructureAction, updateFeeStructureAction, seed2027FeeStructuresAction } from '../actions'
+import { useWingFilter } from '@/components/WingFilterBar'
+import type { WingFilterValue } from '@/lib/wing'
 
 interface FeeStructure {
   id: string
@@ -39,7 +41,10 @@ export default function FeeStructuresClient({
   const [filterYear, setFilterYear] = useState<string>('all')
   const [filterTerm, setFilterTerm] = useState<string>('all')
   const [filterGrade, setFilterGrade] = useState<string>('all')
-  const [filterWing, setFilterWing] = useState<string>('all')
+  const { wingFilter: filterWing, setWingFilter } = useWingFilter('all', null)
+  const setFilterWing = (val: string) => {
+    setWingFilter(val === 'Cambridge' || val === 'NECTA' ? (val as WingFilterValue) : 'all')
+  }
 
   // Modal State for WhatsApp
   const [isWhatsappModalOpen, setIsWhatsappModalOpen] = useState(false)

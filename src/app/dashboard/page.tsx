@@ -2,6 +2,8 @@ import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { getWingContext } from '@/lib/wingServer'
+import { matchesWingFilter } from '@/lib/wing'
 import { 
   Users, UserCog, Wallet, TrendingDown, TrendingUp,
   ClipboardCheck, HandCoins, Settings, BookOpen, PenLine,
@@ -30,10 +32,20 @@ export default async function DashboardPage() {
     redirect('/dashboard/principal/admissions')
   }
 
-  // 1. Fetch KPI totals for Director/Principal/Accountant
-  const { count: studentCount } = await supabase
+  const wingContext = await getWingContext(user?.id, profile)
+  const activeWingLabel =
+    wingContext.activeWingFilter === 'all'
+      ? 'All Wings (Cambridge & NECTA)'
+      : `${wingContext.activeWingFilter} Wing`
+
+  // 1. Fetch KPI totals for Director/Principal/Accountant (wing-aware)
+  const { data: allStudents } = await supabase
     .from('students')
-    .select('*', { count: 'exact', head: true })
+    .select('id, grade_level')
+
+  const studentCount = (allStudents || []).filter((s: any) =>
+    matchesWingFilter(s, wingContext.activeWingFilter)
+  ).length
 
   const { count: staffCount } = await supabase
     .from('staff')
@@ -49,13 +61,20 @@ export default async function DashboardPage() {
     .select('*', { count: 'exact', head: true })
     .eq('status', 'Pending')
 
-  // Fetch financial summary
-  const { data: invoices } = await supabase
+  // Fetch financial summary (wing-aware)
+  const { data: invoicesRaw } = await supabase
     .from('invoices')
-    .select('net_amount, paid_amount')
+    .select('net_amount, paid_amount, total_paid, students:student_id(grade_level)')
 
-  const totalInvoiced = (invoices || []).reduce((acc, curr) => acc + Number(curr.net_amount), 0)
-  const totalCollected = (invoices || []).reduce((acc, curr) => acc + Number(curr.paid_amount), 0)
+  const invoices = (invoicesRaw || []).filter((inv: any) =>
+    matchesWingFilter(inv.students || {}, wingContext.activeWingFilter)
+  )
+
+  const totalInvoiced = invoices.reduce((acc, curr: any) => acc + Number(curr.net_amount || 0), 0)
+  const totalCollected = invoices.reduce(
+    (acc, curr: any) => acc + Number(curr.total_paid ?? curr.paid_amount ?? 0),
+    0
+  )
   const totalOutstanding = totalInvoiced - totalCollected
 
   const formatTZS = (val: number) => {
@@ -77,7 +96,7 @@ export default async function DashboardPage() {
             Welcome back, {profile?.first_name}!
           </h1>
           <p className="page-subtitle">
-            Role: <strong>{userRoles.join(', ')}</strong> • Academic Year: <strong>2025-2026</strong>
+            Role: <strong>{userRoles.join(', ')}</strong> • Scope: <strong>{activeWingLabel}</strong> • Academic Year: <strong>2026-2027</strong>
           </p>
         </div>
         <div className="page-actions">
@@ -94,7 +113,9 @@ export default async function DashboardPage() {
           <div className="stat-icon" style={{ backgroundColor: 'rgba(59, 179, 195, 0.1)' }}>
             <Users size={20} color="var(--color-secondary)" />
           </div>
-          <span className="stat-label">Total Enrolled Students</span>
+          <span className="stat-label">
+            Total Enrolled Students {wingContext.activeWingFilter !== 'all' ? `(${wingContext.activeWingFilter})` : ''}
+          </span>
           <span className="stat-value" style={{ color: 'var(--color-secondary)' }}>{studentCount || 0}</span>
         </div>
 
@@ -112,7 +133,9 @@ export default async function DashboardPage() {
               <div className="stat-icon" style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)' }}>
                 <TrendingDown size={20} color="var(--color-error)" />
               </div>
-              <span className="stat-label">Outstanding Fees (TZS)</span>
+              <span className="stat-label">
+                Outstanding Fees {wingContext.activeWingFilter !== 'all' ? `(${wingContext.activeWingFilter})` : '(TZS)'}
+              </span>
               <span className="stat-value" style={{ color: 'var(--color-error)' }}>{formatTZS(totalOutstanding)}</span>
             </div>
 
@@ -120,7 +143,9 @@ export default async function DashboardPage() {
               <div className="stat-icon" style={{ backgroundColor: 'rgba(16, 185, 129, 0.08)' }}>
                 <TrendingUp size={20} color="var(--color-success)" />
               </div>
-              <span className="stat-label">Total Collections (TZS)</span>
+              <span className="stat-label">
+                Total Collections {wingContext.activeWingFilter !== 'all' ? `(${wingContext.activeWingFilter})` : '(TZS)'}
+              </span>
               <span className="stat-value" style={{ color: 'var(--color-success)' }}>{formatTZS(totalCollected)}</span>
             </div>
           </>

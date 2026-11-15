@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useWingFilter, WingSegmentedBar } from '@/components/WingFilterBar'
+import { type UserWingAssignment, type WingFilterValue } from '@/lib/wing'
 import { 
   CalendarCheck, ShieldAlert, LayoutDashboard, CalendarDays, Users, UserCog, BookOpen, FileSpreadsheet, 
   Settings, Wallet, Receipt, Bell, Menu, X, LogOut,
@@ -28,15 +30,26 @@ export default function DashboardLayoutClient({
   userRoles,
   recentNotifications,
   unreadCount,
+  assignedWing = 'Both',
+  initialWingFilter = 'all',
   children,
 }: {
   profile: any
   userRoles: string[]
   recentNotifications: Notification[]
   unreadCount: number
+  assignedWing?: UserWingAssignment
+  initialWingFilter?: WingFilterValue
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const [wingFilter, setWingFilter] = useWingFilter(initialWingFilter, assignedWing)
+
+  const handleGlobalWingChange = (next: WingFilterValue) => {
+    setWingFilter(next)
+    router.refresh()
+  }
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -487,17 +500,28 @@ export default function DashboardLayoutClient({
                 </NavLink>
               )}
 
-              {userRoles.includes('System Admin') && (
+              {(userRoles.includes('System Admin') ||
+                userRoles.includes('Director') ||
+                userRoles.includes('Principal') ||
+                userRoles.includes('Dean')) && (
                 <NavGroup
                   groupKey="academicSetup"
                   icon={Settings}
-                  label="Academic Setup"
+                  label="Academic & Grading Setup"
                   activePaths={[
+                    '/dashboard/admin/settings/grading',
+                    '/dashboard/admin/settings/assessment-weights',
                     '/dashboard/admin/syllabus',
                     '/dashboard/admin/subjects',
                     '/dashboard/admin/teacher-assignments',
                   ]}
                 >
+                  <NavLink href="/dashboard/admin/settings/grading" icon={Scale}>
+                    Grading Scale
+                  </NavLink>
+                  <NavLink href="/dashboard/admin/settings/assessment-weights" icon={FileSpreadsheet}>
+                    Assessment Weights
+                  </NavLink>
                   <NavLink href="/dashboard/admin/syllabus" icon={Settings}>
                     Syllabus Setup
                   </NavLink>
@@ -518,10 +542,16 @@ export default function DashboardLayoutClient({
                 </NavLink>
               )}
 
-              {(userRoles.includes('System Admin') || userRoles.includes('Dean')) && (
+              {(userRoles.includes('System Admin') ||
+                userRoles.includes('Director') ||
+                userRoles.includes('Principal') ||
+                userRoles.includes('Dean')) && (
                 <>
                   <NavLink href="/dashboard/dean/marks-overview" icon={PenLine}>
                     Marks Overview
+                  </NavLink>
+                  <NavLink href="/dashboard/dean/marks" icon={ClipboardCheck}>
+                    Grades Release & Lock
                   </NavLink>
                   <NavLink href="/dashboard/dean/submissions" icon={BookOpen}>
                     Submissions Review
@@ -543,6 +573,17 @@ export default function DashboardLayoutClient({
                 </>
               )}
 
+              {(userRoles.includes('System Admin') ||
+                userRoles.includes('Director') ||
+                userRoles.includes('Principal') ||
+                userRoles.includes('Dean') ||
+                userRoles.includes('Head of Section') ||
+                userRoles.includes('Teacher')) && (
+                <NavLink href="/dashboard/teacher/marks" icon={PenLine}>
+                  Academic Marks Entry
+                </NavLink>
+              )}
+
               {(userRoles.includes('System Admin') || userRoles.includes('Teacher')) && (
                 <>
                   <NavLink href="/dashboard/teacher" icon={School}>
@@ -550,9 +591,6 @@ export default function DashboardLayoutClient({
                   </NavLink>
                   <NavLink href="/dashboard/teacher/attendance" icon={ClipboardCheck}>
                     Daily Attendance
-                  </NavLink>
-                  <NavLink href="/dashboard/teacher/marks" icon={PenLine}>
-                    Academic Marks
                   </NavLink>
                   <NavLink href="/dashboard/teacher/lesson-plans" icon={BookOpen}>
                     Lesson Plans
@@ -640,6 +678,9 @@ export default function DashboardLayoutClient({
                   <NavLink href="/dashboard/student" icon={School}>
                     Student Dashboard
                   </NavLink>
+                  <NavLink href="/dashboard/student/results" icon={PenLine}>
+                    Academic Results
+                  </NavLink>
                   <NavLink href="/dashboard/student/report-card" icon={FileSpreadsheet}>
                     Report Card
                   </NavLink>
@@ -653,6 +694,9 @@ export default function DashboardLayoutClient({
                   </NavLink>
                   <NavLink href="/dashboard/parent/students" icon={Users}>
                     My Children
+                  </NavLink>
+                  <NavLink href="/dashboard/parent/academic-reports" icon={PenLine}>
+                    Academic Results
                   </NavLink>
                   <NavLink href="/dashboard/parent/report-card" icon={FileSpreadsheet}>
                     Report Card
@@ -763,6 +807,9 @@ export default function DashboardLayoutClient({
             <div style={{ paddingLeft: collapsed ? '0' : '0.5rem' }}>
               <NavLink href="/dashboard/admin/settings" icon={Settings}>
                 School Settings
+              </NavLink>
+              <NavLink href="/dashboard/admin/settings/grading" icon={Scale}>
+                Grading Scale
               </NavLink>
               <NavLink href="/dashboard/admin/settings/assessment-weights" icon={FileSpreadsheet}>
                 Assessment Weights
@@ -918,11 +965,16 @@ export default function DashboardLayoutClient({
           </div>
         </div>
 
-        {/* Dynamic Page Title (Center) */}
-        <div style={{ flex: 1, textAlign: 'center', display: 'flex', justifyContent: 'center' }}>
-          <h1 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 600, color: 'var(--color-text-muted)' }}>
+        {/* Dynamic Page Title & Global Wing Switcher (Center) */}
+        <div style={{ flex: 1, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <h1 className="hide-mobile" style={{ fontSize: '1.05rem', margin: 0, fontWeight: 600, color: 'var(--color-text-muted)' }}>
             {getPageTitle()}
           </h1>
+          <WingSegmentedBar
+            value={wingFilter}
+            onChange={handleGlobalWingChange}
+            lockedWing={assignedWing}
+          />
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>

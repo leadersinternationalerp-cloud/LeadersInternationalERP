@@ -1,6 +1,8 @@
 import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
+import { getWingContext } from '@/lib/wingServer'
+import { matchesWingFilter } from '@/lib/wing'
 import {
   Users, UsersRound, DollarSign, Wallet, FileText,
   Calendar as CalendarIcon, CheckCircle, AlertCircle, LineChart, Banknote
@@ -14,7 +16,7 @@ export default async function DirectorDashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('*')
     .eq('id', user?.id)
     .single()
     
@@ -28,17 +30,34 @@ export default async function DirectorDashboardPage() {
     )
   }
 
-  // Fetch Summary Metrics
-  const [{ count: totalStudents }, { count: totalStaff }] = await Promise.all([
-    supabase.from('students').select('id', { count: 'exact', head: true }).eq('status', 'Active'),
+  const wingContext = await getWingContext(user.id, profile)
+  const activeWingLabel =
+    wingContext.activeWingFilter === 'all'
+      ? 'All Wings (Cambridge & NECTA)'
+      : `${wingContext.activeWingFilter} Wing`
+
+  // Fetch Summary Metrics (wing-aware)
+  const [{ data: activeStudents }, { count: totalStaff }] = await Promise.all([
+    supabase.from('students').select('id, grade_level').eq('status', 'Active'),
     supabase.from('profiles').select('id', { count: 'exact', head: true }).in('role', ['Teacher', 'Principal', 'Dean', 'Head of Section', 'Accountant', 'Director'])
   ])
 
-  // Simplified Fee logic for display
-  const { data: invoices } = await supabase.from('invoices').select('net_amount, total_paid, status')
+  const totalStudents = (activeStudents || []).filter((s: any) =>
+    matchesWingFilter(s, wingContext.activeWingFilter)
+  ).length
+
+  // Simplified Fee logic for display (wing-aware)
+  const { data: invoicesRaw } = await supabase
+    .from('invoices')
+    .select('net_amount, total_paid, status, students:student_id(grade_level)')
+
+  const invoices = (invoicesRaw || []).filter((inv: any) =>
+    matchesWingFilter(inv.students || {}, wingContext.activeWingFilter)
+  )
+
   let feesCollected = 0
   let feesOutstanding = 0
-  invoices?.forEach(inv => {
+  invoices.forEach((inv: any) => {
     const netAmount = Number(inv.net_amount || 0)
     const paidAmount = Number(inv.total_paid || 0)
     feesCollected += paidAmount
@@ -80,7 +99,7 @@ export default async function DirectorDashboardPage() {
         <div>
           <h1 style={{ fontSize: '1.85rem', color: 'var(--color-primary)', margin: 0 }}>Director Overview</h1>
           <p className="page-subtitle">
-            Executive summary of school operations, finances, and administration.
+            Executive summary of school operations, finances, and administration • Scope: <strong>{activeWingLabel}</strong>
           </p>
         </div>
       </div>
@@ -91,7 +110,9 @@ export default async function DirectorDashboardPage() {
           <div className="stat-icon" style={{ backgroundColor: 'rgba(59, 179, 195, 0.1)' }}>
             <UsersRound size={20} color="var(--color-secondary)" />
           </div>
-          <span className="stat-label">Total Students</span>
+          <span className="stat-label">
+            Total Students {wingContext.activeWingFilter !== 'all' ? `(${wingContext.activeWingFilter})` : ''}
+          </span>
           <span className="stat-value" style={{ color: 'var(--color-secondary)' }}>{totalStudents || 0}</span>
         </div>
 
@@ -107,7 +128,9 @@ export default async function DirectorDashboardPage() {
           <div className="stat-icon" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)' }}>
             <Wallet size={20} color="var(--color-success)" />
           </div>
-          <span className="stat-label">Fees Collected</span>
+          <span className="stat-label">
+            Fees Collected {wingContext.activeWingFilter !== 'all' ? `(${wingContext.activeWingFilter})` : ''}
+          </span>
           <span className="stat-value" style={{ color: 'var(--color-success)' }}>{formatCurrency(feesCollected)}</span>
         </div>
 
@@ -115,7 +138,9 @@ export default async function DirectorDashboardPage() {
           <div className="stat-icon" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)' }}>
             <DollarSign size={20} color="var(--color-error)" />
           </div>
-          <span className="stat-label">Outstanding Fees</span>
+          <span className="stat-label">
+            Outstanding Fees {wingContext.activeWingFilter !== 'all' ? `(${wingContext.activeWingFilter})` : ''}
+          </span>
           <span className="stat-value" style={{ color: 'var(--color-error)' }}>{formatCurrency(feesOutstanding)}</span>
         </div>
       </div>

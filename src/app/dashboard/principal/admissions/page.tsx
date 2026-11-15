@@ -1,5 +1,7 @@
 import { getSessionUser } from '@/lib/auth/session'
 import { hasAnyRole } from '@/lib/auth/roles'
+import { getWingContext } from '@/lib/wingServer'
+import { matchesWingFilter } from '@/lib/wing'
 import { createServiceClient } from '@/utils/supabase/service'
 import { ensureMissingAdmissionInvoices } from '@/lib/admissions/ensureAdmissionInvoices'
 import AdmissionsClient, { type AdmissionApplication } from './AdmissionsClient'
@@ -27,6 +29,7 @@ export default async function PrincipalAdmissionsPage() {
     redirect('/dashboard?denied=1')
   }
 
+  const wingContext = await getWingContext(session.user.id, session.profile)
   const supabase = createServiceClient()
 
   // 1. One-time and defensive auto-purge for the specified test applications
@@ -95,7 +98,10 @@ export default async function PrincipalAdmissionsPage() {
         return false
       }
       if (isSalesOnly) {
-        return app.registered_by === session.user.id
+        if (app.registered_by !== session.user.id) return false
+      }
+      if (wingContext.assignedWing === 'Cambridge' || wingContext.assignedWing === 'NECTA') {
+        if (!matchesWingFilter(app, wingContext.assignedWing)) return false
       }
       return true
     })
@@ -104,11 +110,18 @@ export default async function PrincipalAdmissionsPage() {
       admission_invoices: invoicesByAppId[app.id] || [],
     }))
 
+  const scopedClasses =
+    wingContext.assignedWing === 'Cambridge' || wingContext.assignedWing === 'NECTA'
+      ? (classesData || []).filter((c: any) => matchesWingFilter(c, wingContext.assignedWing))
+      : classesData || []
+
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
       <AdmissionsClient
         initialApplications={applications}
-        classes={classesData || []}
+        classes={scopedClasses}
+        assignedWing={wingContext.assignedWing}
+        initialWingFilter={wingContext.activeWingFilter}
         currentUser={{
           id: session.user.id,
           name: `${session.profile?.first_name || ''} ${session.profile?.last_name || ''}`.trim() || (isReceptionist ? 'Receptionist' : 'Sales Staff'),

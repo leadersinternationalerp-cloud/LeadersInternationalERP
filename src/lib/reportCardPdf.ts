@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit'
 import fs from 'fs'
 import path from 'path'
-import { GradeLevel } from '@/utils/grading'
+import { GradeLevel, getGradeDescriptor } from '@/utils/grading'
 import { drawLetterhead } from './pdfLetterhead'
 
 export interface ReportSubjectMark {
@@ -26,16 +26,17 @@ export function computeWeightedOverall(assessments: Record<string, number | null
   const activeConfigs = (configs || []).filter(c => c.is_active !== false)
   const totalWeight = activeConfigs.reduce((sum, c) => sum + Number(c.weight || 0), 0)
   if (totalWeight <= 0) {
-    const keys = Object.keys(assessments)
-    const sum = keys.reduce((s, k) => s + (Number(assessments[k]) || 0), 0)
-    return sum / keys.length
+    const validScores = Object.values(assessments).filter((v): v is number => v !== null && v !== undefined && !isNaN(Number(v)))
+    if (validScores.length === 0) return 0
+    const sum = validScores.reduce((s, v) => s + Number(v), 0)
+    return sum / validScores.length
   }
   let weightedSum = 0
   activeConfigs.forEach(c => {
-    const key = Object.keys(assessments).find(k => k.toLowerCase() === c.type.toLowerCase())
+    const key = Object.keys(assessments).find(k => k.toLowerCase().trim() === c.type.toLowerCase().trim())
     const score = key !== undefined ? assessments[key] : null
-    if (score !== null && score !== undefined) {
-      weightedSum += score * Number(c.weight || 0)
+    if (score !== null && score !== undefined && !isNaN(Number(score))) {
+      weightedSum += Number(score) * Number(c.weight || 0)
     }
   });
   return weightedSum / totalWeight
@@ -536,18 +537,26 @@ function drawGradingAndAttendance(doc: PDFKit.PDFDocument, opts: ReportCardOptio
   const scaleStartY = startY + 20
   const scaleLineH = 15
 
-  const gradingScaleCol1 = [
-    { text: 'A* (90 - 100%)', desc: 'Outstanding' },
-    { text: 'A  (80 - 89%)', desc: 'Excellent' },
-    { text: 'B  (70 - 79%)', desc: 'Very Good' },
-    { text: 'C  (60 - 69%)', desc: 'Good' },
-  ]
-  const gradingScaleCol2 = [
-    { text: 'D  (50 - 59%)', desc: 'Satisfactory' },
-    { text: 'E  (40 - 49%)', desc: 'Fair' },
-    { text: 'F  (30 - 39%)', desc: 'Weak' },
-    { text: 'G  (0 - 29%)', desc: 'Needs Improvement' },
-  ]
+  const sortedLevels = [...(opts.gradingLevels || [])].sort((a, b) => b.max - a.max)
+  const scaleItems = sortedLevels.length > 0
+    ? sortedLevels.map(lvl => ({
+        text: `${lvl.grade.padEnd(2, ' ')} (${lvl.min} - ${lvl.max}%)`,
+        desc: getGradeDescriptor(lvl.grade)
+      }))
+    : [
+        { text: 'A* (90 - 100%)', desc: 'Outstanding' },
+        { text: 'A  (80 - 89%)', desc: 'Excellent' },
+        { text: 'B  (70 - 79%)', desc: 'Very Good' },
+        { text: 'C  (60 - 69%)', desc: 'Good' },
+        { text: 'D  (50 - 59%)', desc: 'Satisfactory' },
+        { text: 'E  (40 - 49%)', desc: 'Fair' },
+        { text: 'F  (30 - 39%)', desc: 'Weak' },
+        { text: 'G  (0 - 29%)', desc: 'Needs Improvement' },
+      ]
+
+  const half = Math.ceil(scaleItems.length / 2)
+  const gradingScaleCol1 = scaleItems.slice(0, Math.min(4, half))
+  const gradingScaleCol2 = scaleItems.slice(Math.min(4, half), Math.min(8, scaleItems.length))
 
   doc.fontSize(7.5).fillColor('#334155')
   gradingScaleCol1.forEach((item, idx) => {

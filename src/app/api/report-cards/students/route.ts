@@ -14,14 +14,18 @@ export const GET = route(
     }
 
     const page = Math.max(1, Number(searchParams.get('page')) || 1)
-    const perPage = Math.min(100, Math.max(1, Number(searchParams.get('perPage')) || 50))
+    const perPage = Math.min(100, Math.max(1, Number(searchParams.get('perPage')) || 100))
     const from = (page - 1) * perPage
     const to = from + perPage - 1
 
     const supabase = await createClient()
 
     // 1. Verify Scope & Class existence
-    const { data: classInfo } = await supabase.from('classes').select('*').eq('id', class_id).maybeSingle()
+    const { data: classInfo } = await supabase
+      .from('classes')
+      .select('*')
+      .eq('id', class_id)
+      .maybeSingle()
 
     if (!classInfo) {
       throw new ApiError('NOT_FOUND', 'Class not found')
@@ -38,16 +42,16 @@ export const GET = route(
         student_id,
         class_id,
         grade_level,
-        status,
-        profiles:id (
+        section,
+        profiles (
           first_name,
-          last_name
+          last_name,
+          email
         )
       `,
         { count: 'exact' }
       )
       .eq('class_id', class_id)
-      .eq('status', 'Active')
       .order('student_id', { ascending: true })
       .range(from, to)
 
@@ -60,8 +64,10 @@ export const GET = route(
       student_id?: string
       class_id?: string
       grade_level?: string
-      status?: string
-      profiles?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[]
+      section?: string
+      profiles?:
+        | { first_name?: string; last_name?: string; email?: string }
+        | { first_name?: string; last_name?: string; email?: string }[]
     }
 
     const formattedStudents = (students || []).map((s: StudentRecord) => {
@@ -70,10 +76,16 @@ export const GET = route(
         id: s.id,
         student_id: s.student_id || '',
         class_id: s.class_id,
-        grade_level: s.grade_level,
-        status: s.status,
+        grade_level: s.grade_level || classInfo.name || '',
+        section: s.section || classInfo.section || '',
+        photo_url: `/api/students/photo?student_id=${s.id}`,
         first_name: p?.first_name || '',
         last_name: p?.last_name || '',
+        profiles: {
+          first_name: p?.first_name || '',
+          last_name: p?.last_name || '',
+          email: p?.email || '',
+        },
       }
     })
 

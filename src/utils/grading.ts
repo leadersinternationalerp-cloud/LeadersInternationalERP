@@ -152,3 +152,82 @@ export function validateGradingLevels(levels: GradeLevel[]): string | null {
 
   return null;
 }
+
+export interface ParsedMarkScore {
+  rawScore: number | null;
+  outOf: number;
+  percentage: number | null;
+}
+
+export function formatGradingScaleMeta(outOf: number, rawScore: number, grade: string): string {
+  const cleanOutOf = Number.isFinite(outOf) && outOf > 0 ? outOf : 100;
+  const cleanRaw = Number.isFinite(rawScore) ? rawScore : 0;
+  return `Out of ${cleanOutOf} (Raw: ${cleanRaw}, Grade: ${grade || '-'})`;
+}
+
+export function parseMarkScore(mark: {
+  score?: number | string | null;
+  raw_score?: number | string | null;
+  out_of?: number | string | null;
+  grading_scale?: string | null;
+} | null | undefined): ParsedMarkScore {
+  if (!mark) {
+    return { rawScore: null, outOf: 100, percentage: null };
+  }
+
+  let outOf = 100;
+  if (mark.out_of !== undefined && mark.out_of !== null && mark.out_of !== '' && !isNaN(Number(mark.out_of)) && Number(mark.out_of) > 0) {
+    outOf = Number(mark.out_of);
+  } else if (typeof mark.grading_scale === 'string') {
+    const outOfMatch = mark.grading_scale.match(/Out of\s+(\d+(?:\.\d+)?)/i);
+    if (outOfMatch) {
+      const parsedOut = parseFloat(outOfMatch[1]);
+      if (parsedOut > 0) outOf = parsedOut;
+    }
+  }
+
+  // 1. Explicit raw_score column present
+  if (mark.raw_score !== undefined && mark.raw_score !== null && mark.raw_score !== '' && !isNaN(Number(mark.raw_score))) {
+    const rawScore = Number(mark.raw_score);
+    const percentage = outOf > 0 ? Math.round(((rawScore / outOf) * 100) * 100) / 100 : 0;
+    return { rawScore, outOf, percentage };
+  }
+
+  // 2. New grading_scale metadata with "Raw: X" (where mark.score is stored as normalized percentage)
+  if (typeof mark.grading_scale === 'string') {
+    const rawMatch = mark.grading_scale.match(/Raw:\s*(\d+(?:\.\d+)?)/i);
+    if (rawMatch) {
+      const rawScore = parseFloat(rawMatch[1]);
+      const hasScore = mark.score !== undefined && mark.score !== null && mark.score !== '' && !isNaN(Number(mark.score));
+      const percentage = hasScore
+        ? Number(mark.score)
+        : (outOf > 0 ? Math.round(((rawScore / outOf) * 100) * 100) / 100 : 0);
+      return { rawScore, outOf, percentage };
+    }
+  }
+
+  // 3. Legacy or standard mark where score is the raw score
+  if (mark.score !== undefined && mark.score !== null && mark.score !== '' && !isNaN(Number(mark.score))) {
+    const rawScore = Number(mark.score);
+    const percentage = outOf > 0 && outOf !== 100
+      ? Math.round(((rawScore / outOf) * 100) * 100) / 100
+      : rawScore;
+    return { rawScore, outOf, percentage };
+  }
+
+  return { rawScore: null, outOf, percentage: null };
+}
+
+export function getGradeDescriptor(grade: string): string {
+  const g = (grade || '').trim().toUpperCase();
+  if (g === 'A*') return 'Outstanding';
+  if (g === 'A') return 'Excellent';
+  if (g === 'B') return 'Very Good';
+  if (g === 'C') return 'Good';
+  if (g === 'D') return 'Satisfactory';
+  if (g === 'E') return 'Fair';
+  if (g === 'F') return 'Weak';
+  if (g === 'G') return 'Needs Improvement';
+  return 'Satisfactory';
+}
+

@@ -1,16 +1,20 @@
 import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
-import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
+import { getWingContext } from '@/lib/wingServer'
+import { matchesWingFilter } from '@/lib/wing'
 import MarksForm from './MarksForm'
-import MarksFilters from './MarksFilters'
+import MarksFilters, { AssessmentTypeOption, TermOptionItem } from './MarksFilters'
 import { parseGradingLevels } from '@/utils/grading'
 import { saveMarksAction } from './actions'
 
 interface AllocationRecord {
   class_id: string
   subject_id: string
-  classes: { id: string; name: string; section?: string } | { id: string; name: string; section?: string }[] | null
+  classes:
+    | { id: string; name: string; section?: string }
+    | { id: string; name: string; section?: string }[]
+    | null
   subjects: { id: string; name: string } | { id: string; name: string }[] | null
 }
 
@@ -27,6 +31,8 @@ interface StudentRecord {
 interface MarkRecord {
   student_id: string
   score: number
+  raw_score?: number | null
+  out_of?: number | null
   remarks: string
   grading_scale?: string
   is_locked?: boolean
@@ -34,22 +40,40 @@ interface MarkRecord {
 }
 
 export default async function TeacherMarksPage({
-  searchParams
+  searchParams,
 }: {
-  searchParams: Promise<{ class_id?: string; class?: string; subject_id?: string; subject?: string; assessment_type?: string; term?: string }>
+  searchParams: Promise<{
+    class_id?: string
+    class?: string
+    subject_id?: string
+    subject?: string
+    assessment_type?: string
+    term?: string
+  }>
 }) {
   const supabase = await createClient()
 
   // Verify access
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, roles')
+    .select('*')
     .eq('id', user?.id)
     .single()
   const userRoles = normalizeRoles(profile)
+  const wingContext = await getWingContext(user?.id, profile)
+  const lockedWing = wingContext.assignedWing !== 'Both' ? wingContext.assignedWing : null
 
-  if (!userRoles.includes('Teacher') && !userRoles.includes('System Admin')) {
+  const isGlobalStaff =
+    userRoles.includes('System Admin') ||
+    userRoles.includes('Director') ||
+    userRoles.includes('Principal') ||
+    userRoles.includes('Dean') ||
+    userRoles.includes('Head of Section')
+
+  if (!userRoles.includes('Teacher') && !isGlobalStaff) {
     return (
       <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
         <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>
@@ -57,15 +81,9 @@ export default async function TeacherMarksPage({
     )
   }
 
-  // Determine if admin
-  const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
-
   let allocations: AllocationRecord[] = []
-  if (isAdmin) {
-    // Admins can see all allocations
-    const { data: allAllocations } = await supabase
-      .from('class_subjects')
-      .select(`
+  if (isGlobalStaff) {
+    const { data: allAllocations } = await supabase.from('class_subjects').select(`
         class_id,
         subject_id,
         classes (id, name, section),
@@ -73,7 +91,6 @@ export default async function TeacherMarksPage({
       `)
     allocations = (allAllocations as unknown as AllocationRecord[]) || []
   } else {
-    // Teachers only see their assigned class-subject combinations
     const { data: teacherAllocations } = await supabase
       .from('class_subjects')
       .select(`
@@ -86,15 +103,83 @@ export default async function TeacherMarksPage({
     allocations = (teacherAllocations as unknown as AllocationRecord[]) || []
   }
 
+  // Enforce symmetric wing isolation if user is assigned to a specific wing
+  if (lockedWing) {
+    allocations = allocations.filter((alloc) => {
+      const cls = Array.isArray(alloc.classes) ? alloc.classes[0] : alloc.classes
+      return cls ? matchesWingFilter(cls, lockedWing) : false
+    })
+  }
+
   // Derive class options from allocations
   const classMap = new Map<string, { id: string; name: string; section?: string }>()
-  allocations.forEach(alloc => {
+  allocations.forEach((alloc) => {
     const cls = Array.isArray(alloc.classes) ? alloc.classes[0] : alloc.classes
     if (cls) {
       classMap.set(cls.id, { id: cls.id, name: cls.name, section: cls.section })
     }
   })
-  const classes = Array.from(classMap.values()).sort((a, b) => a.name.localeCompare(b.name))
+  const classes = Array.from(classMap.values()).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  )
+
+  // Fetch configured Assessment Types from assessment_weights
+  const { data: dbWeights } = await supabase
+    .from('assessment_weights')
+    .select('assessment_type, weight, is_active, display_order')
+    .order('display_order', { ascending: true })
+
+  let assessmentOptions: AssessmentTypeOption[] = []
+  if (dbWeights && dbWeights.length > 0) {
+    // Include active manual assessment types (exclude online-only QUIZZES unless no other types exist)
+    const manualActive = dbWeights.filter(
+      (w: any) =>
+        w.is_active !== false &&
+        String(w.assessment_type || '').toUpperCase() !== 'QUIZZES'
+    )
+    const sourceList = manualActive.length > 0 ? manualActive : dbWeights
+    assessmentOptions = sourceList.map((w: any) => ({
+      name: w.assessment_type,
+      weight: Number(w.weight || 0),
+      is_active: w.is_active,
+    }))
+  }
+
+  if (assessmentOptions.length === 0) {
+    assessmentOptions = [
+      { name: 'Test 1', weight: 20, is_active: true },
+      { name: 'Test 2', weight: 20, is_active: true },
+      { name: 'Mid-Term', weight: 20, is_active: true },
+      { name: 'Terminal', weight: 40, is_active: true },
+    ]
+  }
+
+  // Fetch Terms from DB
+  const { data: dbTerms } = await supabase
+    .from('terms')
+    .select('name, term_name, academic_year, is_current, created_at')
+    .order('is_current', { ascending: false })
+    .order('created_at', { ascending: true })
+
+  const termOptionsMap = new Map<string, TermOptionItem>()
+  ;(dbTerms || []).forEach((t: any) => {
+    const tName = t.term_name || t.name
+    if (tName && !termOptionsMap.has(tName)) {
+      termOptionsMap.set(tName, {
+        name: tName,
+        academic_year: t.academic_year,
+        is_current: Boolean(t.is_current),
+      })
+    }
+  })
+  if (termOptionsMap.size === 0) {
+    termOptionsMap.set('Term 1', { name: 'Term 1', is_current: true })
+    termOptionsMap.set('Term 2', { name: 'Term 2' })
+    termOptionsMap.set('Term 3', { name: 'Term 3' })
+  }
+  const termOptions = Array.from(termOptionsMap.values())
+  const defaultTerm =
+    termOptions.find((t) => t.is_current)?.name || termOptions[0]?.name || 'Term 1'
 
   // Normalize query parameters
   const params = await searchParams
@@ -105,30 +190,49 @@ export default async function TeacherMarksPage({
 
   // Derive subject options based on the selected class
   const classSubjects = allocations
-    .filter(alloc => alloc.class_id === selectedClassId)
-    .map(alloc => {
+    .filter((alloc) => alloc.class_id === selectedClassId)
+    .map((alloc) => {
       const subj = Array.isArray(alloc.subjects) ? alloc.subjects[0] : alloc.subjects
       return subj ? { id: subj.id, name: subj.name } : null
     })
     .filter(Boolean) as { id: string; name: string }[]
 
-  // Deduplicate subjects
   const subjectMap = new Map<string, { id: string; name: string }>()
-  classSubjects.forEach(s => subjectMap.set(s.id, s))
-  const subjects = Array.from(subjectMap.values()).sort((a, b) => a.name.localeCompare(b.name))
+  classSubjects.forEach((s) => subjectMap.set(s.id, s))
+  const subjects = Array.from(subjectMap.values()).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  )
 
-  const selectedSubjectId = rawSubjectId || (subjects.length > 0 ? subjects[0].id : '')
-  const selectedAssessmentType = params.assessment_type || 'Test 1'
-  const selectedTerm = params.term || 'Term 1'
+  const selectedSubjectId =
+    rawSubjectId || (subjects.length > 0 ? subjects[0].id : '')
+  const selectedAssessmentType =
+    params.assessment_type || assessmentOptions[0]?.name || 'Test 1'
+  const selectedTerm = params.term || defaultTerm
+
+  // Ensure selectedAssessmentType & selectedTerm appear in dropdown options even if passed via URL
+  if (!assessmentOptions.some((a) => a.name === selectedAssessmentType)) {
+    assessmentOptions.push({ name: selectedAssessmentType })
+  }
+  if (!termOptions.some((t) => t.name === selectedTerm)) {
+    termOptions.push({ name: selectedTerm })
+  }
 
   // Safety assignment check for non-admin requests
-  if (!isAdmin && selectedClassId && selectedSubjectId) {
-    const isAssigned = allocations.some(alloc => alloc.class_id === selectedClassId && alloc.subject_id === selectedSubjectId)
+  if (!isGlobalStaff && selectedClassId && selectedSubjectId) {
+    const isAssigned = allocations.some(
+      (alloc) =>
+        alloc.class_id === selectedClassId && alloc.subject_id === selectedSubjectId
+    )
     if (!isAssigned) {
       return (
-        <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
+        <div
+          className="glass-panel"
+          style={{ padding: '2rem', textAlign: 'center' }}
+        >
           <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>
-          <p style={{ color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>You are not assigned to this class and subject combination.</p>
+          <p style={{ color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>
+            You are not assigned to this class and subject combination.
+          </p>
         </div>
       )
     }
@@ -158,7 +262,24 @@ export default async function TeacherMarksPage({
       `)
       .eq('class_id', selectedClassId)
 
-    classStudents = (students as unknown as StudentRecord[]) || []
+    const rawStudents = ((students as unknown as any[]) || []).map((s) => {
+      const prof = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles
+      return {
+        id: s.id,
+        student_id: s.student_id || '',
+        grade_level: s.grade_level || '',
+        profiles: {
+          first_name: prof?.first_name || '',
+          last_name: prof?.last_name || '',
+        },
+      }
+    })
+
+    classStudents = rawStudents.sort((a, b) => {
+      const nameA = `${a.profiles.first_name} ${a.profiles.last_name}`.trim()
+      const nameB = `${b.profiles.first_name} ${b.profiles.last_name}`.trim()
+      return nameA.localeCompare(nameB)
+    })
 
     // Fetch existing marks
     const { data: marksLogs } = await supabase
@@ -172,27 +293,57 @@ export default async function TeacherMarksPage({
     existingMarks = (marksLogs as unknown as MarkRecord[]) || []
   }
 
-  const cleanAllocations = allocations.map(alloc => {
+  const cleanAllocations = allocations.map((alloc) => {
     const subj = Array.isArray(alloc.subjects) ? alloc.subjects[0] : alloc.subjects
     return {
       class_id: alloc.class_id,
       subject_id: alloc.subject_id,
-      subject_name: subj?.name || 'Unknown'
+      subject_name: subj?.name || 'Unknown',
     }
   })
 
-  // Server Action to save marks
-  const handleSaveMarks = saveMarksAction
-
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '2rem',
+          flexWrap: 'wrap',
+          gap: '1rem',
+        }}
+      >
         <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)', margin: 0 }}>
-          Enter Class Marks & Grading
+          Enter Class Marks &amp; Grading
         </h1>
-        <Link href="/dashboard/teacher" className="btn btn-secondary" style={{ textDecoration: 'none' }}>
-          Back to Dashboard
-        </Link>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          {isGlobalStaff && (
+            <>
+              <Link
+                href="/dashboard/admin/settings/grading"
+                className="btn btn-secondary"
+                style={{ textDecoration: 'none', fontSize: '0.85rem' }}
+              >
+                ⚙️ Grading Scale
+              </Link>
+              <Link
+                href="/dashboard/admin/settings/assessment-weights"
+                className="btn btn-secondary"
+                style={{ textDecoration: 'none', fontSize: '0.85rem' }}
+              >
+                ⚖️ Assessment Weights
+              </Link>
+            </>
+          )}
+          <Link
+            href="/dashboard/teacher"
+            className="btn btn-secondary"
+            style={{ textDecoration: 'none', fontSize: '0.85rem' }}
+          >
+            Back to Dashboard
+          </Link>
+        </div>
       </div>
 
       <MarksFilters
@@ -202,25 +353,37 @@ export default async function TeacherMarksPage({
         selectedSubjectId={selectedSubjectId}
         selectedAssessmentType={selectedAssessmentType}
         selectedTerm={selectedTerm}
+        assessmentTypes={assessmentOptions}
+        terms={termOptions}
+        initialWingFilter={wingContext.activeWingFilter}
+        lockedWing={lockedWing}
       />
 
-      {/* Marks Form */}
       {classStudents.length > 0 ? (
         <MarksForm
           key={`${selectedClassId}_${selectedSubjectId}_${selectedAssessmentType}_${selectedTerm}`}
           students={classStudents}
           existingMarks={existingMarks}
-          isLocked={existingMarks.some(m => m.is_locked === true)}
-          isReleased={existingMarks.some(m => m.is_released === true)}
+          isLocked={existingMarks.some((m) => m.is_locked === true)}
+          isReleased={existingMarks.some((m) => m.is_released === true)}
+          canUnlock={isGlobalStaff}
           classId={selectedClassId}
           subjectId={selectedSubjectId}
           assessmentType={selectedAssessmentType}
           term={selectedTerm}
           gradingLevels={gradingLevels}
-          saveAction={handleSaveMarks}
+          saveAction={saveMarksAction}
         />
       ) : (
-        <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)', borderRadius: 'var(--radius-lg)' }}>
+        <div
+          className="glass-panel"
+          style={{
+            padding: '3rem',
+            textAlign: 'center',
+            color: 'var(--color-text-muted)',
+            borderRadius: 'var(--radius-lg)',
+          }}
+        >
           No student records found matching this class level/section.
         </div>
       )}

@@ -1,11 +1,14 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
-import { parseGradingLevels, getGradeForPercentage, getGradeColor } from '@/utils/grading'
+import { parseGradingLevels, getGradeForPercentage, getGradeColor, parseMarkScore } from '@/utils/grading'
 
 export interface MarkRecord {
   id: string
   score: number
+  raw_score?: number | null
+  out_of?: number | null
+  grading_scale?: string | null
   term: string
   assessment_type: string
   remarks?: string
@@ -36,7 +39,9 @@ export default function ResultsClient({
   }
 
   const overallAvg = termMarks.length > 0 
-    ? Math.round(termMarks.reduce((acc, curr) => acc + curr.score, 0) / termMarks.length) 
+    ? Math.round(
+        termMarks.reduce((acc, curr) => acc + (parseMarkScore(curr)?.percentage ?? Number(curr.score ?? 0)), 0) / termMarks.length
+      ) 
     : 0
   const overallGrade = termMarks.length > 0 ? getGrade(overallAvg) : 'N/A'
 
@@ -86,7 +91,7 @@ export default function ResultsClient({
         </div>
         <div className="glass-panel" style={{ flex: 1, minWidth: '150px', padding: '1.5rem', borderRadius: 'var(--radius-md)', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <button className="btn btn-primary" onClick={() => window.print()} style={{ width: '100%' }}>
-            📄 Download PDF
+            📄 Print / Save PDF
           </button>
         </div>
       </div>
@@ -105,12 +110,23 @@ export default function ResultsClient({
           </thead>
           <tbody>
             {termMarks.map((m) => {
-              const grade = getGrade(m.score)
+              const parsed = parseMarkScore(m)
+              const pct = parsed?.percentage ?? Number(m.score ?? 0)
+              const rawScore = parsed?.rawScore ?? pct
+              const outOf = parsed?.outOf ?? 100
+              const grade = getGrade(pct)
               return (
                 <tr key={m.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                   <td style={{ padding: '1rem', fontWeight: 600 }}>{m.subjects?.name || 'Unknown'}</td>
                   <td style={{ padding: '1rem', color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>{m.assessment_type}</td>
-                  <td style={{ padding: '1rem', fontWeight: 600 }}>{m.score}%</td>
+                  <td style={{ padding: '1rem', fontWeight: 600 }}>
+                    {pct}%
+                    {outOf !== 100 && (
+                      <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 400, color: 'var(--color-text-muted)' }}>
+                        Raw: {rawScore} / {outOf}
+                      </span>
+                    )}
+                  </td>
                   <td style={{ padding: '1rem' }}>
                     <span style={{
                       padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600,

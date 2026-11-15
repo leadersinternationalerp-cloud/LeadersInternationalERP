@@ -1,5 +1,8 @@
 import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
+import { getWingContext } from '@/lib/wingServer'
+import { inferWing, matchesWingFilter } from '@/lib/wing'
+import { WingBadge } from '@/components/WingFilterBar'
 
 export default async function CollectionReportPage() {
   const supabase = await createClient()
@@ -8,12 +11,12 @@ export default async function CollectionReportPage() {
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, roles')
+    .select('*')
     .eq('id', user?.id)
     .single()
   const userRoles = normalizeRoles(profile)
 
-  const hasAccess = userRoles.includes('Principal') || userRoles.includes('System Admin')
+  const hasAccess = userRoles.some(r => ['Principal', 'Director', 'Accountant', 'Receptionist', 'System Admin'].includes(r))
 
   if (!hasAccess) {
     return (
@@ -24,29 +27,35 @@ export default async function CollectionReportPage() {
     )
   }
 
+  const wingContext = await getWingContext(user?.id, profile)
+
   // Get start of today (UTC or local, let's filter by today's date range in DB)
   const startOfToday = new Date()
   startOfToday.setHours(0, 0, 0, 0)
 
-  // Fetch payments collected today by the logged-in user
-  const { data: payments } = await supabase
+  // Fetch payments collected today
+  const { data: paymentsRaw } = await supabase
     .from('payments')
     .select(`
       *,
       invoices (term, academic_year),
       students (
         student_id,
+        grade_level,
         profiles (
           first_name,
           last_name
         )
       )
     `)
-    .eq('received_by', user?.id)
     .gte('payment_date', startOfToday.toISOString())
     .order('payment_date', { ascending: false })
 
-  const totalCollectedToday = payments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0
+  const payments = (paymentsRaw || []).filter((p: any) =>
+    matchesWingFilter(p.students || {}, wingContext.activeWingFilter)
+  )
+
+  const totalCollectedToday = payments.reduce((sum, p) => sum + Number(p.amount), 0) || 0
 
   function formatTZS(amount: number) {
     return new Intl.NumberFormat('en-TZ', {
@@ -59,15 +68,20 @@ export default async function CollectionReportPage() {
 
   // Group by payment method
   const methodTotals: Record<string, number> = {}
-  payments?.forEach(p => {
+  payments.forEach(p => {
     methodTotals[p.payment_method] = (methodTotals[p.payment_method] || 0) + Number(p.amount)
   })
 
   return (
     <div>
-      <h1 style={{ fontSize: '1.75rem', marginBottom: '1.5rem', color: 'var(--color-primary)' }}>
-        Daily Collection Report (Cashier Shift)
-      </h1>
+      <div style={{ marginBottom: '1.5rem' }}>
+        <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)' }}>
+          Daily Collection Report (Cashier Shift)
+        </h1>
+        <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+          Showing {wingContext.activeWingFilter === 'all' ? 'All Wings (Cambridge & NECTA)' : `${wingContext.activeWingFilter} Wing`}
+        </p>
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem', alignItems: 'start' }}>
         {/* Daily Summary Cards */}
@@ -80,7 +94,7 @@ export default async function CollectionReportPage() {
               {formatTZS(totalCollectedToday)}
             </p>
             <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>
-              Number of Transactions: <strong>{payments?.length || 0}</strong>
+              Number of Transactions: <strong>{payments.length}</strong>
             </div>
           </div>
 
@@ -103,7 +117,7 @@ export default async function CollectionReportPage() {
         {/* Transactions Table */}
         <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
           <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)', backgroundColor: 'rgba(0,0,0,0.02)', fontWeight: 600 }}>
-            Today's Transaction Log
+            Today&apos;s Transaction Log
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
@@ -116,12 +130,18 @@ export default async function CollectionReportPage() {
               </tr>
             </thead>
             <tbody>
-              {payments?.map((pay: any) => (
+              {payments.map((pay: any) => (
                 <tr key={pay.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                   <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--color-secondary)' }}>{pay.receipt_number}</td>
                   <td style={{ padding: '1rem' }}>
-                    <div style={{ fontWeight: 600 }}>{pay.students?.profiles?.first_name} {pay.students?.profiles?.last_name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>ID: {pay.students?.student_id}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 600 }}>{pay.students?.profiles?.first_name} {pay.students?.profiles?.last_name}</span>
+                      <WingBadge wing={inferWing(pay.students || {})} />
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                      ID: {pay.students?.student_id}
+                      {pay.students?.grade_level ? ` · ${pay.students.grade_level}` : ''}
+                    </div>
                   </td>
                   <td style={{ padding: '1rem' }}>
                     <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{pay.payment_method}</span>
@@ -134,10 +154,10 @@ export default async function CollectionReportPage() {
                 </tr>
               ))}
 
-              {(!payments || payments.length === 0) && (
+              {payments.length === 0 && (
                 <tr>
                   <td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                    No collections logged during your shift today.
+                    No collections logged during your shift today for the selected wing.
                   </td>
                 </tr>
               )}

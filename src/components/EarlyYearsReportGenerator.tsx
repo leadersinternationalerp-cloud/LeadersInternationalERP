@@ -62,7 +62,7 @@ export default function EarlyYearsReportGenerator({
       const res = await fetch(`/api/early-years/students?class_id=${classId}`)
       if (res.ok) {
         const data = await res.json()
-        setStudents(data.students || [])
+        setStudents(data.data || data.students || [])
       }
     } catch (e) {
       console.error('Error fetching early years class students:', e)

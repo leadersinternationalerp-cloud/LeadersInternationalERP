@@ -4,7 +4,7 @@ import { assertStudentInScope } from '@/lib/api/scope'
 import { badRequest, ApiError } from '@/lib/api/errors'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { parseGradingLevels, getGradeForPercentage } from '@/utils/grading'
+import { parseGradingLevels, getGradeForPercentage, parseMarkScore } from '@/utils/grading'
 import { generateSmartkidzReportPdf, ReportCardOptions, ReportSubjectMark, computeWeightedOverall } from '@/lib/reportCardPdf'
 
 async function computeClassStudentRanks(
@@ -25,7 +25,7 @@ async function computeClassStudentRanks(
   // Fetch all marks for the class
   const { data: allMarks } = await supabase
     .from('marks')
-    .select('student_id, subject_id, score, assessment_type')
+    .select('student_id, subject_id, score, grading_scale, assessment_type')
     .in('student_id', studentIds)
     .eq('term', termName)
 
@@ -88,7 +88,7 @@ async function computeClassStudentRanks(
             const etName = (et.type || '').toLowerCase().trim()
             return mType === etName || mType.includes(etName) || etName.includes(mType)
           })
-          const score = markRecord ? Number(markRecord.score) : null
+          const score = markRecord ? parseMarkScore(markRecord).percentage : null
           examScores[et.type] = score
           if (score !== null) hasAnyScore = true
         }
@@ -125,6 +125,7 @@ export const GET = route(
     const student_id = searchParams.get('student_id')
     const term_id = searchParams.get('term_id')
     const showRank = searchParams.get('show_rank') === 'true'
+    const assessmentsParam = searchParams.get('assessments')
 
   if (!student_id || !term_id) throw badRequest('Missing student_id or term_id')
 
@@ -165,19 +166,18 @@ export const GET = route(
       .single()
     const gradingLevels = parseGradingLevels(systemSettings?.value)
 
-    // Fetch active assessment weights from table
+    // Fetch assessment weights from table
     const { data: dbWeights } = await supabase
       .from('assessment_weights')
       .select('assessment_type, weight, is_active, display_order')
-      .eq('is_active', true)
       .order('display_order', { ascending: true })
 
-    let assessmentConfigs: any[] = []
+    let allAssessmentConfigs: any[] = []
     if (dbWeights && dbWeights.length > 0) {
-      assessmentConfigs = dbWeights.map(w => ({
+      allAssessmentConfigs = dbWeights.map(w => ({
         type: w.assessment_type,
         weight: Number(w.weight),
-        is_active: w.is_active,
+        is_active: w.is_active !== false,
         display_order: w.display_order
       }))
     } else {
@@ -188,23 +188,56 @@ export const GET = route(
         .maybeSingle()
 
       if (sysSetting?.value && Array.isArray(sysSetting.value)) {
-        assessmentConfigs = sysSetting.value
-          .filter((w: any) => w.is_active !== false)
-          .map((w: any) => ({
-            type: w.type || w.assessment_type,
-            weight: Number(w.weight),
-            is_active: w.is_active,
-            display_order: w.display_order
-          }))
+        allAssessmentConfigs = sysSetting.value.map((w: any) => ({
+          type: w.type || w.assessment_type,
+          weight: Number(w.weight),
+          is_active: w.is_active !== false,
+          display_order: w.display_order
+        }))
       } else {
         // Fallback default seed
-        assessmentConfigs = [
+        allAssessmentConfigs = [
           { type: 'QUIZZES', weight: 20, is_active: true, display_order: 0 },
           { type: 'Test 1', weight: 20, is_active: true, display_order: 1 },
           { type: 'Test 2', weight: 20, is_active: true, display_order: 2 },
           { type: 'Mid-Term', weight: 20, is_active: true, display_order: 3 },
           { type: 'Terminal', weight: 40, is_active: true, display_order: 4 }
         ]
+      }
+    }
+
+    let assessmentConfigs: any[] = []
+    if (assessmentsParam && assessmentsParam.trim().length > 0) {
+      const selectedTypes = assessmentsParam
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+
+      selectedTypes.forEach((selType, idx) => {
+        const match = allAssessmentConfigs.find(
+          c => c.type.toLowerCase().trim() === selType.toLowerCase().trim()
+        )
+        if (match) {
+          assessmentConfigs.push({
+            ...match,
+            weight: Number(match.weight) > 0 ? Number(match.weight) : 20,
+            is_active: true
+          })
+        } else {
+          assessmentConfigs.push({
+            type: selType,
+            weight: 20,
+            is_active: true,
+            display_order: 100 + idx
+          })
+        }
+      })
+    } else {
+      assessmentConfigs = allAssessmentConfigs.filter(
+        w => w.is_active !== false && Number(w.weight) > 0
+      )
+      if (assessmentConfigs.length === 0) {
+        assessmentConfigs = allAssessmentConfigs
       }
     }
 
@@ -322,7 +355,7 @@ export const GET = route(
       // Fetch marks for the current student & term
       const { data: studentMarks } = await supabase
         .from('marks')
-        .select('score, remarks, subject_id, assessment_type')
+        .select('score, grading_scale, remarks, subject_id, assessment_type')
         .eq('student_id', sId)
         .eq('term', termName)
 
@@ -378,7 +411,7 @@ export const GET = route(
               return mType === etName || mType.includes(etName) || etName.includes(mType)
             })
 
-            const score = markRecord ? Number(markRecord.score) : null
+            const score = markRecord ? parseMarkScore(markRecord).percentage : null
             examScores[et.type] = score
 
             if (markRecord?.remarks) {
@@ -438,9 +471,9 @@ export const GET = route(
         .maybeSingle()
 
       const conductGrade = reportCardRecord?.conduct_grade || 'A'
-      const conductRemark = reportCardRecord?.conduct_remark || 'Excellent conduct shown in all learning fields.'
+      const conductRemark = reportCardRecord?.conduct_remark || reportCardRecord?.remarks || 'Excellent conduct shown in all learning fields.'
       const classTeacherComment = reportCardRecord?.class_teacher_comment || 'A hardworking student who shows keen focus in all classes.'
-      let principalComment = reportCardRecord?.principal_comment || ''
+      let principalComment = reportCardRecord?.principal_comment || reportCardRecord?.principal_comments || ''
 
       // Fetch principal grade comments if empty
       if (!principalComment) {

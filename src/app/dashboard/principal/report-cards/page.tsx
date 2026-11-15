@@ -1,5 +1,7 @@
 import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
+import { getWingContext } from '@/lib/wingServer'
+import { matchesWingFilter } from '@/lib/wing'
 import ReportCardsGenerator from '@/components/ReportCardsGenerator'
 import Link from 'next/link'
 import { ChevronLeft, History } from 'lucide-react'
@@ -13,8 +15,10 @@ export default async function PrincipalReportCardsPage() {
     return <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}><h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2></div>
   }
 
-  const { data: profile } = await supabase.from('profiles').select('roles, role').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
   const userRoles = normalizeRoles(profile)
+  const wingContext = await getWingContext(user.id, profile)
+  const lockedWing = wingContext.assignedWing !== 'Both' ? wingContext.assignedWing : null
 
   const isAuthorized = userRoles.includes('Principal') || 
                       userRoles.includes('Dean') || 
@@ -38,22 +42,27 @@ export default async function PrincipalReportCardsPage() {
     academic_year: t.academic_year || '2026-2027'
   }))
 
-  // 3. Fetch all classes
+  // 3. Fetch all classes (enforce wing isolation if locked)
   const { data: classesData } = await supabase
     .from('classes')
     .select('*')
     .order('name', { ascending: true })
   
-  const classes = (classesData || []).map(c => ({
+  const allClasses = (classesData || []).map(c => ({
     id: c.id,
     class_name: c.name || '',
     section: c.section || '',
     name: c.name || ''
   }))
+  const classes = lockedWing
+    ? allClasses.filter(c => matchesWingFilter(c, lockedWing))
+    : allClasses
 
-  // 4. Fetch initial student list for the first class
+  // 4. Fetch initial student list for the first class matching activeWingFilter
   let initialStudents: any[] = []
-  const firstClassId = classes[0]?.id
+  const firstClassId =
+    classes.find(c => matchesWingFilter(c, wingContext.activeWingFilter))?.id ||
+    classes[0]?.id
 
   if (firstClassId) {
     const { data: stdData } = await supabase
@@ -92,18 +101,19 @@ export default async function PrincipalReportCardsPage() {
     .from('report_card_releases')
     .select(`
       *,
-      term:term_id (term_name),
-      class:class_id (class_name),
-      publisher:published_by (first_name, last_name)
+      term:term_id (name),
+      class:class_id (name, section),
+      releaser:released_by (first_name, last_name)
     `)
-    .order('created_at', { ascending: false })
+    .eq('is_released', true)
+    .order('released_at', { ascending: false })
     .limit(10)
 
   // Label for current role
   let roleLabel = 'Principal'
   if (userRoles.includes('System Admin')) roleLabel = 'System Admin'
   else if (userRoles.includes('Director')) roleLabel = 'Director'
-  else if (userRoles.includes('Dean')) roleLabel = 'Dean of Studies'
+  else if (userRoles.includes('Dean')) roleLabel = 'Dean'
   else if (userRoles.includes('Head of Section')) roleLabel = 'Head of Section'
 
   return (
@@ -133,7 +143,9 @@ export default async function PrincipalReportCardsPage() {
               classes={classes} 
               terms={terms} 
               initialStudents={initialStudents} 
-              roleLabel={roleLabel} 
+              roleLabel={roleLabel}
+              initialWingFilter={wingContext.activeWingFilter}
+              lockedWing={lockedWing}
             />
           )}
         </div>
@@ -146,21 +158,26 @@ export default async function PrincipalReportCardsPage() {
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {(releases || []).map((release: any) => {
-              const pName = release.publisher ? `${release.publisher.first_name || ''} ${release.publisher.last_name || ''}`.trim() : 'System'
+              const relProf = release.publisher || release.releaser
+              const pName = relProf ? `${relProf.first_name || ''} ${relProf.last_name || ''}`.trim() : 'Management'
+              const clsLabel = release.class
+                ? `${release.class.class_name || release.class.name || 'Class'}${release.class.section ? ` - ${release.class.section}` : ''}`
+                : 'Class'
+              const termLabel = release.term?.term_name || release.term?.name || 'Term'
               return (
                 <div key={release.id} style={{ fontSize: '0.8rem', padding: '0.75rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)' }}>
                   <div style={{ fontWeight: 700, color: 'var(--color-primary)', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{release.class?.class_name || 'Class'}</span>
+                    <span>{clsLabel}</span>
                     <span style={{ fontSize: '0.7rem', color: 'var(--color-success)', backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: '0.1rem 0.35rem', borderRadius: '4px' }}>Published</span>
                   </div>
                   <div style={{ marginTop: '0.25rem', color: 'var(--color-text-muted)' }}>
-                    Term: <strong>{release.term?.term_name || 'Term'}</strong>
+                    Term: <strong>{termLabel}</strong>
                   </div>
                   <div style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
                     Published By: {pName}
                   </div>
                   <div style={{ marginTop: '0.25rem', fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                    {new Date(release.published_at || release.created_at).toLocaleString()}
+                    {new Date(release.published_at || release.released_at || release.created_at).toLocaleString()}
                   </div>
                 </div>
               )

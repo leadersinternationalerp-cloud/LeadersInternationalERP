@@ -28,7 +28,7 @@ export async function saveWeightsAction(weights: {
 
   const userRoles = normalizeRoles(profile)
 
-  const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal')
+  const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal') || userRoles.includes('Dean')
   if (!isAdmin) {
     return { error: 'Forbidden: You do not have permission to manage assessment weights.' }
   }
@@ -97,6 +97,7 @@ export async function saveWeightsAction(weights: {
 
     // Revalidate paths
     revalidatePath('/dashboard/admin/settings/assessment-weights')
+    revalidatePath('/dashboard/teacher/marks')
     revalidatePath('/api/report-cards/download')
     return { success: true }
   } catch (err: any) {

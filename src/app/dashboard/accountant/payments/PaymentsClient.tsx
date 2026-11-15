@@ -1,20 +1,27 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { Info, Printer, FileDown, MessageSquare, Eye, Search, Users, Check, AlertCircle, X } from 'lucide-react'
 import { recordPaymentAction } from '../actions'
+import { inferWing, matchesWingFilter, type SchoolWing, type WingFilterValue } from '@/lib/wing'
+import { WingSegmentedBar, WingBadge, useWingFilter } from '@/components/WingFilterBar'
 
 interface PaymentsClientProps {
   initialPayments: any[]
   pendingInvoices: any[]
   initialBankDeposits: any[]
+  initialWingFilter?: WingFilterValue
+  lockedWing?: SchoolWing | null
 }
 
 export default function PaymentsClient({
   initialPayments,
   pendingInvoices,
-  initialBankDeposits
+  initialBankDeposits,
+  initialWingFilter = 'all',
+  lockedWing = null,
 }: PaymentsClientProps) {
+  const { wingFilter, setWingFilter } = useWingFilter(initialWingFilter, lockedWing)
   const [payments, setPayments] = useState<any[]>(initialPayments)
   const [bankDeposits, setBankDeposits] = useState<any[]>(initialBankDeposits)
   const [saving, setSaving] = useState(false)
@@ -232,15 +239,30 @@ export default function PaymentsClient({
     await handleSendWhatsappDirect(selectedPayment.id, whatsappNumber.trim())
   }
 
-  // Filter invoices based on search query
+  // Filter invoices based on search query and wing filter
   const filteredInvoices = pendingInvoices.filter((inv: any) => {
     const s = inv.students
+    if (!matchesWingFilter(s || {}, wingFilter)) return false
     const prof = s?.profiles
     const fullName = `${prof?.first_name || ''} ${prof?.last_name || ''}`.toLowerCase()
     const idStr = `${s?.student_id || s?.admission_number || ''}`.toLowerCase()
     const q = searchQuery.toLowerCase()
     return fullName.includes(q) || idStr.includes(q)
   })
+
+  const wingCounts = useMemo(() => {
+    let cambridge = 0
+    let necta = 0
+    for (const p of payments || []) {
+      if (inferWing(p.students || {}) === 'Cambridge') cambridge++
+      else necta++
+    }
+    return { all: (payments || []).length, Cambridge: cambridge, NECTA: necta }
+  }, [payments])
+
+  const filteredPayments = useMemo(() => {
+    return (payments || []).filter((p: any) => matchesWingFilter(p.students || {}, wingFilter))
+  }, [payments, wingFilter])
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.9fr', gap: '2rem', alignItems: 'start' }}>
@@ -637,6 +659,29 @@ export default function PaymentsClient({
 
       {/* RIGHT COLUMN: Payments History Table */}
       <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+        <div
+          style={{
+            padding: '1rem 1.25rem',
+            borderBottom: '1px solid var(--color-border)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
+            backgroundColor: 'rgba(0,0,0,0.02)',
+          }}
+        >
+          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-primary)' }}>
+            Recorded Receipts ({filteredPayments.length})
+          </div>
+          <WingSegmentedBar
+            value={wingFilter}
+            onChange={setWingFilter}
+            lockedWing={lockedWing}
+            counts={wingCounts}
+            compact
+          />
+        </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ backgroundColor: 'rgba(0,0,0,0.05)', borderBottom: '1px solid var(--color-border)' }}>
@@ -650,14 +695,22 @@ export default function PaymentsClient({
             </tr>
           </thead>
           <tbody>
-            {payments?.map((pay: any) => (
+            {filteredPayments.map((pay: any) => (
               <tr key={pay.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                 <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--color-secondary)' }}>
                   REC-{pay.receipt_number.split('-').pop() || pay.receipt_number}
                 </td>
                 <td style={{ padding: '1rem' }}>
-                  <div style={{ fontWeight: 600 }}>{pay.students?.profiles?.first_name} {pay.students?.profiles?.last_name}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>ID: {pay.students?.student_id || pay.students?.admission_number}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 600 }}>
+                      {pay.students?.profiles?.first_name} {pay.students?.profiles?.last_name}
+                    </span>
+                    <WingBadge wing={inferWing(pay.students || {})} />
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                    ID: {pay.students?.student_id || pay.students?.admission_number}
+                    {pay.students?.grade_level ? ` · ${pay.students.grade_level}` : ''}
+                  </div>
                 </td>
                 <td style={{ padding: '1rem' }}>{pay.invoices?.term} ({pay.invoices?.academic_year})</td>
                 <td style={{ padding: '1rem' }}>
@@ -693,10 +746,10 @@ export default function PaymentsClient({
               </tr>
             ))}
 
-            {(!payments || payments.length === 0) && (
+            {(!filteredPayments || filteredPayments.length === 0) && (
               <tr>
                 <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                  No payments recorded yet.
+                  No payments recorded for the selected wing.
                 </td>
               </tr>
             )}

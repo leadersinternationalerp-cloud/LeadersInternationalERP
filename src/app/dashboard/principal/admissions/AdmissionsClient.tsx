@@ -1,6 +1,8 @@
 'use client'
 
-import React, { useState, useMemo, useTransition } from 'react'
+import React, { useState, useMemo, useTransition, useEffect } from 'react'
+import { matchesWingFilter, type UserWingAssignment, type WingFilterValue } from '@/lib/wing'
+import { readWingCookieClient, writeWingCookieClient } from '@/components/WingFilterBar'
 import Link from 'next/link'
 import {
   FileText,
@@ -128,6 +130,8 @@ interface Props {
   initialApplications: AdmissionApplication[]
   classes?: ClassOption[]
   currentUser?: CurrentUser
+  assignedWing?: UserWingAssignment
+  initialWingFilter?: WingFilterValue
 }
 
 const STATUS_CONFIG: Record<
@@ -180,11 +184,55 @@ const STATUS_CONFIG: Record<
 
 const STREAM_PRESETS = ['A', 'B', 'C', 'Blue', 'Gold', 'East', 'West']
 
-export default function AdmissionsClient({ initialApplications, classes = [], currentUser }: Props) {
+export default function AdmissionsClient({
+  initialApplications,
+  classes = [],
+  currentUser,
+  assignedWing = 'Both',
+  initialWingFilter = 'all',
+}: Props) {
   const [applications, setApplications] = useState<AdmissionApplication[]>(initialApplications)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [curriculumFilter, setCurriculumFilter] = useState<string>('all')
+  const [curriculumFilter, setCurriculumFilterState] = useState<string>(() => {
+    if (assignedWing === 'Cambridge') return 'cambridge'
+    if (assignedWing === 'NECTA') return 'necta'
+    if (initialWingFilter === 'Cambridge') return 'cambridge'
+    if (initialWingFilter === 'NECTA') return 'necta'
+    return 'all'
+  })
+
+  useEffect(() => {
+    if (assignedWing === 'Cambridge') {
+      setCurriculumFilterState('cambridge')
+      return
+    }
+    if (assignedWing === 'NECTA') {
+      setCurriculumFilterState('necta')
+      return
+    }
+    const cookieVal = readWingCookieClient()
+    if (cookieVal === 'Cambridge') setCurriculumFilterState('cambridge')
+    else if (cookieVal === 'NECTA') setCurriculumFilterState('necta')
+
+    const handleGlobalWing = (e: Event) => {
+      const ev = e as CustomEvent<{ wing: WingFilterValue }>
+      const w = ev.detail?.wing
+      if (w === 'Cambridge') setCurriculumFilterState('cambridge')
+      else if (w === 'NECTA') setCurriculumFilterState('necta')
+      else if (w === 'all') setCurriculumFilterState('all')
+    }
+    window.addEventListener('lis-wing-change', handleGlobalWing)
+    return () => window.removeEventListener('lis-wing-change', handleGlobalWing)
+  }, [assignedWing])
+
+  const setCurriculumFilter = (val: string) => {
+    if (assignedWing === 'Cambridge' || assignedWing === 'NECTA') return
+    setCurriculumFilterState(val)
+    if (val === 'cambridge') writeWingCookieClient('Cambridge')
+    else if (val === 'necta') writeWingCookieClient('NECTA')
+    else writeWingCookieClient('all')
+  }
   const [attributionFilter, setAttributionFilter] = useState<string>('all') // 'all' | 'website' | 'sales' | 'walk_in'
   const [selectedApp, setSelectedApp] = useState<AdmissionApplication | null>(null)
   const [previewPdfApp, setPreviewPdfApp] = useState<AdmissionApplication | null>(null)
@@ -258,30 +306,34 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
     enrollImmediately: false,
   })
 
-  // Metrics
+  // Metrics (filtered by active curriculum/wing)
+  const wingScopedApps = useMemo(() => {
+    return applications.filter((app) => matchesWingFilter(app, curriculumFilter))
+  }, [applications, curriculumFilter])
+
   const metrics = useMemo(() => {
     return {
-      total: applications.length,
-      submitted: applications.filter((a) => a.status === 'submitted').length,
-      underReview: applications.filter((a) => a.status === 'under_review').length,
-      enrolled: applications.filter((a) => a.status === 'enrolled').length,
-      walkInCount: applications.filter(
+      total: wingScopedApps.length,
+      submitted: wingScopedApps.filter((a) => a.status === 'submitted').length,
+      underReview: wingScopedApps.filter((a) => a.status === 'under_review').length,
+      enrolled: wingScopedApps.filter((a) => a.status === 'enrolled').length,
+      walkInCount: wingScopedApps.filter(
         (a) => a.source === 'walk_in' || a.sales_agent_name?.toUpperCase() === 'WALK IN'
       ).length,
-      salesCount: applications.filter(
+      salesCount: wingScopedApps.filter(
         (a) =>
           (a.sales_agent_name && a.sales_agent_name.toUpperCase() !== 'WALK IN') ||
           a.source === 'sales'
       ).length,
-      websiteCount: applications.filter(
+      websiteCount: wingScopedApps.filter(
         (a) => !a.sales_agent_name && a.source !== 'sales' && a.source !== 'walk_in'
       ).length,
     }
-  }, [applications])
+  }, [wingScopedApps])
 
   // Filtered List
   const filtered = useMemo(() => {
-    return applications.filter((app) => {
+    return wingScopedApps.filter((app) => {
       const matchSearch =
         searchTerm === '' ||
         `${app.first_name} ${app.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -294,17 +346,6 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
 
       const matchStatus = statusFilter === 'all' || app.status === statusFilter
 
-      const matchCurriculum =
-        curriculumFilter === 'all' ||
-        (curriculumFilter === 'cambridge' &&
-          (app.curriculum?.toLowerCase().includes('cambridge') ||
-            app.class_applied_for.toLowerCase().includes('cambridge') ||
-            app.class_applied_for.toLowerCase().includes('year'))) ||
-        (curriculumFilter === 'necta' &&
-          (app.curriculum?.toLowerCase().includes('necta') ||
-            app.class_applied_for.toLowerCase().includes('necta') ||
-            app.class_applied_for.toLowerCase().includes('grade')))
-
       const isWalkIn = Boolean(app.source === 'walk_in' || app.sales_agent_name?.toUpperCase() === 'WALK IN')
       const isSalesAttributed = Boolean(!isWalkIn && (app.sales_agent_name || app.source === 'sales'))
       const matchAttribution =
@@ -313,9 +354,9 @@ export default function AdmissionsClient({ initialApplications, classes = [], cu
         (attributionFilter === 'website' && !isSalesAttributed && !isWalkIn) ||
         (attributionFilter === 'sales' && isSalesAttributed)
 
-      return matchSearch && matchStatus && matchCurriculum && matchAttribution
+      return matchSearch && matchStatus && matchAttribution
     })
-  }, [applications, searchTerm, statusFilter, curriculumFilter, attributionFilter])
+  }, [wingScopedApps, searchTerm, statusFilter, attributionFilter])
 
   const classGenderBreakdown = useMemo(() => {
     const map = new Map<string, { classroom: string; male: number; female: number; enrolled: number; total: number }>()

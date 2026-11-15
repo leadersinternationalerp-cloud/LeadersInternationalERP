@@ -2,7 +2,10 @@ import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import PrintButton from '@/components/PrintButton'
-import { parseGradingLevels, getGradeForPercentage } from '@/utils/grading'
+import { getWingContext } from '@/lib/wingServer'
+import { inferWing, matchesWingFilter } from '@/lib/wing'
+import { WingBadge } from '@/components/WingFilterBar'
+import { parseGradingLevels, getGradeForPercentage, parseMarkScore } from '@/utils/grading'
 
 export default async function PrincipalAcademicReportsPage({
   searchParams
@@ -15,12 +18,13 @@ export default async function PrincipalAcademicReportsPage({
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, roles')
+    .select('*')
     .eq('id', user?.id)
     .single()
   const userRoles = normalizeRoles(profile)
+  const wingContext = await getWingContext(user?.id, profile)
 
-  if (!userRoles.includes('Principal') && !userRoles.includes('System Admin') && !userRoles.includes('Dean')) {
+  if (!userRoles.includes('Principal') && !userRoles.includes('System Admin') && !userRoles.includes('Dean') && !userRoles.includes('Director')) {
     return (
       <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
         <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>
@@ -28,13 +32,17 @@ export default async function PrincipalAcademicReportsPage({
     )
   }
 
-  // Fetch all students
-  const { data: students } = await supabase
+  // Fetch all students and filter by active wing
+  const { data: studentsRaw } = await supabase
     .from('students')
     .select(`
       *,
       profiles(id, first_name, last_name)
     `)
+
+  const students = (studentsRaw || []).filter((s: any) =>
+    matchesWingFilter(s, wingContext.activeWingFilter)
+  )
 
   const params = await searchParams
   const selectedStudentId = params.student_id || (students && students.length > 0 ? students[0].id : null)
@@ -68,13 +76,18 @@ export default async function PrincipalAcademicReportsPage({
     realMarks = marks || []
   }
 
-  const subjectsReport = realMarks.map(m => {
-    const scoreVal = Number(m.score)
+  const subjectsReport = realMarks.map((m, idx) => {
+    const parsed = parseMarkScore(m)
+    const scoreVal = parsed?.percentage ?? Number(m.score ?? 0)
     const grade = getGradeForPercentage(scoreVal, gradingLevels)
 
     return {
+      key: `${m.id || idx}`,
       subject: m.subjects?.name || 'Unknown',
+      assessmentType: m.assessment_type || 'Exam',
       score: scoreVal,
+      rawScore: parsed?.rawScore ?? scoreVal,
+      outOf: parsed?.outOf ?? 100,
       grade,
       remarks: m.remarks || 'No remarks provided.'
     }
@@ -87,9 +100,14 @@ export default async function PrincipalAcademicReportsPage({
 
   return (
     <div>
-      <h1 style={{ fontSize: '1.75rem', marginBottom: '1.5rem', color: 'var(--color-primary)' }}>
-        View Student Academic Report Cards
-      </h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <h1 style={{ fontSize: '1.75rem', margin: 0, color: 'var(--color-primary)' }}>
+          View Student Academic Report Cards
+        </h1>
+        <Link href="/dashboard/principal/report-cards" className="btn btn-secondary" style={{ textDecoration: 'none' }}>
+          Open Official PDF Report Card Generator →
+        </Link>
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem', alignItems: 'start' }}>
         
@@ -110,8 +128,11 @@ export default async function PrincipalAcademicReportsPage({
                     color: 'var(--color-text)'
                   }}
                 >
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
-                    {stud.profiles?.first_name} {stud.profiles?.last_name}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem' }}>
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                      {stud.profiles?.first_name} {stud.profiles?.last_name}
+                    </span>
+                    <WingBadge wing={inferWing(stud)} />
                   </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
                     Grade: {stud.grade_level} {stud.section ? `- ${stud.section}` : ''}
@@ -171,7 +192,7 @@ export default async function PrincipalAcademicReportsPage({
                 Official Academic Report Card
               </h3>
               <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: 0 }}>
-                Term: <strong>Term 1</strong> • Academic Year: <strong>2025-2026</strong>
+                Term: <strong>{realMarks[0]?.term || 'Current Term'}</strong> • Academic Year: <strong>{realMarks[0]?.academic_year || '2026-2027'}</strong>
               </p>
             </div>
 
@@ -190,13 +211,14 @@ export default async function PrincipalAcademicReportsPage({
                 <strong>Date of Report:</strong> {new Date().toLocaleDateString('en-TZ')}
               </div>
             </div>
-                       {subjectsReport.length > 0 ? (
+            {subjectsReport.length > 0 ? (
               <>
                 {/* Subjects Table */}
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '2rem' }}>
                   <thead>
                     <tr style={{ backgroundColor: 'rgba(0,0,0,0.03)', borderBottom: '2px solid var(--color-border)' }}>
                       <th style={{ padding: '0.75rem' }}>Subject Name</th>
+                      <th style={{ padding: '0.75rem' }}>Assessment</th>
                       <th style={{ padding: '0.75rem' }}>Score (%)</th>
                       <th style={{ padding: '0.75rem' }}>Grade</th>
                       <th style={{ padding: '0.75rem' }}>Teacher's Remarks</th>
@@ -204,14 +226,22 @@ export default async function PrincipalAcademicReportsPage({
                   </thead>
                   <tbody>
                     {subjectsReport.map(sub => (
-                      <tr key={sub.subject} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <tr key={sub.key} style={{ borderBottom: '1px solid var(--color-border)' }}>
                         <td style={{ padding: '0.75rem', fontWeight: 500 }}>{sub.subject}</td>
-                        <td style={{ padding: '0.75rem', fontWeight: 600 }}>{sub.score}%</td>
+                        <td style={{ padding: '0.75rem', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{sub.assessmentType}</td>
+                        <td style={{ padding: '0.75rem', fontWeight: 600 }}>
+                          {sub.score}%
+                          {sub.outOf !== 100 && (
+                            <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 400, color: 'var(--color-text-muted)' }}>
+                              Raw: {sub.rawScore} / {sub.outOf}
+                            </span>
+                          )}
+                        </td>
                         <td style={{ padding: '0.75rem' }}>
                           <span style={{
                             padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
-                            backgroundColor: sub.grade === 'A' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0,0,0,0.05)',
-                            color: sub.grade === 'A' ? 'var(--color-success)' : 'var(--color-text)'
+                            backgroundColor: sub.grade === 'A' || sub.grade === 'A*' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0,0,0,0.05)',
+                            color: sub.grade === 'A' || sub.grade === 'A*' ? 'var(--color-success)' : 'var(--color-text)'
                           }}>
                             {sub.grade}
                           </span>
@@ -249,13 +279,13 @@ export default async function PrincipalAcademicReportsPage({
               <div>
                 <strong>Principal Recommendation Remarks:</strong>
                 <p style={{ fontStyle: 'italic', color: 'var(--color-text-muted)', margin: '0.5rem 0' }}>
-                  "A very consistent performance. Promoted to next class with honours. Keep up the high standard of academic dedication."
+                  "A very consistent performance. Keep up the high standard of academic dedication."
                 </p>
               </div>
               <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'flex-end' }}>
                 <div style={{ borderBottom: '1px dashed var(--color-text-muted)', width: '150px', height: '30px', marginBottom: '0.5rem' }}></div>
-                <strong>Fatma Suleiman</strong>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>School Principal</span>
+                <strong>School Principal</strong>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Leaders International School</span>
               </div>
             </div>
 

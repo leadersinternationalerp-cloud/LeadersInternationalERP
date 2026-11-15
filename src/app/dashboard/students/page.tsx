@@ -1,5 +1,7 @@
 import StudentsListClient from './StudentsListClient'
 import { requireRole } from '@/lib/auth/session'
+import { getWingContext } from '@/lib/wingServer'
+import { inferWing, matchesWingFilter } from '@/lib/wing'
 import { parsePageParams, sanitizeSearch } from '@/lib/pagination'
 import { Pagination } from '@/components/Pagination'
 import { ListToolbar } from '@/components/ListToolbar'
@@ -20,7 +22,8 @@ export default async function StudentsPage({
     'Teacher',
     'Receptionist',
   ])
-  const { user, roles, supabase } = session
+  const { user, profile, roles, supabase } = session
+  const wingContext = await getWingContext(user.id, profile)
   const serviceSupabase = createServiceClient()
 
   const sp = searchParams ? await searchParams : undefined
@@ -143,17 +146,23 @@ export default async function StudentsPage({
     }
   }
 
-  const mappedStudentsList = studentsList.map((s: any) => {
+  const allMappedStudents = studentsList.map((s: any) => {
     const profs = s.profiles
     const singleProfile = Array.isArray(profs) ? profs[0] : profs
     const linkedApp = admissionMap.get(s.admission_id) || admissionMap.get(s.id)
     const linkedParent = parentMap.get(s.id)
+    const wing = inferWing({
+      wing: s.wing,
+      curriculum: linkedApp?.curriculum,
+      grade_level: s.grade_level,
+    })
 
     return {
       id: s.id,
       student_id: s.student_id,
       grade_level: s.grade_level,
       section: s.section,
+      wing,
       photo_url: `/api/students/photo?student_id=${s.id}`,
       parent_contact:
         singleProfile?.phone ||
@@ -193,6 +202,17 @@ export default async function StudentsPage({
     }
   })
 
+  // Enforce strict server-side wing isolation for wing-assigned staff
+  const mappedStudentsList =
+    wingContext.assignedWing === 'Cambridge' || wingContext.assignedWing === 'NECTA'
+      ? allMappedStudents.filter((s) => matchesWingFilter(s, wingContext.assignedWing))
+      : allMappedStudents
+
+  const scopedClasses =
+    wingContext.assignedWing === 'Cambridge' || wingContext.assignedWing === 'NECTA'
+      ? (classes || []).filter((c: any) => matchesWingFilter(c, wingContext.assignedWing))
+      : classes || []
+
   return (
     <div className="space-y-4">
       <ListToolbar searchPlaceholder="Search by student ID or grade..." initialSearch={q || ''} initialPerPage={perPage} />
@@ -200,7 +220,9 @@ export default async function StudentsPage({
         initialStudents={mappedStudentsList}
         userRoles={roles}
         terms={terms || []}
-        classes={classes || []}
+        classes={scopedClasses}
+        assignedWing={wingContext.assignedWing}
+        initialWingFilter={wingContext.activeWingFilter}
       />
       <Pagination
         page={page}

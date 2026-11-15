@@ -14,14 +14,18 @@ export const GET = route(
     }
 
     const page = Math.max(1, Number(searchParams.get('page')) || 1)
-    const perPage = Math.min(100, Math.max(1, Number(searchParams.get('perPage')) || 50))
+    const perPage = Math.min(100, Math.max(1, Number(searchParams.get('perPage')) || 100))
     const from = (page - 1) * perPage
     const to = from + perPage - 1
 
     const supabase = await createClient()
 
     // 1. Verify Class Existence & Scope
-    const { data: classInfo } = await supabase.from('classes').select('*').eq('id', class_id).maybeSingle()
+    const { data: classInfo } = await supabase
+      .from('classes')
+      .select('*')
+      .eq('id', class_id)
+      .maybeSingle()
 
     if (!classInfo) {
       throw new ApiError('NOT_FOUND', 'Class not found')
@@ -38,18 +42,18 @@ export const GET = route(
         student_id,
         class_id,
         grade_level,
-        status,
-        profiles:id (
+        section,
+        profiles (
           first_name,
           last_name,
           gender,
-          dob
+          dob,
+          email
         )
       `,
         { count: 'exact' }
       )
       .eq('class_id', class_id)
-      .eq('status', 'Active')
       .order('student_id', { ascending: true })
       .range(from, to)
 
@@ -62,20 +66,23 @@ export const GET = route(
       student_id?: string
       class_id?: string
       grade_level?: string
-      status?: string
-      profiles?: { first_name?: string; last_name?: string; gender?: string; dob?: string } | { first_name?: string; last_name?: string; gender?: string; dob?: string }[]
+      section?: string
+      profiles?:
+        | {
+            first_name?: string
+            last_name?: string
+            gender?: string
+            dob?: string
+            email?: string
+          }
+        | {
+            first_name?: string
+            last_name?: string
+            gender?: string
+            dob?: string
+            email?: string
+          }[]
     }
-
-    const studentIds = (students || []).map((s: StudentRecord) => s.id)
-    const { data: photos } = await supabase
-      .from('student_photos')
-      .select('student_id, photo_url')
-      .in('student_id', studentIds.length > 0 ? studentIds : ['00000000-0000-0000-0000-000000000000'])
-
-    const photoMap: Record<string, string> = {}
-    photos?.forEach((p: { student_id: string; photo_url: string }) => {
-      photoMap[p.student_id] = p.photo_url
-    })
 
     const formattedStudents = (students || []).map((s: StudentRecord) => {
       const p = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles
@@ -83,13 +90,18 @@ export const GET = route(
         id: s.id,
         student_id: s.student_id || '',
         class_id: s.class_id,
-        grade_level: s.grade_level,
-        status: s.status,
+        grade_level: s.grade_level || classInfo.name || '',
+        section: s.section || classInfo.section || '',
         first_name: p?.first_name || '',
         last_name: p?.last_name || '',
         gender: p?.gender || '',
         dob: p?.dob || '',
-        photo_url: photoMap[s.id] || null,
+        photo_url: `/api/students/photo?student_id=${s.id}`,
+        profiles: {
+          first_name: p?.first_name || '',
+          last_name: p?.last_name || '',
+          email: p?.email || '',
+        },
       }
     })
 

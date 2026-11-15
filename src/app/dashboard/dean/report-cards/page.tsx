@@ -1,5 +1,7 @@
 import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
+import { getWingContext } from '@/lib/wingServer'
+import { matchesWingFilter } from '@/lib/wing'
 import ReportCardsGenerator from '@/components/ReportCardsGenerator'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
@@ -13,10 +15,12 @@ export default async function DeanReportCardsPage() {
     return <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}><h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2></div>
   }
 
-  const { data: profile } = await supabase.from('profiles').select('roles, role').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
   const userRoles = normalizeRoles(profile)
+  const wingContext = await getWingContext(user.id, profile)
+  const lockedWing = wingContext.assignedWing !== 'Both' ? wingContext.assignedWing : null
 
-  if (!userRoles.includes('Dean') && !userRoles.includes('Principal') && !userRoles.includes('System Admin')) {
+  if (!userRoles.includes('Dean') && !userRoles.includes('Principal') && !userRoles.includes('Director') && !userRoles.includes('System Admin')) {
     return <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}><h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2></div>
   }
 
@@ -38,16 +42,21 @@ export default async function DeanReportCardsPage() {
     .select('*')
     .order('name', { ascending: true })
   
-  const classes = (classesData || []).map(c => ({
+  const allClasses = (classesData || []).map(c => ({
     id: c.id,
     class_name: c.name || '',
     section: c.section || '',
     name: c.name || ''
   }))
+  const classes = lockedWing
+    ? allClasses.filter(c => matchesWingFilter(c, lockedWing))
+    : allClasses
 
   // 4. Fetch initial student list for the first class
   let initialStudents: any[] = []
-  const firstClassId = classes[0]?.id
+  const firstClassId =
+    classes.find(c => matchesWingFilter(c, wingContext.activeWingFilter))?.id ||
+    classes[0]?.id
 
   if (firstClassId) {
     const { data: stdData } = await supabase
@@ -105,7 +114,9 @@ export default async function DeanReportCardsPage() {
           classes={classes} 
           terms={terms} 
           initialStudents={initialStudents} 
-          roleLabel="Dean of Studies" 
+          roleLabel="Dean"
+          initialWingFilter={wingContext.activeWingFilter}
+          lockedWing={lockedWing}
         />
       )}
     </div>

@@ -29,6 +29,7 @@ export default async function StudentResultsPage() {
     .select(`
       id,
       score,
+      grading_scale,
       term,
       assessment_type,
       remarks,

@@ -1,5 +1,6 @@
 'use server'
 import { normalizeRoles } from '@/lib/auth/roles'
+import { encodeRolesWithWing, isCrossWingRole, type UserWingAssignment } from '@/lib/wing'
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@supabase/supabase-js'
@@ -9,20 +10,19 @@ import { type FormState } from './CreateUserForm'
 
 export async function createUserAction(prevState: FormState, formData: FormData): Promise<FormState> {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  
+
   if (!serviceRoleKey) {
     return { error: 'Service role key not configured. Cannot create users.' }
   }
 
-  // Create an admin client bypassing RLS to create Auth users
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     serviceRoleKey,
     {
       auth: {
         autoRefreshToken: false,
-        persistSession: false
-      }
+        persistSession: false,
+      },
     }
   )
 
@@ -32,15 +32,24 @@ export async function createUserAction(prevState: FormState, formData: FormData)
   const first_name = formData.get('first_name') as string
   const last_name = formData.get('last_name') as string
   const role = formData.get('role') as string
+  const rawWing = (formData.get('wing') as string) || 'Both'
+  const wing: UserWingAssignment = isCrossWingRole([role])
+    ? 'Both'
+    : rawWing === 'Cambridge'
+      ? 'Cambridge'
+      : rawWing === 'NECTA'
+        ? 'NECTA'
+        : 'Both'
 
   if (!email || !username || !password || !first_name || !last_name || !role) {
     return { error: 'All fields are required' }
   }
 
   try {
-    // Verify if caller is authorized
     const supabase = await createServerClient()
-    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser()
     if (!currentUser) {
       throw new Error('Unauthorized')
     }
@@ -50,14 +59,13 @@ export async function createUserAction(prevState: FormState, formData: FormData)
       .select('role, roles')
       .eq('id', currentUser.id)
       .single()
-  const userRoles = normalizeRoles(profile)
+    const userRoles = normalizeRoles(profile)
 
     const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
     if (!isAdmin) {
       throw new Error('Access denied: Insufficient permissions')
     }
 
-    // PIN Validation for non-System Admins
     if (role !== 'System Admin') {
       const pinRegex = /^\d{6,10}$/
       if (!pinRegex.test(password)) {
@@ -65,24 +73,23 @@ export async function createUserAction(prevState: FormState, formData: FormData)
       }
     }
 
-    // 1. Create the user in Supabase Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Auto confirm for internal systems
+      email_confirm: true,
       user_metadata: {
         first_name,
         last_name,
         role,
-        username
-      }
+        wing,
+        username,
+      },
     })
 
     if (authError) throw authError
     if (!authData.user) throw new Error('User creation failed')
 
-    // 2. Insert into the public.profiles table
-    const normalizedRoles = normalizeRoles({ role })
+    const encodedRoles = encodeRolesWithWing({ role }, wing)
     const profilePayload: Record<string, any> = {
       id: authData.user.id,
       first_name,
@@ -90,35 +97,40 @@ export async function createUserAction(prevState: FormState, formData: FormData)
       email,
       username,
       role,
-      roles: normalizedRoles,
-      is_active: true
+      roles: encodedRoles,
+      wing,
+      is_active: true,
     }
 
-    let { error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .insert(profilePayload)
+    let { error: profileError } = await supabaseAdmin.from('profiles').insert(profilePayload)
 
-    // Fallback if database enum user_role does not yet include the new role (e.g., "Sales")
+    // Fallback if wing column is not yet migrated on remote DB
+    if (profileError && /wing/i.test(profileError.message)) {
+      delete profilePayload.wing
+      const retryWing = await supabaseAdmin.from('profiles').insert(profilePayload)
+      profileError = retryWing.error
+    }
+
+    // Fallback if database enum user_role does not yet include the new role
     if (profileError && /invalid input value for enum user_role/i.test(profileError.message)) {
       const { role: _omittedRole, ...payloadWithoutEnumRole } = profilePayload
-      const retry = await supabaseAdmin
-        .from('profiles')
-        .insert(payloadWithoutEnumRole)
+      const retry = await supabaseAdmin.from('profiles').insert(payloadWithoutEnumRole)
       profileError = retry.error
     }
 
     if (profileError) {
-      // Rollback auth user creation if profile insert fails
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
       throw profileError
     }
 
-    // 3. Log Audit
-    await logAuditAction(
-      'CREATE_USER',
-      'profiles',
-      { targetUserId: authData.user.id, email, first_name, last_name, role }
-    )
+    await logAuditAction('CREATE_USER', 'profiles', {
+      targetUserId: authData.user.id,
+      email,
+      first_name,
+      last_name,
+      role,
+      wing,
+    })
 
     revalidatePath('/dashboard/users')
     return { success: true, error: null }
@@ -133,15 +145,17 @@ export async function updateUserAction(
   last_name: string,
   role: string,
   email: string,
-  username?: string
+  username?: string,
+  wingInput?: UserWingAssignment
 ): Promise<{ success: boolean; error: string | null }> {
-  // 1. Authorize: Check if the caller is an Admin or Director
   const supabase = await createServerClient()
-  const { data: { user: currentUser } } = await supabase.auth.getUser()
+  const {
+    data: { user: currentUser },
+  } = await supabase.auth.getUser()
   if (!currentUser) {
     return { success: false, error: 'Unauthorized' }
   }
-  
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('role, roles')
@@ -166,35 +180,44 @@ export async function updateUserAction(
     {
       auth: {
         autoRefreshToken: false,
-        persistSession: false
-      }
+        persistSession: false,
+      },
     }
   )
 
+  const wing: UserWingAssignment = isCrossWingRole([role])
+    ? 'Both'
+    : wingInput === 'Cambridge'
+      ? 'Cambridge'
+      : wingInput === 'NECTA'
+        ? 'NECTA'
+        : 'Both'
+
   try {
-    // 2. Update user in Supabase Auth (role / email / username changes need admin bypass)
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
       email,
       user_metadata: {
         first_name,
         last_name,
         role,
-        ...(username ? { username } : {})
+        wing,
+        ...(username ? { username } : {}),
       },
-      email_confirm: true
+      email_confirm: true,
     })
 
     if (authError) throw authError
 
-    // 3. Update profiles table
+    const encodedRoles = encodeRolesWithWing({ role }, wing)
     const updateData: any = {
       first_name,
       last_name,
       role,
-      roles: normalizeRoles({ role }),
-      email
+      roles: encodedRoles,
+      wing,
+      email,
     }
-    
+
     if (username) {
       updateData.username = username
     }
@@ -204,7 +227,16 @@ export async function updateUserAction(
       .update(updateData)
       .eq('id', userId)
 
-    // Fallback if database enum user_role does not yet include the new role (e.g., "Sales")
+    // Fallback if wing column is not yet migrated on remote DB
+    if (profileError && /wing/i.test(profileError.message)) {
+      delete updateData.wing
+      const retryWing = await supabaseAdmin
+        .from('profiles')
+        .update(updateData)
+        .eq('id', userId)
+      profileError = retryWing.error
+    }
+
     if (profileError && /invalid input value for enum user_role/i.test(profileError.message)) {
       const { role: _omittedRole, ...updateWithoutEnumRole } = updateData
       const retry = await supabaseAdmin
@@ -216,12 +248,14 @@ export async function updateUserAction(
 
     if (profileError) throw profileError
 
-    // 4. Log Audit
-    await logAuditAction(
-      'UPDATE_USER',
-      'profiles',
-      { targetUserId: userId, first_name, last_name, role, email }
-    )
+    await logAuditAction('UPDATE_USER', 'profiles', {
+      targetUserId: userId,
+      first_name,
+      last_name,
+      role,
+      wing,
+      email,
+    })
 
     revalidatePath('/dashboard/users')
     return { success: true, error: null }
@@ -234,13 +268,14 @@ export async function toggleUserStatusAction(
   userId: string,
   active: boolean
 ): Promise<{ success: boolean; error: string | null }> {
-  // 1. Authorize: Check if the caller is an Admin or Director
   const supabase = await createServerClient()
-  const { data: { user: currentUser } } = await supabase.auth.getUser()
+  const {
+    data: { user: currentUser },
+  } = await supabase.auth.getUser()
   if (!currentUser) {
     return { success: false, error: 'Unauthorized' }
   }
-  
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('role, roles')
@@ -265,13 +300,12 @@ export async function toggleUserStatusAction(
     {
       auth: {
         autoRefreshToken: false,
-        persistSession: false
-      }
+        persistSession: false,
+      },
     }
   )
 
   try {
-    // 2. Update profiles table is_active column
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .update({ is_active: active })
@@ -279,19 +313,16 @@ export async function toggleUserStatusAction(
 
     if (profileError) throw profileError
 
-    // 3. Ban/unban in auth admin API
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-      ban_duration: active ? 'none' : '87600h'
+      ban_duration: active ? 'none' : '87600h',
     })
 
     if (authError) throw authError
 
-    // 4. Log Audit
-    await logAuditAction(
-      active ? 'ACTIVATE_USER' : 'SUSPEND_USER',
-      'profiles',
-      { targetUserId: userId, is_active: active }
-    )
+    await logAuditAction(active ? 'ACTIVATE_USER' : 'SUSPEND_USER', 'profiles', {
+      targetUserId: userId,
+      is_active: active,
+    })
 
     revalidatePath('/dashboard/users')
     return { success: true, error: null }
@@ -304,13 +335,14 @@ export async function resetUserPasswordAction(
   userId: string,
   password: string
 ): Promise<{ success: boolean; error: string | null }> {
-  // 1. Authorize: Check if the caller is an Admin or Director
   const supabase = await createServerClient()
-  const { data: { user: currentUser } } = await supabase.auth.getUser()
+  const {
+    data: { user: currentUser },
+  } = await supabase.auth.getUser()
   if (!currentUser) {
     return { success: false, error: 'Unauthorized' }
   }
-  
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('role, roles')
@@ -335,16 +367,19 @@ export async function resetUserPasswordAction(
     {
       auth: {
         autoRefreshToken: false,
-        persistSession: false
-      }
+        persistSession: false,
+      },
     }
   )
 
   try {
-    // Check target user's role to enforce PIN constraints
-    const { data: targetProfile } = await supabaseAdmin.from('profiles').select('roles, role').eq('id', userId).single()
+    const { data: targetProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('roles, role')
+      .eq('id', userId)
+      .single()
     const targetRoles = normalizeRoles(targetProfile)
-    
+
     const isTargetSystemAdmin = targetRoles.includes('System Admin')
 
     if (!isTargetSystemAdmin) {
@@ -358,14 +393,12 @@ export async function resetUserPasswordAction(
       }
     }
 
-    // 2. Reset user password directly
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-      password
+      password,
     })
 
     if (authError) throw authError
 
-    // Also update pin_hash
     let pinHash = null
     if (!isTargetSystemAdmin) {
       const crypto = require('crypto')
@@ -374,12 +407,7 @@ export async function resetUserPasswordAction(
 
     await supabaseAdmin.from('profiles').update({ pin_hash: pinHash }).eq('id', userId)
 
-    // 3. Log Audit
-    await logAuditAction(
-      'RESET_USER_PASSWORD',
-      'profiles',
-      { targetUserId: userId }
-    )
+    await logAuditAction('RESET_USER_PASSWORD', 'profiles', { targetUserId: userId })
 
     revalidatePath('/dashboard/users')
     return { success: true, error: null }

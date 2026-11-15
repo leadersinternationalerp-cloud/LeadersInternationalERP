@@ -1,9 +1,11 @@
 import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
+import { getWingContext } from '@/lib/wingServer'
+import { matchesWingFilter } from '@/lib/wing'
 import {
-  Wallet, DollarSign, TrendingUp, CreditCard, Banknote, FileSpreadsheet,
-  AlertCircle, History, Clock
+  Wallet, DollarSign, TrendingUp,
+  AlertCircle, History
 } from 'lucide-react'
 import { formatDate } from '@/utils/date'
 
@@ -14,13 +16,13 @@ export default async function AccountantDashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('*')
     .eq('id', user?.id)
     .single()
     
   const userRoles = normalizeRoles(profile)
 
-  if (!user || (!userRoles.includes('Accountant') && !userRoles.includes('System Admin'))) {
+  if (!user || (!userRoles.includes('Accountant') && !userRoles.includes('System Admin') && !userRoles.includes('Director') && !userRoles.includes('Principal'))) {
     return (
       <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
         <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>
@@ -28,13 +30,26 @@ export default async function AccountantDashboardPage() {
     )
   }
 
-  // Fetch Summary Metrics
-  const { data: invoices } = await supabase.from('invoices').select('net_amount, total_paid, status')
+  const wingContext = await getWingContext(user.id, profile)
+  const activeWingLabel =
+    wingContext.activeWingFilter === 'all'
+      ? 'All Wings (Cambridge & NECTA)'
+      : `${wingContext.activeWingFilter} Wing`
+
+  // Fetch Summary Metrics (wing-aware)
+  const { data: invoicesRaw } = await supabase
+    .from('invoices')
+    .select('net_amount, total_paid, status, students:student_id(grade_level)')
+
+  const invoices = (invoicesRaw || []).filter((inv: any) =>
+    matchesWingFilter(inv.students || {}, wingContext.activeWingFilter)
+  )
+
   let feesBilled = 0
   let feesCollected = 0
   let feesOutstanding = 0
 
-  invoices?.forEach(inv => {
+  invoices.forEach((inv: any) => {
     const netAmount = Number(inv.net_amount || 0)
     const paidAmount = Number(inv.total_paid || 0)
     
@@ -43,12 +58,13 @@ export default async function AccountantDashboardPage() {
     feesOutstanding += (netAmount - paidAmount)
   })
 
-  // Include TZS 30,000 Admission Application Invoices in Revenue / Collections summary
+  // Include TZS 30,000 Admission Application Invoices in Revenue / Collections summary (wing-aware)
   try {
     const { data: admInvoices } = await supabase
       .from('admission_invoices')
-      .select('amount, status')
-    admInvoices?.forEach((inv: { amount: number; status: string }) => {
+      .select('amount, status, admission_applications:application_id(curriculum, class_applied_for)')
+    admInvoices?.forEach((inv: any) => {
+      if (!matchesWingFilter(inv.admission_applications || {}, wingContext.activeWingFilter)) return
       const amt = Number(inv.amount || 0)
       if (inv.status === 'paid') {
         feesBilled += amt
@@ -69,12 +85,16 @@ export default async function AccountantDashboardPage() {
     .eq('status', 'Approved')
     .limit(5)
 
-  // Recent Transactions
-  const { data: recentPayments } = await supabase
+  // Recent Transactions (wing-aware)
+  const { data: recentPaymentsRaw } = await supabase
     .from('payments')
-    .select('amount, payment_method, payment_date, students(profiles(first_name, last_name))')
+    .select('amount, payment_method, payment_date, students(grade_level, profiles(first_name, last_name))')
     .order('payment_date', { ascending: false })
-    .limit(5)
+    .limit(20)
+
+  const recentPayments = (recentPaymentsRaw || [])
+    .filter((p: any) => matchesWingFilter(p.students || {}, wingContext.activeWingFilter))
+    .slice(0, 5)
 
   const formatCurrency = (amount: number) => {
     if (amount >= 1000000) return `TZS ${(amount / 1000000).toFixed(1)}M`
@@ -90,7 +110,7 @@ export default async function AccountantDashboardPage() {
       <div>
         <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)', margin: 0 }}>Accountant Dashboard</h1>
         <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-          Financial overview, collections, and disbursements.
+          Financial overview, collections, and disbursements • Scope: <strong>{activeWingLabel}</strong>
         </p>
       </div>
 
@@ -101,7 +121,9 @@ export default async function AccountantDashboardPage() {
             <Wallet size={24} color="var(--color-primary)" />
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Fees Billed</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+              Fees Billed {wingContext.activeWingFilter !== 'all' ? `(${wingContext.activeWingFilter})` : ''}
+            </div>
             <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text)' }}>{formatCurrency(feesBilled)}</div>
           </div>
         </div>
@@ -111,7 +133,9 @@ export default async function AccountantDashboardPage() {
             <TrendingUp size={24} color="var(--color-success)" />
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Fees Collected</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+              Fees Collected {wingContext.activeWingFilter !== 'all' ? `(${wingContext.activeWingFilter})` : ''}
+            </div>
             <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-success)' }}>{formatCurrency(feesCollected)}</div>
           </div>
         </div>
@@ -121,7 +145,9 @@ export default async function AccountantDashboardPage() {
             <DollarSign size={24} color="var(--color-error)" />
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Outstanding</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+              Outstanding {wingContext.activeWingFilter !== 'all' ? `(${wingContext.activeWingFilter})` : ''}
+            </div>
             <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-error)' }}>{formatCurrency(feesOutstanding)}</div>
           </div>
         </div>
@@ -177,12 +203,12 @@ export default async function AccountantDashboardPage() {
             <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2rem 0' }}>No recent transactions.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {recentPayments.map((payment, idx) => (
+              {recentPayments.map((payment: any, idx: number) => (
                 <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid var(--color-border)' }}>
                   <div>
                     <div style={{ fontWeight: 500, color: 'var(--color-text)' }}>Payment Received</div>
                     <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-                      {(payment.students as any)?.profiles?.first_name} {(payment.students as any)?.profiles?.last_name} • {payment.payment_method}
+                      {payment.students?.profiles?.first_name} {payment.students?.profiles?.last_name} • {payment.payment_method}
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>

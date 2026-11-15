@@ -60,6 +60,7 @@ export default async function ParentAcademicReportsPage({
     .select(`
       id,
       score,
+      grading_scale,
       term,
       assessment_type,
       remarks,

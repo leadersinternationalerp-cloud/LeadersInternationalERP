@@ -1,5 +1,7 @@
 import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
+import { getWingContext } from '@/lib/wingServer'
+import { matchesWingFilter } from '@/lib/wing'
 import ReportCardsGenerator from '@/components/ReportCardsGenerator'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
@@ -13,8 +15,10 @@ export default async function TeacherReportCardsPage() {
     return <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}><h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2></div>
   }
 
-  const { data: profile } = await supabase.from('profiles').select('roles, role').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
   const userRoles = normalizeRoles(profile)
+  const wingContext = await getWingContext(user.id, profile)
+  const lockedWing = wingContext.assignedWing !== 'Both' ? wingContext.assignedWing : null
 
   if (!userRoles.includes('Teacher') && !userRoles.includes('System Admin')) {
     return <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}><h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2></div>
@@ -71,9 +75,15 @@ export default async function TeacherReportCardsPage() {
     classes = Array.from(uniqueClassMap.values())
   }
 
+  if (lockedWing) {
+    classes = classes.filter(c => matchesWingFilter(c, lockedWing))
+  }
+
   // 4. Fetch initial student list for the first class
   let initialStudents: any[] = []
-  const firstClassId = classes[0]?.id
+  const firstClassId =
+    classes.find(c => matchesWingFilter(c, wingContext.activeWingFilter))?.id ||
+    classes[0]?.id
 
   if (firstClassId) {
     const { data: stdData } = await supabase
@@ -123,7 +133,7 @@ export default async function TeacherReportCardsPage() {
         <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center', borderRadius: 'var(--radius-lg)' }}>
           <h3 style={{ color: 'var(--color-text-muted)' }}>No Assigned Classes</h3>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
-            You are not currently assigned as a teacher for any subjects or classes.
+            You are not currently assigned as a teacher for any subjects or classes in your wing.
           </p>
         </div>
       ) : (
@@ -131,7 +141,9 @@ export default async function TeacherReportCardsPage() {
           classes={classes} 
           terms={terms} 
           initialStudents={initialStudents} 
-          roleLabel={userRoles.includes('System Admin') ? 'System Admin' : 'Class Teacher'} 
+          roleLabel={userRoles.includes('System Admin') ? 'System Admin' : 'Class Teacher'}
+          initialWingFilter={wingContext.activeWingFilter}
+          lockedWing={lockedWing}
         />
       )}
     </div>

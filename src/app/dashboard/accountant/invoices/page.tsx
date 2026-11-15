@@ -2,6 +2,8 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { ensureMissingAdmissionInvoices } from '@/lib/admissions/ensureAdmissionInvoices'
 import { getSessionUser } from '@/lib/auth/session'
 import { hasAnyRole } from '@/lib/auth/roles'
+import { getWingContext } from '@/lib/wingServer'
+import { matchesWingFilter } from '@/lib/wing'
 import { generateInvoicesAction } from '../actions'
 import InvoicesClient from './InvoicesClient'
 
@@ -25,6 +27,13 @@ export default async function InvoicesPage() {
   }
 
   const supabase = createServiceClient()
+  const { data: myProfile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', session.user.id)
+    .maybeSingle()
+  const wingContext = await getWingContext(session.user.id, myProfile)
+  const lockedWing = wingContext.assignedWing !== 'Both' ? wingContext.assignedWing : null
 
   // Fetch all invoices joining students, profiles, and payments
   const { data: invoicesRaw } = await supabase
@@ -47,7 +56,7 @@ export default async function InvoicesPage() {
     `)
     .order('created_at', { ascending: false })
 
-  const invoices = (invoicesRaw || []).map((inv) => {
+  const allInvoices = (invoicesRaw || []).map((inv) => {
     const paid = (inv.payments || []).reduce((sum: number, p: any) => sum + Number(p.amount), 0)
     return {
       ...inv,
@@ -55,6 +64,10 @@ export default async function InvoicesPage() {
       students: inv.students,
     }
   })
+
+  const invoices = lockedWing
+    ? allInvoices.filter((inv) => matchesWingFilter(inv.students || {}, lockedWing))
+    : allInvoices
 
   // Backfill & fetch admission form invoices (TZS 30,000)
   let admissionInvoices: any[] = []
@@ -81,7 +94,10 @@ export default async function InvoicesPage() {
         )
       `)
       .order('created_at', { ascending: false })
-    admissionInvoices = admInvRaw || []
+    const rawAdm = admInvRaw || []
+    admissionInvoices = lockedWing
+      ? rawAdm.filter((inv) => matchesWingFilter(inv.admission_applications || {}, lockedWing))
+      : rawAdm
   } catch (admErr) {
     console.warn('[invoices/page] admission_invoices query notice:', admErr)
   }
@@ -171,7 +187,12 @@ export default async function InvoicesPage() {
         </div>
 
         {/* Invoices List */}
-        <InvoicesClient initialInvoices={invoices || []} initialAdmissionInvoices={admissionInvoices} />
+        <InvoicesClient
+          initialInvoices={invoices || []}
+          initialAdmissionInvoices={admissionInvoices}
+          initialWingFilter={wingContext.activeWingFilter}
+          lockedWing={lockedWing}
+        />
       </div>
     </div>
   )

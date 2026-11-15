@@ -1,10 +1,17 @@
 import { createClient } from '@/utils/supabase/server'
-import { revalidatePath } from 'next/cache'
 import { autoGenerateMissingInvoices, getCurrentTermAndYear } from '../actions'
 import { isCurrentOrPast } from '@/utils/billing'
+import { getWingContext } from '@/lib/wingServer'
+import { inferWing, matchesWingFilter } from '@/lib/wing'
+import { WingBadge } from '@/components/WingFilterBar'
 
 export default async function FeeBalancesPage() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = user
+    ? await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+    : { data: null }
+  const wingContext = await getWingContext(user?.id, profile)
 
   // 1. Trigger auto-generation of missing invoices for current & past terms
   await autoGenerateMissingInvoices()
@@ -21,6 +28,7 @@ export default async function FeeBalancesPage() {
         id,
         student_id,
         admission_number,
+        grade_level,
         profiles (
           first_name,
           last_name
@@ -41,16 +49,19 @@ export default async function FeeBalancesPage() {
     overdue_90_plus: 0
   }
 
-  // 4. Filter to keep only current or past invoices, calculate amount_due on the client side, and categorize by overdue age
+  // 4. Filter to keep only current or past invoices, filter by active wing, calculate amount_due, and categorize by overdue age
   const enhancedInvoices = (invoices || [])
     .filter(inv => isCurrentOrPast(inv.academic_year, inv.term, currentYear, currentTerm))
+    .filter(inv => matchesWingFilter((inv as any).student || {}, wingContext.activeWingFilter))
     .map(inv => {
       const studentInfo: any = inv.student
-      const profile: any = Array.isArray(studentInfo?.profiles) ? studentInfo.profiles[0] : studentInfo?.profiles
-      const firstName = profile?.first_name || ''
-      const lastName = profile?.last_name || ''
+      const profileRow: any = Array.isArray(studentInfo?.profiles) ? studentInfo.profiles[0] : studentInfo?.profiles
+      const firstName = profileRow?.first_name || ''
+      const lastName = profileRow?.last_name || ''
       const studentName = `${firstName} ${lastName}`.trim()
       const admissionNo = studentInfo?.student_id || studentInfo?.admission_number || ''
+      const gradeLevel = studentInfo?.grade_level || ''
+      const wing = inferWing(studentInfo || {})
 
       // Calculate actual unpaid amount due
       const netAmount = Number(inv.net_amount || inv.total_amount)
@@ -72,6 +83,8 @@ export default async function FeeBalancesPage() {
         ...inv, 
         studentName,
         admissionNo,
+        gradeLevel,
+        wing,
         amount_due: amountDue,
         daysOverdue, 
         bucket 
@@ -81,8 +94,13 @@ export default async function FeeBalancesPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)' }}>Fee Balances (A/R Aging)</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)' }}>Fee Balances (A/R Aging)</h1>
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+            Showing {wingContext.activeWingFilter === 'all' ? 'All Wings (Cambridge & NECTA)' : `${wingContext.activeWingFilter} Wing`} — switch wing in the top header bar
+          </p>
+        </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button className="btn-secondary" style={{ textDecoration: 'none' }}>Export Excel</button>
           <button className="btn-secondary" style={{ textDecoration: 'none' }}>Print PDF</button>
@@ -115,6 +133,7 @@ export default async function FeeBalancesPage() {
           <thead>
             <tr style={{ backgroundColor: 'rgba(0,0,0,0.02)', borderBottom: '1px solid var(--color-border)' }}>
               <th style={{ textAlign: 'left', padding: '1rem', fontWeight: 600 }}>Student</th>
+              <th style={{ textAlign: 'left', padding: '1rem', fontWeight: 600 }}>Class / Wing</th>
               <th style={{ textAlign: 'left', padding: '1rem', fontWeight: 600 }}>Invoice Ref</th>
               <th style={{ textAlign: 'left', padding: '1rem', fontWeight: 600 }}>Due Date</th>
               <th style={{ textAlign: 'left', padding: '1rem', fontWeight: 600 }}>Aging Bucket</th>
@@ -128,6 +147,12 @@ export default async function FeeBalancesPage() {
                 <td style={{ padding: '1rem', fontWeight: 600 }}>
                   <div>{inv.studentName}</div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>ID: {inv.admissionNo}</div>
+                </td>
+                <td style={{ padding: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.85rem' }}>{inv.gradeLevel || '—'}</span>
+                    <WingBadge wing={inv.wing} />
+                  </div>
                 </td>
                 <td style={{ padding: '1rem', fontFamily: 'monospace' }}>{inv.id.substring(0, 8).toUpperCase()}</td>
                 <td style={{ padding: '1rem' }}>{new Date(inv.due_date).toLocaleDateString()}</td>
@@ -150,8 +175,8 @@ export default async function FeeBalancesPage() {
             ))}
             {enhancedInvoices.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-success)', fontWeight: 600 }}>
-                  All current and past invoices are paid in full. No outstanding balances.
+                <td colSpan={7} style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-success)', fontWeight: 600 }}>
+                  All current and past invoices are paid in full for the selected wing. No outstanding balances.
                 </td>
               </tr>
             )}

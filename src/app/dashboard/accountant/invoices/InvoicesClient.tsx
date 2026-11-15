@@ -5,14 +5,21 @@ import { FileDown, CheckCircle2, Receipt, X } from 'lucide-react'
 import { formatCurrency } from '@/utils/formatters'
 import { markAdmissionInvoicePaidAction } from '@/app/dashboard/principal/admissions/actions'
 import { downloadApplicationInvoicePdf } from '@/lib/admissions/applicationInvoicePdf'
+import { inferWing, matchesWingFilter, type SchoolWing, type WingFilterValue } from '@/lib/wing'
+import { WingSegmentedBar, WingBadge, useWingFilter } from '@/components/WingFilterBar'
 
 export default function InvoicesClient({
   initialInvoices,
   initialAdmissionInvoices = [],
+  initialWingFilter = 'all',
+  lockedWing = null,
 }: {
   initialInvoices: any[]
   initialAdmissionInvoices?: any[]
+  initialWingFilter?: WingFilterValue
+  lockedWing?: SchoolWing | null
 }) {
+  const { wingFilter, setWingFilter } = useWingFilter(initialWingFilter, lockedWing)
   const [activeTab, setActiveTab] = useState<'student' | 'admission'>('student')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
@@ -29,14 +36,30 @@ export default function InvoicesClient({
   const [admMessage, setAdmMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
+  const wingCounts = useMemo(() => {
+    const rows = activeTab === 'student' ? initialInvoices : admissionInvoices
+    let cambridge = 0
+    let necta = 0
+    for (const r of rows) {
+      const target = activeTab === 'student' ? r.students || {} : r.admission_applications || {}
+      if (inferWing(target) === 'Cambridge') cambridge++
+      else necta++
+    }
+    return { all: rows.length, Cambridge: cambridge, NECTA: necta }
+  }, [activeTab, initialInvoices, admissionInvoices])
+
   const unpaidAdmCount = useMemo(
-    () => admissionInvoices.filter((i) => i.status === 'unpaid').length,
-    [admissionInvoices]
+    () =>
+      admissionInvoices.filter(
+        (i) => i.status === 'unpaid' && matchesWingFilter(i.admission_applications || {}, wingFilter)
+      ).length,
+    [admissionInvoices, wingFilter]
   )
 
   const filteredAdmissionInvoices = useMemo(() => {
     return admissionInvoices.filter((inv) => {
       const app = inv.admission_applications || {}
+      if (!matchesWingFilter(app, wingFilter)) return false
       const q = admSearch.toLowerCase().trim()
       const matchesSearch =
         !q ||
@@ -48,7 +71,7 @@ export default function InvoicesClient({
       const matchesStatus = admStatus === 'all' || inv.status === admStatus
       return matchesSearch && matchesStatus
     })
-  }, [admissionInvoices, admSearch, admStatus])
+  }, [admissionInvoices, admSearch, admStatus, wingFilter])
 
   const handleDownloadAdmPdf = (inv: any) => {
     const app = inv.admission_applications || {}
@@ -104,11 +127,14 @@ export default function InvoicesClient({
     initialInvoices.forEach((inv) => {
       if (inv.students?.grade_level) set.add(inv.students.grade_level)
     })
-    return Array.from(set).sort()
-  }, [initialInvoices])
+    return Array.from(set)
+      .filter((g) => matchesWingFilter(g, wingFilter))
+      .sort()
+  }, [initialInvoices, wingFilter])
 
   const filteredInvoices = useMemo(() => {
     return initialInvoices.filter((inv) => {
+      if (!matchesWingFilter(inv.students || {}, wingFilter)) return false
       const name = `${inv.students?.profiles?.first_name || ''} ${inv.students?.profiles?.last_name || ''}`.toLowerCase()
       const matchesSearch =
         name.includes(search.toLowerCase()) ||
@@ -119,71 +145,88 @@ export default function InvoicesClient({
 
       return matchesSearch && matchesStatus && matchesGrade && matchesTerm
     })
-  }, [initialInvoices, search, statusFilter, gradeFilter, termFilter])
+  }, [initialInvoices, search, statusFilter, gradeFilter, termFilter, wingFilter])
 
   return (
     <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-      {/* Tabs */}
+      {/* Tabs & Wing Filter */}
       <div
         style={{
           display: 'flex',
-          gap: '0.5rem',
-          padding: '1rem 1.5rem 0',
+          gap: '0.75rem',
+          padding: '0.85rem 1.5rem 0',
           borderBottom: '1px solid var(--color-border)',
           backgroundColor: 'rgba(0,0,0,0.02)',
           flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
         }}
       >
-        <button
-          type="button"
-          onClick={() => setActiveTab('student')}
-          style={{
-            padding: '0.6rem 1rem',
-            fontSize: '0.85rem',
-            fontWeight: 700,
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'student' ? '3px solid var(--color-primary)' : '3px solid transparent',
-            color: activeTab === 'student' ? 'var(--color-primary)' : 'var(--color-text-muted)',
-            cursor: 'pointer',
-          }}
-        >
-          Student Tuition Invoices ({initialInvoices.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('admission')}
-          style={{
-            padding: '0.6rem 1rem',
-            fontSize: '0.85rem',
-            fontWeight: 700,
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'admission' ? '3px solid var(--color-primary)' : '3px solid transparent',
-            color: activeTab === 'admission' ? 'var(--color-primary)' : 'var(--color-text-muted)',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-          }}
-        >
-          <Receipt size={15} />
-          <span>Admission Form Invoices (TZS 30,000)</span>
-          {unpaidAdmCount > 0 && (
-            <span
-              style={{
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                padding: '0.1rem 0.45rem',
-                borderRadius: '9999px',
-                backgroundColor: '#fef3c7',
-                color: '#92400e',
-              }}
-            >
-              {unpaidAdmCount} Unpaid
-            </span>
-          )}
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setActiveTab('student')}
+            style={{
+              padding: '0.6rem 1rem',
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'student' ? '3px solid var(--color-primary)' : '3px solid transparent',
+              color: activeTab === 'student' ? 'var(--color-primary)' : 'var(--color-text-muted)',
+              cursor: 'pointer',
+            }}
+          >
+            Student Tuition Invoices ({filteredInvoices.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('admission')}
+            style={{
+              padding: '0.6rem 1rem',
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'admission' ? '3px solid var(--color-primary)' : '3px solid transparent',
+              color: activeTab === 'admission' ? 'var(--color-primary)' : 'var(--color-text-muted)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            <Receipt size={15} />
+            <span>Admission Form Invoices (TZS 30,000)</span>
+            {unpaidAdmCount > 0 && (
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  padding: '0.1rem 0.45rem',
+                  borderRadius: '9999px',
+                  backgroundColor: '#fef3c7',
+                  color: '#92400e',
+                }}
+              >
+                {unpaidAdmCount} Unpaid
+              </span>
+            )}
+          </button>
+        </div>
+
+        <div style={{ paddingBottom: '0.5rem' }}>
+          <WingSegmentedBar
+            value={wingFilter}
+            onChange={(next) => {
+              setWingFilter(next)
+              setGradeFilter('All')
+            }}
+            lockedWing={lockedWing}
+            counts={wingCounts}
+            compact
+          />
+        </div>
       </div>
 
       {activeTab === 'student' ? (
@@ -283,7 +326,12 @@ export default function InvoicesClient({
                       ID: {inv.students?.student_id}
                     </div>
                   </td>
-                  <td style={{ padding: '1rem' }}>{inv.students?.grade_level}</td>
+                  <td style={{ padding: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                      <span>{inv.students?.grade_level}</span>
+                      <WingBadge wing={inferWing(inv.students || {})} />
+                    </div>
+                  </td>
                   <td style={{ padding: '1rem' }}>{inv.term}</td>
                   <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--color-primary)' }}>
                     {formatCurrency(inv.net_amount)}
@@ -431,7 +479,10 @@ export default function InvoicesClient({
                         </div>
                       </td>
                       <td style={{ padding: '1rem 1.25rem', fontSize: '0.85rem' }}>
-                        <div>{app.class_applied_for || '-'}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <span>{app.class_applied_for || '-'}</span>
+                          <WingBadge wing={inferWing(app)} />
+                        </div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
                           {app.sales_agent_name || app.source || 'website'}
                         </div>

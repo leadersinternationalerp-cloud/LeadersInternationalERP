@@ -1,10 +1,10 @@
 import { normalizeRoles } from '@/lib/auth/roles'
+import { getWingContext } from '@/lib/wingServer'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import InactivityTimeout from '@/components/InactivityTimeout'
 import DashboardLayoutClient from '@/components/DashboardLayoutClient'
 
-// Cache-busting trigger comment to force Next.js to compile layout updates: 2026-07-25T09:59:44
 export default async function DashboardLayout({
   children,
 }: {
@@ -45,6 +45,9 @@ export default async function DashboardLayout({
   // Roles
   const userRoles = normalizeRoles(profile).length > 0 ? normalizeRoles(profile) : (user?.email === 'admin@leaders.ac.tz' ? ['System Admin'] : [])
 
+  // Wing Context
+  const wingContext = await getWingContext(user.id, profile)
+
   // Fetch unread notifications count
   const { count: unreadCount } = await supabase
     .from('notifications')
@@ -68,6 +71,8 @@ export default async function DashboardLayout({
         userRoles={userRoles} 
         unreadCount={unreadCount || 0}
         recentNotifications={recentNotifications || []}
+        assignedWing={wingContext.assignedWing}
+        initialWingFilter={wingContext.activeWingFilter}
       >
         {children}
       </DashboardLayoutClient>

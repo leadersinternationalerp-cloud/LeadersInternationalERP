@@ -1,5 +1,7 @@
 import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
+import { getWingContext } from '@/lib/wingServer'
+import { matchesWingFilter } from '@/lib/wing'
 import PaymentsClient from './PaymentsClient'
 import { autoGenerateMissingInvoices } from '../actions'
 
@@ -16,10 +18,10 @@ export default async function PaymentsPage() {
     )
   }
 
-  const { data: prof } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
+  const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
   const userRoles = normalizeRoles(prof)
 
-  const canRead = userRoles.some(r => ['System Admin', 'Director', 'Principal', 'Accountant'].includes(r))
+  const canRead = userRoles.some(r => ['System Admin', 'Director', 'Principal', 'Accountant', 'Receptionist'].includes(r))
   if (!canRead) {
     return (
       <div style={{ padding: '2rem', color: 'var(--color-error)', fontWeight: 600 }}>
@@ -28,11 +30,14 @@ export default async function PaymentsPage() {
     )
   }
 
+  const wingContext = await getWingContext(user.id, prof)
+  const lockedWing = wingContext.assignedWing !== 'Both' ? wingContext.assignedWing : null
+
   // Trigger auto-generation check for missing invoices (current & past terms)
   await autoGenerateMissingInvoices()
 
   // Fetch pending/partially paid invoices for selection
-  const { data: pendingInvoices } = await supabase
+  const { data: pendingInvoicesRaw } = await supabase
     .from('invoices')
     .select(`
       id,
@@ -43,6 +48,8 @@ export default async function PaymentsPage() {
       student_id,
       students (
         student_id,
+        admission_number,
+        grade_level,
         profiles (
           first_name,
           last_name
@@ -55,13 +62,15 @@ export default async function PaymentsPage() {
     .neq('status', 'Paid')
 
   // Fetch recorded payments history
-  const { data: payments } = await supabase
+  const { data: paymentsRaw } = await supabase
     .from('payments')
     .select(`
       *,
       invoices (term, academic_year),
       students (
         student_id,
+        admission_number,
+        grade_level,
         profiles (
           first_name,
           last_name
@@ -69,6 +78,14 @@ export default async function PaymentsPage() {
       )
     `)
     .order('payment_date', { ascending: false })
+
+  const pendingInvoices = lockedWing
+    ? (pendingInvoicesRaw || []).filter((inv: any) => matchesWingFilter(inv.students || {}, lockedWing))
+    : pendingInvoicesRaw || []
+
+  const payments = lockedWing
+    ? (paymentsRaw || []).filter((p: any) => matchesWingFilter(p.students || {}, lockedWing))
+    : paymentsRaw || []
 
   // Fetch pending bank deposits
   const { data: bankDeposits } = await supabase
@@ -87,6 +104,8 @@ export default async function PaymentsPage() {
         initialPayments={payments || []}
         pendingInvoices={pendingInvoices || []}
         initialBankDeposits={bankDeposits || []}
+        initialWingFilter={wingContext.activeWingFilter}
+        lockedWing={lockedWing}
       />
     </div>
   )

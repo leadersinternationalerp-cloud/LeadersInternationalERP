@@ -23,6 +23,8 @@ import {
   toggleStudentActiveAction,
   generateSingleStudentInvoiceAction,
 } from './enroll/actions'
+import { useWingFilter, WingBadge, WingSegmentedBar } from '@/components/WingFilterBar'
+import { inferWing, matchesWingFilter, type UserWingAssignment, type WingFilterValue } from '@/lib/wing'
 
 interface StudentDocumentItem {
   id: string
@@ -41,6 +43,7 @@ interface StudentRecord {
   photo_url: string | null
   grade_level: string
   section?: string
+  wing?: string | null
   parent_contact?: string
   class_id?: string
   dob?: string | null
@@ -84,15 +87,20 @@ interface StudentsListClientProps {
   userRoles: string[]
   terms: any[]
   classes: ClassRecord[]
+  assignedWing?: UserWingAssignment
+  initialWingFilter?: WingFilterValue
 }
 
 export default function StudentsListClient({
   initialStudents,
   userRoles,
   classes = [],
+  assignedWing = 'Both',
+  initialWingFilter = 'all',
 }: StudentsListClientProps) {
   const [students, setStudents] = useState<StudentRecord[]>(initialStudents)
   const [search, setSearch] = useState('')
+  const [wingFilter, setWingFilter] = useWingFilter(initialWingFilter, assignedWing)
 
   // Bio Data view modal state
   const [viewingBioStudent, setViewingBioStudent] = useState<StudentRecord | null>(null)
@@ -185,21 +193,34 @@ export default function StudentsListClient({
     }
   }
 
-  // 1. Calculate class statistics
+  // Wing counts for filter bar
+  const wingCounts = useMemo(() => {
+    let cambridge = 0
+    let necta = 0
+    students.forEach((s) => {
+      if (inferWing(s) === 'Cambridge') cambridge++
+      else necta++
+    })
+    return { all: students.length, cambridge, necta }
+  }, [students])
+
+  // 1. Calculate class statistics (filtered by active wing)
   const gradeCounts = useMemo(() => {
     const counts: Record<string, number> = {}
     students.forEach((s) => {
+      if (!matchesWingFilter(s, wingFilter)) return
       const gl = s.grade_level || 'Unassigned'
       counts[gl] = (counts[gl] || 0) + 1
     })
     return counts
-  }, [students])
+  }, [students, wingFilter])
 
-  // 2. Filter students list by search term
+  // 2. Filter students list by wing & search term
   const filteredStudents = useMemo(() => {
-    if (!search.trim()) return students
+    const wingScoped = students.filter((s) => matchesWingFilter(s, wingFilter))
+    if (!search.trim()) return wingScoped
     const term = search.toLowerCase()
-    return students.filter((s) => {
+    return wingScoped.filter((s) => {
       const fullName = `${s.profiles?.first_name || ''} ${s.profiles?.last_name || ''}`.toLowerCase()
       const studentId = s.student_id?.toLowerCase() || ''
       const email = s.profiles?.email?.toLowerCase() || ''
@@ -208,6 +229,7 @@ export default function StudentsListClient({
       const sales = s.sales_agent_name?.toLowerCase() || ''
       const source = s.source?.toLowerCase() || ''
       const grade = s.grade_level?.toLowerCase() || ''
+      const wingStr = inferWing(s).toLowerCase()
 
       return (
         fullName.includes(term) ||
@@ -217,10 +239,11 @@ export default function StudentsListClient({
         parentName.includes(term) ||
         sales.includes(term) ||
         source.includes(term) ||
-        grade.includes(term)
+        grade.includes(term) ||
+        wingStr.includes(term)
       )
     })
-  }, [students, search])
+  }, [students, search, wingFilter])
 
   // Determine report card generation link depending on role (Receptionist does NOT see academics)
   const getReportCardLink = () => {
@@ -481,15 +504,23 @@ export default function StudentsListClient({
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div style={{ marginBottom: '1.25rem' }}>
-        <input
-          type="text"
-          className="input-field"
-          placeholder="Search students by name, Student ID, class/grade, parent phone, or attribution (WALK IN / Sales)..."
-          style={{ width: '100%', padding: '0.75rem 1rem' }}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+      {/* Search & Wing Filter Bar */}
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ flex: 1, minWidth: '280px' }}>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Search students by name, Student ID, class/grade, wing, parent phone, or attribution..."
+            style={{ width: '100%', padding: '0.75rem 1rem' }}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <WingSegmentedBar
+          value={wingFilter}
+          onChange={setWingFilter}
+          lockedWing={assignedWing}
+          counts={wingCounts}
         />
       </div>
 
@@ -587,7 +618,10 @@ export default function StudentsListClient({
 
                     {/* Class & Grade Placement */}
                     <td style={{ padding: '1rem' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <div>
+                          <WingBadge item={s} size="xs" />
+                        </div>
                         {classNameDisplay ? (
                           <span
                             style={{

@@ -5,8 +5,10 @@ import AssessmentWeightsClient from './AssessmentWeightsClient'
 export default async function AssessmentWeightsPage() {
   const supabase = await createClient()
 
-  // 1. Verify user role (System Admin, Director, Principal)
-  const { data: { user } } = await supabase.auth.getUser()
+  // 1. Verify user role (System Admin, Director, Principal, Dean)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return (
       <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
@@ -24,7 +26,12 @@ export default async function AssessmentWeightsPage() {
 
   const userRoles = normalizeRoles(profile)
 
-  const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director') || userRoles.includes('Principal')
+  const isAdmin =
+    userRoles.includes('System Admin') ||
+    userRoles.includes('Director') ||
+    userRoles.includes('Principal') ||
+    userRoles.includes('Dean')
+
   if (!isAdmin) {
     return (
       <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
@@ -45,9 +52,18 @@ export default async function AssessmentWeightsPage() {
   return (
     <div>
       <div style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)', margin: 0 }}>Assessment Weights Configuration</h1>
-        <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-          Define weights for exams, quizzes, and class activities to calculate weighted overall scores.
+        <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)', margin: 0 }}>
+          Assessment Weights Configuration
+        </h1>
+        <p
+          style={{
+            color: 'var(--color-text-muted)',
+            fontSize: '0.9rem',
+            marginTop: '0.25rem',
+          }}
+        >
+          Define weights for exams, quizzes, and class activities to calculate weighted
+          overall scores on Report Cards and populate the Marks Entry assessment list.
         </p>
       </div>
 
