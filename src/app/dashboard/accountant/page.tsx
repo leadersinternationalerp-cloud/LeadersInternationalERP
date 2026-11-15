@@ -1,5 +1,5 @@
-import { normalizeRoles } from '@/lib/auth/roles'
-import { createClient } from '@/utils/supabase/server'
+import { getSessionUser } from '@/lib/auth/session'
+import { buildCacheKey, CACHE_TTL, getOrSetCache } from '@/lib/cache/redisCache'
 import Link from 'next/link'
 import { getWingContext } from '@/lib/wingServer'
 import { matchesWingFilter } from '@/lib/wing'
@@ -10,17 +10,7 @@ import {
 import { formatDate } from '@/utils/date'
 
 export default async function AccountantDashboardPage() {
-  const supabase = await createClient()
-
-  // Verify access
-  const { data: { user } } = await supabase.auth.getUser()
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user?.id)
-    .single()
-    
-  const userRoles = normalizeRoles(profile)
+  const { user, profile, roles: userRoles, supabase } = await getSessionUser()
 
   if (!user || (!userRoles.includes('Accountant') && !userRoles.includes('System Admin') && !userRoles.includes('Director') && !userRoles.includes('Principal'))) {
     return (
@@ -36,65 +26,78 @@ export default async function AccountantDashboardPage() {
       ? 'All Wings (Cambridge & NECTA)'
       : `${wingContext.activeWingFilter} Wing`
 
-  // Fetch Summary Metrics (wing-aware)
-  const { data: invoicesRaw } = await supabase
-    .from('invoices')
-    .select('net_amount, total_paid, status, students:student_id(grade_level)')
+  // Fetch all Summary Metrics, Pending Disbursements, and Recent Transactions in parallel (cached 60s)
+  const { feesBilled, feesCollected, feesOutstanding, pendingAdvances, recentPayments } =
+    await getOrSetCache(
+      buildCacheKey('dashboard:accountant_summary', [], wingContext.activeWingFilter),
+      CACHE_TTL.DASHBOARD_SUMMARY,
+      async () => {
+        const [
+          { data: invoicesRaw },
+          admInvoicesResult,
+          { data: advancesData },
+          { data: recentPaymentsRaw },
+        ] = await Promise.all([
+          supabase
+            .from('invoices')
+            .select('net_amount, total_paid, status, students:student_id(grade_level)'),
+          supabase
+            .from('admission_invoices')
+            .select('amount, status, admission_applications:application_id(curriculum, class_applied_for)')
+            .then((r) => r, () => ({ data: [] as any[] })),
+          supabase
+            .from('salary_advances')
+            .select('id, amount_requested, status, created_at, profiles(first_name, last_name)')
+            .eq('status', 'Approved')
+            .limit(5),
+          supabase
+            .from('payments')
+            .select('amount, payment_method, payment_date, students(grade_level, profiles(first_name, last_name))')
+            .order('payment_date', { ascending: false })
+            .limit(20),
+        ])
 
-  const invoices = (invoicesRaw || []).filter((inv: any) =>
-    matchesWingFilter(inv.students || {}, wingContext.activeWingFilter)
-  )
+        const invoices = (invoicesRaw || []).filter((inv: any) =>
+          matchesWingFilter(inv.students || {}, wingContext.activeWingFilter)
+        )
 
-  let feesBilled = 0
-  let feesCollected = 0
-  let feesOutstanding = 0
+        let billed = 0
+        let collected = 0
+        let outstanding = 0
 
-  invoices.forEach((inv: any) => {
-    const netAmount = Number(inv.net_amount || 0)
-    const paidAmount = Number(inv.total_paid || 0)
-    
-    feesBilled += netAmount
-    feesCollected += paidAmount
-    feesOutstanding += (netAmount - paidAmount)
-  })
+        invoices.forEach((inv: any) => {
+          const netAmount = Number(inv.net_amount || 0)
+          const paidAmount = Number(inv.total_paid || 0)
+          billed += netAmount
+          collected += paidAmount
+          outstanding += netAmount - paidAmount
+        })
 
-  // Include TZS 30,000 Admission Application Invoices in Revenue / Collections summary (wing-aware)
-  try {
-    const { data: admInvoices } = await supabase
-      .from('admission_invoices')
-      .select('amount, status, admission_applications:application_id(curriculum, class_applied_for)')
-    admInvoices?.forEach((inv: any) => {
-      if (!matchesWingFilter(inv.admission_applications || {}, wingContext.activeWingFilter)) return
-      const amt = Number(inv.amount || 0)
-      if (inv.status === 'paid') {
-        feesBilled += amt
-        feesCollected += amt
-      } else if (inv.status === 'unpaid') {
-        feesBilled += amt
-        feesOutstanding += amt
+        ;(admInvoicesResult?.data || []).forEach((inv: any) => {
+          if (!matchesWingFilter(inv.admission_applications || {}, wingContext.activeWingFilter)) return
+          const amt = Number(inv.amount || 0)
+          if (inv.status === 'paid') {
+            billed += amt
+            collected += amt
+          } else if (inv.status === 'unpaid') {
+            billed += amt
+            outstanding += amt
+          }
+        })
+
+        const scopedPayments = (recentPaymentsRaw || [])
+          .filter((p: any) => matchesWingFilter(p.students || {}, wingContext.activeWingFilter))
+          .slice(0, 5)
+
+        return {
+          feesBilled: billed,
+          feesCollected: collected,
+          feesOutstanding: outstanding,
+          pendingAdvances: advancesData || [],
+          recentPayments: scopedPayments,
+        }
       }
-    })
-  } catch {
-    // Graceful if admission_invoices migration not yet applied
-  }
-
-  // Pending Disbursements
-  const { data: pendingAdvances } = await supabase
-    .from('salary_advances')
-    .select('id, amount_requested, status, created_at, profiles(first_name, last_name)')
-    .eq('status', 'Approved')
-    .limit(5)
-
-  // Recent Transactions (wing-aware)
-  const { data: recentPaymentsRaw } = await supabase
-    .from('payments')
-    .select('amount, payment_method, payment_date, students(grade_level, profiles(first_name, last_name))')
-    .order('payment_date', { ascending: false })
-    .limit(20)
-
-  const recentPayments = (recentPaymentsRaw || [])
-    .filter((p: any) => matchesWingFilter(p.students || {}, wingContext.activeWingFilter))
-    .slice(0, 5)
+    )
 
   const formatCurrency = (amount: number) => {
     if (amount >= 1000000) return `TZS ${(amount / 1000000).toFixed(1)}M`

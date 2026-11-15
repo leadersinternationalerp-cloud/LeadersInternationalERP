@@ -1,21 +1,12 @@
 import { normalizeRoles } from '@/lib/auth/roles'
+import { getSessionUser } from '@/lib/auth/session'
 import { extractWingFromProfile, inferWing, isCrossWingRole } from '@/lib/wing'
-import { createClient } from '@/utils/supabase/server'
 import { CreateUserForm } from './CreateUserForm'
 import { UserTable } from './UserTable'
 import { type User } from './types'
 
 export default async function UsersPage() {
-  const supabase = await createClient()
-  
-  // Verify if current user is an admin
-  const { data: { user } } = await supabase.auth.getUser()
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, roles')
-    .eq('id', user?.id)
-    .single()
-  const userRoles = normalizeRoles(profile)
+  const { user, roles: userRoles, supabase } = await getSessionUser()
     
   const isAdmin = userRoles.includes('System Admin') || userRoles.includes('Director')
   

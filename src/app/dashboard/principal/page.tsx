@@ -1,24 +1,14 @@
-import { normalizeRoles } from '@/lib/auth/roles'
-import { createClient } from '@/utils/supabase/server'
+import { getSessionUser } from '@/lib/auth/session'
+import { buildCacheKey, CACHE_TTL, getOrSetCache } from '@/lib/cache/redisCache'
 import Link from 'next/link'
 import {
-  Users, UserCheck, FileText, FileBadge, FileSpreadsheet,
+  Users, UserCheck, FileText,
   Calendar as CalendarIcon, Briefcase, CreditCard, AlertCircle
 } from 'lucide-react'
 import { formatDate } from '@/utils/date'
 
 export default async function PrincipalDashboardPage() {
-  const supabase = await createClient()
-
-  // Verify access
-  const { data: { user } } = await supabase.auth.getUser()
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user?.id)
-    .single()
-    
-  const userRoles = normalizeRoles(profile)
+  const { user, roles: userRoles, supabase } = await getSessionUser()
 
   if (!user || (!userRoles.includes('Principal') && !userRoles.includes('System Admin'))) {
     return (
@@ -28,28 +18,49 @@ export default async function PrincipalDashboardPage() {
     )
   }
 
-  // Fetch Summary Metrics
-  const [
-    { count: totalStudents },
-    { count: totalStaff },
-    { count: pendingLessonPlans },
-    { count: pendingLeave },
-    { count: pendingAdvances }
-  ] = await Promise.all([
-    supabase.from('students').select('id', { count: 'exact', head: true }).eq('status', 'Active'),
-    supabase.from('profiles').select('id', { count: 'exact', head: true }).in('role', ['Teacher', 'Principal', 'Dean', 'Head of Section', 'Accountant', 'Director']),
-    supabase.from('lesson_plans').select('id', { count: 'exact', head: true }).eq('status', 'Submitted'),
-    supabase.from('leave_applications').select('id', { count: 'exact', head: true }).eq('status', 'Submitted'),
-    supabase.from('salary_advances').select('id', { count: 'exact', head: true }).eq('status', 'Submitted')
-  ])
+  // Fetch Summary Metrics & Calendar Events in a single parallel batch (cached 60s)
+  const {
+    totalStudents,
+    totalStaff,
+    pendingLessonPlans,
+    pendingLeave,
+    pendingAdvances,
+    upcomingEvents,
+  } = await getOrSetCache(
+    buildCacheKey('dashboard:principal_summary'),
+    CACHE_TTL.DASHBOARD_SUMMARY,
+    async () => {
+      const [
+        { count: stdCnt },
+        { count: staffCnt },
+        { count: plansCnt },
+        { count: leaveCnt },
+        { count: advCnt },
+        { data: eventsData },
+      ] = await Promise.all([
+        supabase.from('students').select('id', { count: 'exact', head: true }).eq('status', 'Active'),
+        supabase.from('profiles').select('id', { count: 'exact', head: true }).in('role', ['Teacher', 'Principal', 'Dean', 'Head of Section', 'Accountant', 'Director']),
+        supabase.from('lesson_plans').select('id', { count: 'exact', head: true }).eq('status', 'Submitted'),
+        supabase.from('leave_applications').select('id', { count: 'exact', head: true }).eq('status', 'Submitted'),
+        supabase.from('salary_advances').select('id', { count: 'exact', head: true }).eq('status', 'Submitted'),
+        supabase
+          .from('calendar_events')
+          .select('id, title, event_type, start_date')
+          .gte('start_date', new Date().toISOString())
+          .order('start_date', { ascending: true })
+          .limit(7),
+      ])
 
-  // Calendar Events
-  const { data: upcomingEvents } = await supabase
-    .from('calendar_events')
-    .select('*')
-    .gte('start_date', new Date().toISOString())
-    .order('start_date', { ascending: true })
-    .limit(7)
+      return {
+        totalStudents: stdCnt || 0,
+        totalStaff: staffCnt || 0,
+        pendingLessonPlans: plansCnt || 0,
+        pendingLeave: leaveCnt || 0,
+        pendingAdvances: advCnt || 0,
+        upcomingEvents: eventsData || [],
+      }
+    }
+  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -164,7 +175,7 @@ export default async function PrincipalDashboardPage() {
             <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2rem 0' }}>No upcoming events scheduled.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {upcomingEvents.map(event => (
+              {upcomingEvents.map((event: any) => (
                 <div key={event.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--color-border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 500, color: 'var(--color-text)' }}>{event.title}</span>

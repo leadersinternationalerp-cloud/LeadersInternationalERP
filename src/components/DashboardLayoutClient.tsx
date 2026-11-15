@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useTransition, useCallback } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -45,11 +45,26 @@ export default function DashboardLayoutClient({
   const pathname = usePathname()
   const router = useRouter()
   const [wingFilter, setWingFilter] = useWingFilter(initialWingFilter, assignedWing)
+  const [isPendingNav, startNavTransition] = useTransition()
+  const [pendingHref, setPendingHref] = useState<string | null>(null)
 
   const handleGlobalWingChange = (next: WingFilterValue) => {
     setWingFilter(next)
-    router.refresh()
+    startNavTransition(() => {
+      router.refresh()
+    })
   }
+
+  const prefetchRoute = useCallback(
+    (href: string) => {
+      try {
+        router.prefetch(href)
+      } catch {
+        // ignore prefetch errors
+      }
+    },
+    [router]
+  )
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -87,9 +102,10 @@ export default function DashboardLayoutClient({
     }))
   }
 
-  // Close mobile sidebar on route change
+  // Close mobile sidebar and clear optimistic pending link on route change
   useEffect(() => {
     setMobileOpen(false)
+    setPendingHref(null)
   }, [pathname])
 
   // Map routes to dynamic titles
@@ -108,10 +124,11 @@ export default function DashboardLayoutClient({
     return 'Dashboard Overview'
   }
 
-  // Helper for active styling
+  // Helper for active styling (supports instant optimistic active highlight on click)
+  const effectivePath = pendingHref || pathname
   const isActive = (path: string) => {
-    if (path === '/dashboard' && pathname === '/dashboard') return true
-    if (path !== '/dashboard' && pathname.startsWith(path)) return true
+    if (path === '/dashboard' && effectivePath === '/dashboard') return true
+    if (path !== '/dashboard' && effectivePath.startsWith(path)) return true
     return false
   }
 
@@ -119,16 +136,26 @@ export default function DashboardLayoutClient({
 
   const NavLink = ({ href, icon: Icon, children: label }: { href: string; icon: any; children: React.ReactNode }) => {
     const active = isActive(href)
+    const isThisLinkPending = pendingHref === href
     return (
       <Link
         href={href}
-        onClick={() => setMobileOpen(false)}
+        prefetch={true}
+        onMouseEnter={() => prefetchRoute(href)}
+        onFocus={() => prefetchRoute(href)}
+        onClick={() => {
+          setMobileOpen(false)
+          if (href !== pathname) {
+            setPendingHref(href)
+          }
+        }}
         className={`nav-link ${active ? 'active' : ''}`}
         title={collapsed ? String(label) : undefined}
         style={{
           justifyContent: collapsed ? 'center' : 'flex-start',
           padding: collapsed ? '0.7rem' : '0.7rem 0.85rem',
           position: 'relative',
+          opacity: isThisLinkPending ? 0.92 : 1,
         }}
       >
         <span className="nav-icon" style={{ flexShrink: 0 }}>{Icon && <Icon size={18} />}</span>
@@ -906,7 +933,38 @@ export default function DashboardLayoutClient({
           from { opacity: 0; transform: translateY(-50%) translateX(-4px); }
           to   { opacity: 1; transform: translateY(-50%) translateX(0); }
         }
+        @keyframes navProgressSlide {
+          0%   { transform: translateX(-100%); }
+          50%  { transform: translateX(0%); }
+          100% { transform: translateX(100%); }
+        }
       `}} />
+
+      {/* Instant Top Navigation Progress Indicator */}
+      {(pendingHref || isPendingNav) && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '3px',
+            zIndex: 9999,
+            overflow: 'hidden',
+            backgroundColor: 'rgba(59, 179, 195, 0.2)',
+          }}
+        >
+          <div
+            style={{
+              width: '55%',
+              height: '100%',
+              background: 'linear-gradient(90deg, #3bb3c3, #f7b239, #1d4ed8)',
+              animation: 'navProgressSlide 0.9s ease-in-out infinite',
+            }}
+          />
+        </div>
+      )}
 
       {/* Top Navbar */}
       <header style={{ 

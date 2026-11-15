@@ -1,5 +1,6 @@
 import { normalizeRoles } from '@/lib/auth/roles'
 import { resolveUserProfileAndWing } from '@/lib/auth/session'
+import { buildCacheKey, getOrSetCache } from '@/lib/cache/redisCache'
 import { getWingContext } from '@/lib/wingServer'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
@@ -45,20 +46,30 @@ export default async function DashboardLayout({
   // Wing Context
   const wingContext = await getWingContext(user.id, profile)
 
-  // Fetch unread notifications count and 5 most recent notifications in parallel
-  const [{ count: unreadCount }, { data: recentNotifications }] = await Promise.all([
-    supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('is_read', false),
-    supabase
-      .from('notifications')
-      .select('id, title, message, is_read, created_at')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(5),
-  ])
+  // Fetch unread notifications count and 5 most recent notifications (cached 20s per user for fast navigation)
+  const { unreadCount, recentNotifications } = await getOrSetCache(
+    buildCacheKey('notifications:header', [user.id]),
+    20,
+    async () => {
+      const [{ count }, { data }] = await Promise.all([
+        supabase
+          .from('notifications')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('is_read', false),
+        supabase
+          .from('notifications')
+          .select('id, title, message, is_read, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(5),
+      ])
+      return {
+        unreadCount: count || 0,
+        recentNotifications: data || [],
+      }
+    }
+  )
 
   return (
     <>

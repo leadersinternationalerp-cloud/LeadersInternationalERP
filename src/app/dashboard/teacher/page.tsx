@@ -1,5 +1,4 @@
-import { normalizeRoles } from '@/lib/auth/roles'
-import { createClient } from '@/utils/supabase/server'
+import { getSessionUser } from '@/lib/auth/session'
 import Link from 'next/link'
 import {
   Users, Calendar as CalendarIcon, BookOpen, PenTool,
@@ -21,16 +20,7 @@ interface ClassSubjectRow {
 }
 
 export default async function TeacherDashboard() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user?.id)
-    .single()
-    
-  const userRoles = normalizeRoles(profile)
+  const { user, roles: userRoles, supabase } = await getSessionUser()
 
   if (!user || (!userRoles.includes('Teacher') && !userRoles.includes('System Admin'))) {
     return (
@@ -41,32 +31,31 @@ export default async function TeacherDashboard() {
     )
   }
 
-  // Fetch classes assigned to this teacher
-  const { data: classSubjects } = await supabase
-    .from('class_subjects')
-    .select(`
-      id,
-      classes (id, name, section),
-      subjects (id, name)
-    `)
-    .eq('teacher_id', user.id)
+  // Fetch classes, pending lesson plans, and notifications in parallel
+  const [{ data: classSubjects }, { count: pendingPlans }, { data: notifications }] =
+    await Promise.all([
+      supabase
+        .from('class_subjects')
+        .select(`
+          id,
+          classes (id, name, section),
+          subjects (id, name)
+        `)
+        .eq('teacher_id', user.id),
+      supabase
+        .from('lesson_plans')
+        .select('id', { count: 'exact', head: true })
+        .eq('teacher_id', user.id)
+        .in('status', ['Draft', 'Returned']),
+      supabase
+        .from('notifications')
+        .select('id, message, is_read, created_at, link_url')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5),
+    ])
 
-  // Fetch pending lesson plans
-  const { count: pendingPlans } = await supabase
-    .from('lesson_plans')
-    .select('id', { count: 'exact', head: true })
-    .eq('teacher_id', user.id)
-    .in('status', ['Draft', 'Returned'])
-
-  // Fetch unread notifications
-  const { data: notifications } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(5)
-    
-  const unreadCount = notifications?.filter(n => !n.is_read).length || 0
+  const unreadCount = notifications?.filter((n: any) => !n.is_read).length || 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -198,7 +187,7 @@ export default async function TeacherDashboard() {
             <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2rem 0' }}>You&apos;re all caught up!</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {notifications.map(note => (
+              {notifications.map((note: any) => (
                 <div key={note.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--color-border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <span style={{ fontSize: '0.9rem', color: note.is_read ? 'var(--color-text-muted)' : 'var(--color-text)', fontWeight: note.is_read ? 400 : 600 }}>{note.message}</span>

@@ -1,5 +1,6 @@
 import StudentsListClient from './StudentsListClient'
 import { requireRole } from '@/lib/auth/session'
+import { getCachedClasses, getCachedTerms } from '@/lib/cache/referenceData'
 import { getWingContext } from '@/lib/wingServer'
 import { inferWing, matchesWingFilter } from '@/lib/wing'
 import { parsePageParams, sanitizeSearch } from '@/lib/pagination'
@@ -30,9 +31,11 @@ export default async function StudentsPage({
   const { page, perPage, from, to } = parsePageParams(sp)
   const q = sanitizeSearch(typeof sp?.q === 'string' ? sp.q : undefined)
 
-  // 1. Fetch terms and classes for placement & generators
-  const { data: terms } = await supabase.from('terms').select('*').order('created_at', { ascending: false })
-  const { data: classes } = await supabase.from('classes').select('*').order('class_name', { ascending: true })
+  // 1. Fetch cached terms and classes in parallel
+  const [terms, classes] = await Promise.all([
+    getCachedTerms(),
+    getCachedClasses(),
+  ])
 
   // 2. Teacher scope resolution (Receptionist and Management see all students)
   const isTeacherOnly =
@@ -88,63 +91,50 @@ export default async function StudentsPage({
   const studentIds = studentsList.map((s: any) => s.id).filter(Boolean)
   const admissionIds = studentsList.map((s: any) => s.admission_id).filter(Boolean)
 
-  // 4. Fetch linked admission applications & parent links for rich bio-data
+  // 4. Fetch linked admission applications & parent links in parallel
   const admissionMap = new Map<string, any>()
-  if (studentIds.length > 0 || admissionIds.length > 0) {
-    try {
-      const { data: appsData } = await serviceSupabase
-        .from('admission_applications')
-        .select('*')
-        .or(
-          [
-            studentIds.length > 0 ? `enrolled_student_id.in.(${studentIds.join(',')})` : '',
-            admissionIds.length > 0 ? `id.in.(${admissionIds.join(',')})` : '',
-          ]
-            .filter(Boolean)
-            .join(',')
-        )
-      ;(appsData || []).forEach((app: any) => {
-        if (app.id) admissionMap.set(app.id, app)
-        if (app.enrolled_student_id) admissionMap.set(app.enrolled_student_id, app)
-      })
-    } catch {
-      // non-fatal
-    }
-  }
-
   const parentMap = new Map<string, any>()
-  if (studentIds.length > 0) {
-    try {
-      const { data: spData } = await serviceSupabase
-        .from('student_parents')
-        .select('student_id, relationship, parent_id')
-        .in('student_id', studentIds)
 
-      const parentIds = Array.from(new Set((spData || []).map((sp: any) => sp.parent_id).filter(Boolean)))
-      const parentProfileMap = new Map<string, any>()
-      if (parentIds.length > 0) {
-        const { data: parentProfs } = await serviceSupabase
-          .from('profiles')
-          .select('id, first_name, last_name, email, phone')
-          .in('id', parentIds)
-        ;(parentProfs || []).forEach((p: any) => parentProfileMap.set(p.id, p))
-      }
+  const [appsResult, spResult] = await Promise.all([
+    studentIds.length > 0 || admissionIds.length > 0
+      ? serviceSupabase
+          .from('admission_applications')
+          .select('*')
+          .or(
+            [
+              studentIds.length > 0 ? `enrolled_student_id.in.(${studentIds.join(',')})` : '',
+              admissionIds.length > 0 ? `id.in.(${admissionIds.join(',')})` : '',
+            ]
+              .filter(Boolean)
+              .join(',')
+          )
+          .then((r) => r, () => ({ data: [] as any[] }))
+      : Promise.resolve({ data: [] as any[] }),
+    studentIds.length > 0
+      ? serviceSupabase
+          .from('student_parents')
+          .select('student_id, relationship, parent_id, profiles:parent_id(id, first_name, last_name, email, phone)')
+          .in('student_id', studentIds)
+          .then((r) => r, () => ({ data: [] as any[] }))
+      : Promise.resolve({ data: [] as any[] }),
+  ])
 
-      ;(spData || []).forEach((sp: any) => {
-        const pProf = parentProfileMap.get(sp.parent_id)
-        if (pProf && !parentMap.has(sp.student_id)) {
-          parentMap.set(sp.student_id, {
-            name: `${pProf.first_name || ''} ${pProf.last_name || ''}`.trim(),
-            relationship: sp.relationship || 'Parent',
-            email: pProf.email,
-            phone: pProf.phone,
-          })
-        }
+  ;(appsResult?.data || []).forEach((app: any) => {
+    if (app.id) admissionMap.set(app.id, app)
+    if (app.enrolled_student_id) admissionMap.set(app.enrolled_student_id, app)
+  })
+
+  ;(spResult?.data || []).forEach((sp: any) => {
+    const pProf = Array.isArray(sp.profiles) ? sp.profiles[0] : sp.profiles
+    if (pProf && !parentMap.has(sp.student_id)) {
+      parentMap.set(sp.student_id, {
+        name: `${pProf.first_name || ''} ${pProf.last_name || ''}`.trim(),
+        relationship: sp.relationship || 'Parent',
+        email: pProf.email,
+        phone: pProf.phone,
       })
-    } catch {
-      // non-fatal
     }
-  }
+  })
 
   const allMappedStudents = studentsList.map((s: any) => {
     const profs = s.profiles

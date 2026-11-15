@@ -1,5 +1,5 @@
-import { normalizeRoles } from '@/lib/auth/roles'
-import { createClient } from '@/utils/supabase/server'
+import { getSessionUser } from '@/lib/auth/session'
+import { buildCacheKey, CACHE_TTL, getOrSetCache } from '@/lib/cache/redisCache'
 import Link from 'next/link'
 import { getWingContext } from '@/lib/wingServer'
 import { matchesWingFilter } from '@/lib/wing'
@@ -10,17 +10,7 @@ import {
 import { formatDate } from '@/utils/date'
 
 export default async function DirectorDashboardPage() {
-  const supabase = await createClient()
-
-  // Verify access
-  const { data: { user } } = await supabase.auth.getUser()
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user?.id)
-    .single()
-    
-  const userRoles = normalizeRoles(profile)
+  const { user, profile, roles: userRoles, supabase } = await getSessionUser()
 
   if (!user || (!userRoles.includes('Director') && !userRoles.includes('System Admin'))) {
     return (
@@ -36,54 +26,87 @@ export default async function DirectorDashboardPage() {
       ? 'All Wings (Cambridge & NECTA)'
       : `${wingContext.activeWingFilter} Wing`
 
-  // Fetch Summary Metrics (wing-aware)
-  const [{ data: activeStudents }, { count: totalStaff }] = await Promise.all([
-    supabase.from('students').select('id, grade_level').eq('status', 'Active'),
-    supabase.from('profiles').select('id', { count: 'exact', head: true }).in('role', ['Teacher', 'Principal', 'Dean', 'Head of Section', 'Accountant', 'Director'])
-  ])
+  // Fetch all Summary Metrics, Pending Items, Recent Logs, and Upcoming Events in a single parallel batch
+  const {
+    totalStudents,
+    totalStaff,
+    feesCollected,
+    feesOutstanding,
+    pendingLeave,
+    pendingAdvances,
+    recentLogs,
+    upcomingEvents,
+  } = await getOrSetCache(
+    buildCacheKey('dashboard:director_summary', [], wingContext.activeWingFilter),
+    CACHE_TTL.DASHBOARD_SUMMARY,
+    async () => {
+      const [
+        { data: activeStudents },
+        { count: staffCnt },
+        { data: invoicesRaw },
+        { count: leaveCnt },
+        { count: advancesCnt },
+        { data: logsData },
+        { data: eventsData },
+      ] = await Promise.all([
+        supabase.from('students').select('id, grade_level').eq('status', 'Active'),
+        supabase
+          .from('profiles')
+          .select('id', { count: 'exact', head: true })
+          .in('role', ['Teacher', 'Principal', 'Dean', 'Head of Section', 'Accountant', 'Director']),
+        supabase
+          .from('invoices')
+          .select('net_amount, total_paid, status, students:student_id(grade_level)'),
+        supabase
+          .from('leave_applications')
+          .select('id', { count: 'exact', head: true })
+          .in('status', ['Submitted', 'Reviewed_Principal']),
+        supabase
+          .from('salary_advances')
+          .select('id', { count: 'exact', head: true })
+          .in('status', ['Submitted', 'Reviewed_Principal']),
+        supabase
+          .from('audit_logs')
+          .select('action, entity, created_at, profiles(first_name, last_name)')
+          .order('created_at', { ascending: false })
+          .limit(5),
+        supabase
+          .from('calendar_events')
+          .select('id, title, event_type, start_date')
+          .gte('start_date', new Date().toISOString())
+          .order('start_date', { ascending: true })
+          .limit(5),
+      ])
 
-  const totalStudents = (activeStudents || []).filter((s: any) =>
-    matchesWingFilter(s, wingContext.activeWingFilter)
-  ).length
+      const stdCnt = (activeStudents || []).filter((s: any) =>
+        matchesWingFilter(s, wingContext.activeWingFilter)
+      ).length
 
-  // Simplified Fee logic for display (wing-aware)
-  const { data: invoicesRaw } = await supabase
-    .from('invoices')
-    .select('net_amount, total_paid, status, students:student_id(grade_level)')
+      const invoices = (invoicesRaw || []).filter((inv: any) =>
+        matchesWingFilter(inv.students || {}, wingContext.activeWingFilter)
+      )
 
-  const invoices = (invoicesRaw || []).filter((inv: any) =>
-    matchesWingFilter(inv.students || {}, wingContext.activeWingFilter)
+      let collected = 0
+      let outstanding = 0
+      invoices.forEach((inv: any) => {
+        const netAmount = Number(inv.net_amount || 0)
+        const paidAmount = Number(inv.total_paid || 0)
+        collected += paidAmount
+        outstanding += netAmount - paidAmount
+      })
+
+      return {
+        totalStudents: stdCnt,
+        totalStaff: staffCnt || 0,
+        feesCollected: collected,
+        feesOutstanding: outstanding,
+        pendingLeave: leaveCnt || 0,
+        pendingAdvances: advancesCnt || 0,
+        recentLogs: logsData || [],
+        upcomingEvents: eventsData || [],
+      }
+    }
   )
-
-  let feesCollected = 0
-  let feesOutstanding = 0
-  invoices.forEach((inv: any) => {
-    const netAmount = Number(inv.net_amount || 0)
-    const paidAmount = Number(inv.total_paid || 0)
-    feesCollected += paidAmount
-    feesOutstanding += (netAmount - paidAmount)
-  })
-
-  // Pending Items
-  const [{ count: pendingLeave }, { count: pendingAdvances }] = await Promise.all([
-    supabase.from('leave_applications').select('id', { count: 'exact', head: true }).in('status', ['Submitted', 'Reviewed_Principal']),
-    supabase.from('salary_advances').select('id', { count: 'exact', head: true }).in('status', ['Submitted', 'Reviewed_Principal'])
-  ])
-
-  // Recent Activity Feed
-  const { data: recentLogs } = await supabase
-    .from('audit_logs')
-    .select('action, entity, created_at, profiles(first_name, last_name)')
-    .order('created_at', { ascending: false })
-    .limit(5)
-
-  // Upcoming Events
-  const { data: upcomingEvents } = await supabase
-    .from('calendar_events')
-    .select('*')
-    .gte('start_date', new Date().toISOString())
-    .order('start_date', { ascending: true })
-    .limit(5)
 
   const formatCurrency = (amount: number) => {
     if (amount >= 1000000) return `TZS ${(amount / 1000000).toFixed(1)}M`

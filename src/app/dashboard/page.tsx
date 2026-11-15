@@ -1,5 +1,5 @@
-import { normalizeRoles } from '@/lib/auth/roles'
-import { createClient } from '@/utils/supabase/server'
+import { getSessionUser } from '@/lib/auth/session'
+import { buildCacheKey, CACHE_TTL, getOrSetCache } from '@/lib/cache/redisCache'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getWingContext } from '@/lib/wingServer'
@@ -11,15 +11,7 @@ import {
 } from 'lucide-react'
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user?.id)
-    .single()
-  const userRoles = normalizeRoles(profile)
+  const { user, profile, roles: userRoles, supabase } = await getSessionUser()
 
   // Role-based redirections for pure student/parent users
   if (userRoles.includes('Student') && userRoles.length === 1) {
@@ -38,44 +30,50 @@ export default async function DashboardPage() {
       ? 'All Wings (Cambridge & NECTA)'
       : `${wingContext.activeWingFilter} Wing`
 
-  // 1. Fetch KPI totals for Director/Principal/Accountant (wing-aware)
-  const { data: allStudents } = await supabase
-    .from('students')
-    .select('id, grade_level')
+  // 1. Fetch KPI totals in parallel and cache for 60s per wing filter
+  const { studentCount, staffCount, pendingLeaves, pendingAdvances, totalCollected, totalOutstanding } =
+    await getOrSetCache(
+      buildCacheKey('dashboard:overview_kpis', [], wingContext.activeWingFilter),
+      CACHE_TTL.DASHBOARD_SUMMARY,
+      async () => {
+        const [
+          { data: allStudents },
+          { count: staffCnt },
+          { count: leavesCnt },
+          { count: advancesCnt },
+          { data: invoicesRaw },
+        ] = await Promise.all([
+          supabase.from('students').select('id, grade_level'),
+          supabase.from('staff').select('id', { count: 'exact', head: true }),
+          supabase.from('leave_applications').select('id', { count: 'exact', head: true }).eq('status', 'Pending'),
+          supabase.from('salary_advances').select('id', { count: 'exact', head: true }).eq('status', 'Pending'),
+          supabase.from('invoices').select('net_amount, paid_amount, total_paid, students:student_id(grade_level)'),
+        ])
 
-  const studentCount = (allStudents || []).filter((s: any) =>
-    matchesWingFilter(s, wingContext.activeWingFilter)
-  ).length
+        const stdCnt = (allStudents || []).filter((s: any) =>
+          matchesWingFilter(s, wingContext.activeWingFilter)
+        ).length
 
-  const { count: staffCount } = await supabase
-    .from('staff')
-    .select('*', { count: 'exact', head: true })
+        const invoices = (invoicesRaw || []).filter((inv: any) =>
+          matchesWingFilter(inv.students || {}, wingContext.activeWingFilter)
+        )
 
-  const { count: pendingLeaves } = await supabase
-    .from('leave_applications')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'Pending')
+        const invoiced = invoices.reduce((acc, curr: any) => acc + Number(curr.net_amount || 0), 0)
+        const collected = invoices.reduce(
+          (acc, curr: any) => acc + Number(curr.total_paid ?? curr.paid_amount ?? 0),
+          0
+        )
 
-  const { count: pendingAdvances } = await supabase
-    .from('salary_advances')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'Pending')
-
-  // Fetch financial summary (wing-aware)
-  const { data: invoicesRaw } = await supabase
-    .from('invoices')
-    .select('net_amount, paid_amount, total_paid, students:student_id(grade_level)')
-
-  const invoices = (invoicesRaw || []).filter((inv: any) =>
-    matchesWingFilter(inv.students || {}, wingContext.activeWingFilter)
-  )
-
-  const totalInvoiced = invoices.reduce((acc, curr: any) => acc + Number(curr.net_amount || 0), 0)
-  const totalCollected = invoices.reduce(
-    (acc, curr: any) => acc + Number(curr.total_paid ?? curr.paid_amount ?? 0),
-    0
-  )
-  const totalOutstanding = totalInvoiced - totalCollected
+        return {
+          studentCount: stdCnt,
+          staffCount: staffCnt || 0,
+          pendingLeaves: leavesCnt || 0,
+          pendingAdvances: advancesCnt || 0,
+          totalCollected: collected,
+          totalOutstanding: invoiced - collected,
+        }
+      }
+    )
 
   const formatTZS = (val: number) => {
     return new Intl.NumberFormat('en-TZ', {
