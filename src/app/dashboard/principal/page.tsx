@@ -3,6 +3,7 @@ import { normalizeRoles } from '@/lib/auth/roles'
 import { buildCacheKey, CACHE_TTL, getOrSetCache } from '@/lib/cache/redisCache'
 import { getWingContext } from '@/lib/wingServer'
 import { inferWing, matchesWingFilter } from '@/lib/wing'
+import { createServiceClient } from '@/utils/supabase/service'
 import Link from 'next/link'
 import {
   Users,
@@ -49,9 +50,10 @@ export default async function PrincipalDashboardPage() {
 
   // Fetch all Principal Dashboard metrics in a single parallel batch (cached 60s per wing filter)
   const data = await getOrSetCache(
-    buildCacheKey('dashboard:principal_summary_v2', [], wingContext.activeWingFilter),
+    buildCacheKey('dashboard:principal_summary_v3', [], wingContext.activeWingFilter),
     CACHE_TTL.DASHBOARD_SUMMARY,
     async () => {
+      const serviceSupabase = createServiceClient()
       const now = new Date()
       const todayStr = now.toISOString().split('T')[0]
       const startOfToday = new Date(now)
@@ -103,9 +105,10 @@ export default async function PrincipalDashboardPage() {
           .from('payments')
           .select('id, amount, payment_method, students:student_id(grade_level, section)')
           .gte('payment_date', startOfToday.toISOString()),
-        supabase
+        serviceSupabase
           .from('admission_applications')
-          .select('id, status, grade_applied, wing, created_at')
+          .select('id, application_no, first_name, last_name, status, class_applied_for, curriculum, parent_name, parent_phone, parent_email, created_at')
+          .order('created_at', { ascending: false })
           .limit(500),
         supabase
           .from('leave_applications')
@@ -157,21 +160,33 @@ export default async function PrincipalDashboardPage() {
         .slice(0, 8)
 
       // Admissions pipeline
-      const scopedAdmissions = (admissionsRaw || []).filter((a: any) =>
-        matchesWingFilter(
-          { wing: a.wing, grade_level: a.grade_applied },
-          wingContext.activeWingFilter
-        )
-      )
+      const purgedNos = new Set(['LIS-2026-960M', 'LIS-2026-YOSZ', 'IS-2026-960M'])
+      const purgedEmails = new Set(['wawerusamymwangi@gmail.com'])
+      const scopedAdmissions = (admissionsRaw || []).filter((a: any) => {
+        if (purgedNos.has(a.application_no)) return false
+        if (a.parent_email && purgedEmails.has(String(a.parent_email).toLowerCase())) return false
+        return matchesWingFilter(a, wingContext.activeWingFilter)
+      })
       const totalApplications = scopedAdmissions.length
       const pendingApplications = scopedAdmissions.filter((a: any) =>
-        ['Submitted', 'Pending', 'Under Review', 'Pending Payment'].includes(
-          String(a.status || 'Pending')
+        ['submitted', 'under_review', 'interview_scheduled'].includes(
+          String(a.status || 'submitted').toLowerCase()
         )
       ).length
       const approvedApplications = scopedAdmissions.filter((a: any) =>
-        ['Approved', 'Enrolled', 'Admitted'].includes(String(a.status || ''))
+        ['accepted', 'enrolled'].includes(String(a.status || '').toLowerCase())
       ).length
+      const recentApplications = scopedAdmissions.slice(0, 6).map((a: any) => ({
+        id: a.id,
+        applicationNo: a.application_no || '—',
+        studentName: `${a.first_name || ''} ${a.last_name || ''}`.trim() || 'Applicant',
+        classAppliedFor: a.class_applied_for || '—',
+        curriculum: a.curriculum || inferWing(a),
+        parentName: a.parent_name || '—',
+        parentPhone: a.parent_phone || '',
+        status: String(a.status || 'submitted').toLowerCase(),
+        createdAt: a.created_at,
+      }))
 
       // 2. STAFF & TEACHER COMPLIANCE
       const allProfiles = profilesRaw || []
@@ -299,6 +314,7 @@ export default async function PrincipalDashboardPage() {
         totalApplications,
         pendingApplications,
         approvedApplications,
+        recentApplications,
         // Staff & Compliance
         totalStaff: staffMembers.length,
         totalTeachers: teachers.length,
@@ -485,7 +501,11 @@ export default async function PrincipalDashboardPage() {
         </div>
 
         {/* 5. Admissions Pipeline */}
-        <div className="glass-panel" style={{ padding: '1.35rem', borderRadius: 'var(--radius-lg)' }}>
+        <Link
+          href="/dashboard/principal/admissions"
+          className="glass-panel"
+          style={{ padding: '1.35rem', borderRadius: 'var(--radius-lg)', textDecoration: 'none', color: 'inherit', display: 'block' }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>
               Admissions Pipeline
@@ -501,7 +521,10 @@ export default async function PrincipalDashboardPage() {
             <strong style={{ color: 'var(--color-warning)' }}>{data.pendingApplications} pending</strong> •{' '}
             <strong style={{ color: 'var(--color-success)' }}>{data.approvedApplications} admitted</strong>
           </div>
-        </div>
+          <div style={{ fontSize: '0.74rem', color: 'var(--color-primary)', fontWeight: 600, marginTop: '0.45rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            View {data.totalApplications} applications <ArrowRight size={12} />
+          </div>
+        </Link>
       </div>
 
       {/* Main Two-Column Grid: Teacher Compliance & Student Population Growth */}
@@ -778,6 +801,98 @@ export default async function PrincipalDashboardPage() {
             </Link>
           </div>
         </div>
+      </div>
+
+      {/* Admissions Pipeline & Recent Applications */}
+      <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <GraduationCap size={20} color="var(--color-secondary)" />
+            <h2 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--color-primary)', fontWeight: 700 }}>
+              Admissions Pipeline Applications ({data.totalApplications})
+            </h2>
+          </div>
+          <Link
+            href="/dashboard/principal/admissions"
+            style={{ fontSize: '0.82rem', color: 'var(--color-primary)', textDecoration: 'none', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+          >
+            Manage All Applications <ArrowRight size={14} />
+          </Link>
+        </div>
+
+        {data.recentApplications.length === 0 ? (
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '0.88rem', textAlign: 'center', padding: '1.25rem 0', margin: 0 }}>
+            No admission applications found for {activeWingLabel}.
+          </p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--color-border)', textAlign: 'left', color: 'var(--color-text-muted)', fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                  <th style={{ padding: '0.6rem 0.75rem' }}>App No.</th>
+                  <th style={{ padding: '0.6rem 0.75rem' }}>Applicant</th>
+                  <th style={{ padding: '0.6rem 0.75rem' }}>Class &amp; Wing</th>
+                  <th style={{ padding: '0.6rem 0.75rem' }}>Parent / Guardian</th>
+                  <th style={{ padding: '0.6rem 0.75rem' }}>Applied</th>
+                  <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.recentApplications.map((app: any) => {
+                  const statusMap: Record<string, { bg: string; color: string; label: string }> = {
+                    submitted: { bg: 'rgba(245, 158, 11, 0.15)', color: '#d97706', label: 'Submitted' },
+                    under_review: { bg: 'rgba(59, 179, 195, 0.15)', color: '#0284c7', label: 'Under Review' },
+                    interview_scheduled: { bg: 'rgba(139, 92, 246, 0.15)', color: '#7c3aed', label: 'Interview' },
+                    accepted: { bg: 'rgba(16, 185, 129, 0.15)', color: '#059669', label: 'Accepted' },
+                    enrolled: { bg: 'rgba(16, 185, 129, 0.2)', color: '#047857', label: 'Enrolled' },
+                    rejected: { bg: 'rgba(239, 68, 68, 0.12)', color: '#dc2626', label: 'Rejected' },
+                    cancelled: { bg: 'rgba(148, 163, 184, 0.18)', color: '#64748b', label: 'Cancelled' },
+                  }
+                  const st = statusMap[app.status] || {
+                    bg: 'rgba(148, 163, 184, 0.18)',
+                    color: '#64748b',
+                    label: app.status,
+                  }
+
+                  return (
+                    <tr key={app.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '0.65rem 0.75rem', fontWeight: 700, color: 'var(--color-primary)', whiteSpace: 'nowrap' }}>
+                        {app.applicationNo}
+                      </td>
+                      <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600, color: 'var(--color-text)' }}>
+                        {app.studentName}
+                      </td>
+                      <td style={{ padding: '0.65rem 0.75rem', color: 'var(--color-text-muted)' }}>
+                        {app.classAppliedFor} • <span style={{ fontWeight: 600 }}>{app.curriculum}</span>
+                      </td>
+                      <td style={{ padding: '0.65rem 0.75rem', color: 'var(--color-text-muted)' }}>
+                        {app.parentName}{app.parentPhone ? ` (${app.parentPhone})` : ''}
+                      </td>
+                      <td style={{ padding: '0.65rem 0.75rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                        {app.createdAt ? formatDate(app.createdAt) : '—'}
+                      </td>
+                      <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right' }}>
+                        <span
+                          style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '999px',
+                            backgroundColor: st.bg,
+                            color: st.color,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {st.label}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Bottom Two-Column Grid: Fee Collection & School Events / Approvals */}
