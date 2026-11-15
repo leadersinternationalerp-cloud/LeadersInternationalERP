@@ -1,6 +1,7 @@
 import type { Role } from './roles'
 
 export const ROUTE_ACL: Record<string, readonly Role[]> = {
+  '/dashboard/admin/timetable': ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section'],
   '/dashboard/admin': ['System Admin'],
   '/dashboard/director': ['System Admin', 'Director'],
   '/dashboard/principal/admissions': ['System Admin', 'Director', 'Principal', 'Dean', 'Head of Section', 'Sales', 'Receptionist'],

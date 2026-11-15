@@ -326,6 +326,7 @@ export default function DashboardLayoutClient({
               )}
 
               {(userRoles.includes('System Admin') || 
+                userRoles.includes('Director') || 
                 userRoles.includes('Principal') || 
                 userRoles.includes('Dean') || 
                 userRoles.includes('Head of Section')) && (
