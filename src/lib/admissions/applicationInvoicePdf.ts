@@ -29,7 +29,7 @@ function pdfEscape(text: string): string {
     .replace(/\)/g, '\\)')
 }
 
-async function loadLogoJpeg(logoUrl = '/crest.svg'): Promise<{ bytes: Uint8Array; width: number; height: number } | null> {
+async function loadLogoJpeg(logoUrl = '/logo.png'): Promise<{ bytes: Uint8Array; width: number; height: number } | null> {
   if (typeof window === 'undefined' || typeof document === 'undefined') return null
 
   const tryLoad = (src: string) =>
@@ -38,7 +38,7 @@ async function loadLogoJpeg(logoUrl = '/crest.svg'): Promise<{ bytes: Uint8Array
       img.crossOrigin = 'anonymous'
       img.onload = () => {
         try {
-          const size = 160
+          const size = 320
           const canvas = document.createElement('canvas')
           canvas.width = size
           canvas.height = size
@@ -75,7 +75,7 @@ async function loadLogoJpeg(logoUrl = '/crest.svg'): Promise<{ bytes: Uint8Array
       img.src = src
     })
 
-  return (await tryLoad(logoUrl)) || (await tryLoad('/logo.png'))
+  return (await tryLoad(logoUrl)) || (await tryLoad('/crest.svg'))
 }
 
 function concatUint8Arrays(chunks: Uint8Array[]): Uint8Array {
@@ -93,7 +93,7 @@ export async function buildApplicationInvoicePdf(data: ApplicationInvoicePdfData
   // A5 Portrait: 420 x 595 pt (148 x 210 mm)
   const W = 420
   const H = 595
-  const logo = await loadLogoJpeg('/crest.svg')
+  const logo = await loadLogoJpeg('/logo.png')
 
   const cmds: string[] = []
   const rect = (x: number, y: number, w: number, h: number, fillRgb: string) => {
