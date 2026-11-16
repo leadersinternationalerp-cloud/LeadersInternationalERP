@@ -11,14 +11,22 @@ UPDATE public.admission_invoices
 SET
   amount = 30000,
   updated_at = now()
-  WHERE amount != 30000;
+WHERE amount != 30000;
 
--- 3. Sync journal entry line items linked to admission fees
-UPDATE public.journal_lines jl
-SET
-  debit = CASE WHEN debit > 0 THEN 30000 ELSE 0 END,
-  credit = CASE WHEN credit > 0 THEN 30000 ELSE 0 END
-FROM public.journal_entries je
-WHERE jl.journal_entry_id = je.id
-  AND je.entry_type = 'ADMISSION_FEE'
-  AND (jl.debit = 20000 OR jl.credit = 20000);
+-- 3. Sync journal entry line items linked to admission fees in journal_entry_lines
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_schema = 'public' AND table_name = 'journal_entry_lines'
+  ) THEN
+    UPDATE public.journal_entry_lines jel
+    SET
+      debit_amount = CASE WHEN debit_amount > 0 THEN 30000 ELSE 0 END,
+      credit_amount = CASE WHEN credit_amount > 0 THEN 30000 ELSE 0 END
+    FROM public.journal_entries je
+    WHERE jel.journal_id = je.id
+      AND je.entry_type = 'ADMISSION_FEE'
+      AND (jel.debit_amount = 20000 OR jel.credit_amount = 20000);
+  END IF;
+END $$;
