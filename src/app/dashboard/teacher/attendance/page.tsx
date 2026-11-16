@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import AttendanceForm from './AttendanceForm'
+import { getHolidayForDate } from '@/lib/attendance/tanzaniaHolidays'
 
 export default async function TeacherAttendancePage({
   searchParams
@@ -20,7 +21,11 @@ export default async function TeacherAttendancePage({
     .single()
   const userRoles = normalizeRoles(profile)
 
-  if (!userRoles.includes('Teacher') && !userRoles.includes('System Admin')) {
+  const canBackfill = userRoles.some(r =>
+    ['System Admin', 'Director', 'Principal', 'Dean', 'HOS', 'Head of Section'].includes(r)
+  )
+
+  if (!userRoles.includes('Teacher') && !canBackfill) {
     return (
       <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
         <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>
@@ -35,8 +40,14 @@ export default async function TeacherAttendancePage({
     .order('name', { ascending: true })
 
   const params = await searchParams
+  const todayStr = new Date().toISOString().split('T')[0]
   const selectedClassId = params.class_id || (classes && classes.length > 0 ? classes[0].id : '')
-  const selectedDate = params.date || new Date().toISOString().split('T')[0]
+  const selectedDate = params.date || todayStr
+  const isFutureDate = selectedDate > todayStr
+  const canEditDate = !isFutureDate && (selectedDate === todayStr || canBackfill)
+  const holidayItem = getHolidayForDate(selectedDate)
+  const dayOfWeek = new Date(selectedDate + 'T00:00:00').getDay()
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
 
   // Fetch students in selected class using multi-strategy fallback
   let classStudents: any[] = []
@@ -194,38 +205,67 @@ export default async function TeacherAttendancePage({
   }
 
   // Server Action to submit attendance
-  async function handleSaveAttendance(formData: FormData) {
+  async function handleSaveAttendance(formData: FormData): Promise<{ error?: string } | void> {
     'use server'
     const supabase = await createClient()
     const classId = formData.get('classId') as string
     const date = formData.get('date') as string
     const lock = formData.get('lock') === 'true'
 
-    if (!classId || !date) return
+    if (!classId || !date) return { error: 'Missing class or date.' }
 
-    const { data: { user } } = await supabase.auth.getUser()
+    const currentToday = new Date().toISOString().split('T')[0]
+    if (date > currentToday) {
+      return { error: 'Attendance cannot be marked for future dates.' }
+    }
 
-    // Parse statuses from form data
+    const { data: { user: actionUser } } = await supabase.auth.getUser()
+    if (!actionUser) return { error: 'Unauthorized' }
+
+    const { data: actionProfile } = await supabase
+      .from('profiles')
+      .select('role, roles')
+      .eq('id', actionUser.id)
+      .single()
+    const actionRoles = normalizeRoles(actionProfile)
+    const actionCanBackfill = actionRoles.some(r =>
+      ['System Admin', 'Director', 'Principal', 'Dean', 'HOS', 'Head of Section'].includes(r)
+    )
+
+    if (date < currentToday && !actionCanBackfill) {
+      return { error: 'Teachers can only mark today’s attendance. Contact leadership to backfill past dates.' }
+    }
+
+    // Parse statuses and reasons from form data
     const updates: any[] = []
     const absents: string[] = []
 
     formData.forEach((value, key) => {
       if (key.startsWith('status_')) {
         const studentId = key.replace('status_', '')
+        const status = String(value)
+        const reason = String(formData.get(`reason_${studentId}`) || '').trim()
+
         updates.push({
           student_id: studentId,
           class_id: classId,
           date,
-          status: value as string,
-          recorded_by: user?.id,
-          is_locked: lock
+          status,
+          reason,
+          recorded_by: actionUser.id,
+          is_locked: lock,
         })
 
-        if (value === 'Absent' || value === 'Late') {
+        if (status === 'Absent' || status === 'Late') {
           absents.push(studentId)
         }
       }
     })
+
+    const missingReason = updates.find(u => u.status === 'Absent' && !u.reason)
+    if (missingReason) {
+      return { error: 'An absence reason is required for every student marked Absent.' }
+    }
 
     // Upsert attendance logs
     for (const update of updates) {
@@ -235,6 +275,7 @@ export default async function TeacherAttendancePage({
 
       if (error) {
         console.error('Error saving attendance:', error.message)
+        return { error: `Failed to save attendance: ${error.message}` }
       }
     }
 
@@ -297,7 +338,7 @@ export default async function TeacherAttendancePage({
 
           <div className="form-group" style={{ minWidth: '200px' }}>
             <label className="form-label">Date</label>
-            <input type="date" name="date" defaultValue={selectedDate} className="input-field" required />
+            <input type="date" name="date" defaultValue={selectedDate} max={todayStr} className="input-field" required />
           </div>
 
           <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem 2rem' }}>
@@ -309,9 +350,14 @@ export default async function TeacherAttendancePage({
       {/* Students Marking Form */}
       {classStudents.length > 0 ? (
         <AttendanceForm
+          key={`${selectedClassId}_${selectedDate}`}
           students={classStudents}
           existingLogs={existingLogs}
           isLocked={isLocked}
+          canEditDate={canEditDate}
+          isFutureDate={isFutureDate}
+          holidayName={holidayItem?.name || null}
+          isWeekend={isWeekend}
           classId={selectedClassId}
           date={selectedDate}
           saveAction={handleSaveAttendance}

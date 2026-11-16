@@ -109,19 +109,21 @@ export const POST = route(
       const serviceClient = createServiceClient()
       const { data: termData } = await supabase
         .from('terms')
-        .select('id')
+        .select('id, name')
         .eq('is_current', true)
         .maybeSingle()
 
       let termId = termData?.id
+      let termName = termData?.name
       if (!termId) {
         const { data: fallbackTerm } = await supabase
           .from('terms')
-          .select('id')
+          .select('id, name')
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle()
         termId = fallbackTerm?.id
+        termName = fallbackTerm?.name
       }
 
       const { data: subj } = await supabase
@@ -131,16 +133,22 @@ export const POST = route(
         .maybeSingle()
 
       if (termId && subj?.id) {
+        const persistedAssessmentType =
+          activity.activity_type === 'quiz' ? 'QUIZZES' : 'CA'
+
         await serviceClient.from('marks').upsert(
           {
             student_id: user.id,
             class_id: activity.class_id,
             subject_id: subj.id,
             term_id: termId,
+            term: termName || undefined,
             class_activity_id: activity.id,
+            raw_score: evaluation.score,
+            out_of: evaluation.maxScore,
             score: evaluation.percentage,
-            assessment_type: 'HOME WORKS (H/W)',
-            remarks: `Quiz: ${activity.title} (Auto-marked)`,
+            assessment_type: persistedAssessmentType,
+            remarks: `${activity.activity_type === 'quiz' ? 'Online Quiz' : 'Activity'}: ${activity.title} (Auto-marked)`,
             graded_by: activity.created_by,
             is_released: false,
           },

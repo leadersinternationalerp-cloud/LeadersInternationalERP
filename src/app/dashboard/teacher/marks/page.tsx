@@ -9,6 +9,7 @@ import { getWingContext } from '@/lib/wingServer'
 import { matchesWingFilter } from '@/lib/wing'
 import MarksForm from './MarksForm'
 import MarksFilters, { AssessmentTypeOption, TermOptionItem } from './MarksFilters'
+import AssessmentPaperBanner from './AssessmentPaperBanner'
 import { parseGradingLevels } from '@/utils/grading'
 import { saveMarksAction } from './actions'
 
@@ -297,7 +298,14 @@ export default async function TeacherMarksPage({
         <h1 style={{ fontSize: '1.75rem', color: 'var(--color-primary)', margin: 0 }}>
           Enter Class Marks &amp; Grading
         </h1>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <Link
+            href="/dashboard/teacher/ca-tests"
+            className="btn btn-primary"
+            style={{ textDecoration: 'none', fontSize: '0.85rem' }}
+          >
+            📝 Create &amp; Grade C.A. Tests
+          </Link>
           {isGlobalStaff && (
             <>
               <Link
@@ -340,8 +348,17 @@ export default async function TeacherMarksPage({
       />
 
       {classStudents.length > 0 ? (
-        <MarksForm
-          key={`${selectedClassId}_${selectedSubjectId}_${selectedAssessmentType}_${selectedTerm}`}
+        <>
+          {selectedClassId && selectedSubjectId && selectedAssessmentType && selectedTerm && (
+            <AssessmentPaperBanner
+              classId={selectedClassId}
+              subjectId={selectedSubjectId}
+              assessmentType={selectedAssessmentType}
+              term={selectedTerm}
+            />
+          )}
+          <MarksForm
+            key={`${selectedClassId}_${selectedSubjectId}_${selectedAssessmentType}_${selectedTerm}`}
           students={classStudents}
           existingMarks={existingMarks}
           isLocked={existingMarks.some((m) => m.is_locked === true)}
@@ -354,6 +371,7 @@ export default async function TeacherMarksPage({
           gradingLevels={gradingLevels}
           saveAction={saveMarksAction}
         />
+        </>
       ) : (
         <div
           className="glass-panel"

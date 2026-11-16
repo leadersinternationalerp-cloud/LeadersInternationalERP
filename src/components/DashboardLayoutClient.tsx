@@ -627,6 +627,9 @@ export default function DashboardLayoutClient({
                   <NavLink href="/dashboard/teacher/attendance" icon={ClipboardCheck}>
                     Daily Attendance
                   </NavLink>
+                  <NavLink href="/dashboard/teacher/ca-tests" icon={FileSpreadsheet}>
+                    C.A. Tests
+                  </NavLink>
                   <NavLink href="/dashboard/teacher/lesson-plans" icon={BookOpen}>
                     Lesson Plans
                   </NavLink>

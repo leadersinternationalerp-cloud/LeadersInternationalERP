@@ -45,7 +45,7 @@ export const POST = route(
       data,
     }
 
-    let result = { sent: 0, failed: 0, cleanedUp: 0 }
+    const result = { sent: 0, failed: 0, cleanedUp: 0 }
 
     if (targetUserIds && targetUserIds.length > 0) {
       const userRes = await sendPushToUsers(supabase, targetUserIds, payload)

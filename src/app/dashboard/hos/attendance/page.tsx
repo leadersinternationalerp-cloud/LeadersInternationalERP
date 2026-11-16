@@ -1,79 +1,172 @@
 import { createClient } from '@/utils/supabase/server'
+import { normalizeRoles } from '@/lib/auth/roles'
+import { getExpectedSchoolDates } from '@/lib/attendance/tanzaniaHolidays'
+import HOSAttendanceClient, { AbsenteeItem, ClassSummaryItem } from './HOSAttendanceClient'
 
-export default async function HOSAttendancePage() {
+const ALLOWED_ROLES = ['System Admin', 'Director', 'Principal', 'Dean', 'HOS', 'Head of Section']
+
+export default async function HOSAttendancePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string; period?: string }>
+}) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  // In a real implementation, we would filter by HOS department
-  // For MVP, we will show all classes
-  const { data: classes } = await supabase
-    .from('classes')
-    .select('*')
-    .order('class_name', { ascending: true })
+  if (!user) {
+    return (
+      <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
+        <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>
+        <p>Please log in to view attendance overview.</p>
+      </div>
+    )
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, roles')
+    .eq('id', user.id)
+    .single()
+
+  const userRoles = normalizeRoles(profile)
+  if (!userRoles.some(r => ALLOWED_ROLES.includes(r))) {
+    return (
+      <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
+        <h2 style={{ color: 'var(--color-error)' }}>Access Denied</h2>
+        <p>You do not have permission to view this page.</p>
+      </div>
+    )
+  }
+
+  const params = await searchParams
+  const todayStr = new Date().toISOString().split('T')[0]
+  const selectedDate = params.date && params.date <= todayStr ? params.date : todayStr
+  const period: 'daily' | 'weekly' | 'monthly' =
+    params.period === 'weekly' || params.period === 'monthly' ? params.period : 'daily'
+
+  const endD = new Date(selectedDate + 'T00:00:00')
+  const startD = new Date(endD)
+  if (period === 'weekly') {
+    startD.setDate(endD.getDate() - 6)
+  } else if (period === 'monthly') {
+    startD.setDate(endD.getDate() - 29)
+  }
+  const periodStart = `${startD.getFullYear()}-${String(startD.getMonth() + 1).padStart(2, '0')}-${String(startD.getDate()).padStart(2, '0')}`
+  const periodEnd = selectedDate
+
+  const expectedSchoolDates = getExpectedSchoolDates(periodStart, periodEnd)
+
+  const [{ data: classes }, { data: periodLogs }, { data: dayAbsentees }] = await Promise.all([
+    supabase
+      .from('classes')
+      .select('id, name, section')
+      .order('name', { ascending: true }),
+    supabase
+      .from('attendance')
+      .select('class_id, date, status')
+      .gte('date', periodStart)
+      .lte('date', periodEnd),
+    supabase
+      .from('attendance')
+      .select(`
+        id,
+        student_id,
+        class_id,
+        status,
+        reason,
+        classes (name),
+        students (
+          student_id,
+          profiles (first_name, last_name)
+        )
+      `)
+      .eq('date', selectedDate)
+      .in('status', ['Absent', 'Late', 'Excused']),
+  ])
+
+  const classList = classes || []
+  const logs = periodLogs || []
+
+  // Group logs by class_id
+  const logsByClass = new Map<string, Array<{ date: string; status: string }>>()
+  const markedDatesByClass = new Map<string, Set<string>>()
+
+  for (const l of logs) {
+    if (!l.class_id) continue
+    if (!logsByClass.has(l.class_id)) logsByClass.set(l.class_id, [])
+    logsByClass.get(l.class_id)!.push({ date: l.date, status: l.status })
+
+    if (!markedDatesByClass.has(l.class_id)) markedDatesByClass.set(l.class_id, new Set())
+    markedDatesByClass.get(l.class_id)!.add(l.date)
+  }
+
+  let classesMarkedOnDate = 0
+  const classSummaries: ClassSummaryItem[] = classList.map((c: any) => {
+    const clsLogs = logsByClass.get(c.id) || []
+    const markedDates = markedDatesByClass.get(c.id) || new Set<string>()
+    const markedToday = markedDates.has(selectedDate)
+    if (markedToday) classesMarkedOnDate++
+
+    let present = 0
+    let absent = 0
+    let late = 0
+    let excused = 0
+
+    for (const row of clsLogs) {
+      if (row.status === 'Present') present++
+      else if (row.status === 'Absent') absent++
+      else if (row.status === 'Late') late++
+      else if (row.status === 'Excused') excused++
+    }
+
+    const total = clsLogs.length
+    const rate = total > 0 ? Math.round(((present + late) / total) * 100) : 0
+    const unmarkedDates = expectedSchoolDates.filter(d => !markedDates.has(d))
+
+    return {
+      class_id: c.id,
+      class_name: c.name,
+      section: c.section || '',
+      present,
+      absent,
+      late,
+      excused,
+      total_records: total,
+      attendance_rate_pct: rate,
+      marked_today: markedToday,
+      unmarked_dates: unmarkedDates,
+    }
+  })
+
+  const absentees: AbsenteeItem[] = (dayAbsentees || []).map((row: any) => {
+    const cls = Array.isArray(row.classes) ? row.classes[0] : row.classes
+    const stud = Array.isArray(row.students) ? row.students[0] : row.students
+    const prof = stud ? (Array.isArray(stud.profiles) ? stud.profiles[0] : stud.profiles) : null
+    const fullName = prof ? `${prof.first_name || ''} ${prof.last_name || ''}`.trim() : 'Student'
+
+    return {
+      id: row.id,
+      student_id: row.student_id,
+      student_code: stud?.student_id || '',
+      student_name: fullName || 'Student',
+      class_id: row.class_id || '',
+      class_name: cls?.name || 'Unknown Class',
+      status: row.status,
+      reason: row.reason || '',
+    }
+  })
 
   return (
-    <div>
-      <h1 style={{ fontSize: '1.75rem', marginBottom: '1.5rem', color: 'var(--color-primary)' }}>Section Attendance Overview</h1>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-        <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)', borderLeft: '4px solid var(--color-primary)' }}>
-          <h3 style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>Average Section Attendance</h3>
-          <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--color-text)' }}>
-            94.2%
-          </div>
-        </div>
-        <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)', borderLeft: '4px solid var(--color-error)' }}>
-          <h3 style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>Students Below 80%</h3>
-          <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--color-text)' }}>
-            12
-          </div>
-        </div>
-      </div>
-
-      <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-        <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)', backgroundColor: 'rgba(0,0,0,0.02)' }}>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Class Attendance Rates (Today)</h3>
-        </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ backgroundColor: 'rgba(0,0,0,0.02)', borderBottom: '1px solid var(--color-border)' }}>
-              <th style={{ textAlign: 'left', padding: '1rem', fontWeight: 600 }}>Class Name</th>
-              <th style={{ textAlign: 'center', padding: '1rem', fontWeight: 600 }}>Present</th>
-              <th style={{ textAlign: 'center', padding: '1rem', fontWeight: 600 }}>Absent</th>
-              <th style={{ textAlign: 'center', padding: '1rem', fontWeight: 600 }}>Late</th>
-              <th style={{ textAlign: 'right', padding: '1rem', fontWeight: 600 }}>Attendance %</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(classes || []).map((c) => {
-              // Mock data for MVP
-              const present = Math.floor(Math.random() * 20) + 10
-              const absent = Math.floor(Math.random() * 5)
-              const late = Math.floor(Math.random() * 3)
-              const total = present + absent + late
-              const percent = total > 0 ? Math.round((present / total) * 100) : 0
-
-              return (
-                <tr key={c.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                  <td style={{ padding: '1rem', fontWeight: 600 }}>{c.class_name}</td>
-                  <td style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-success)' }}>{present}</td>
-                  <td style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-error)' }}>{absent}</td>
-                  <td style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-warning)' }}>{late}</td>
-                  <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 600, color: percent < 85 ? 'var(--color-error)' : 'var(--color-success)' }}>
-                    {percent}%
-                  </td>
-                </tr>
-              )
-            })}
-            {(!classes || classes.length === 0) && (
-              <tr>
-                <td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                  No classes found in your section.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <HOSAttendanceClient
+      selectedDate={selectedDate}
+      period={period}
+      periodStart={periodStart}
+      periodEnd={periodEnd}
+      expectedSchoolDaysCount={expectedSchoolDates.length}
+      totalClasses={classList.length}
+      classesMarkedOnDate={classesMarkedOnDate}
+      absentees={absentees}
+      classSummaries={classSummaries}
+    />
   )
 }

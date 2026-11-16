@@ -12,6 +12,7 @@ export async function saveWeightsAction(weights: {
   weight: number
   is_active: boolean
   display_order: number
+  assessment_category?: 'ca' | 'exam'
 }[]) {
   const supabase = await createClient()
 
@@ -42,9 +43,22 @@ export async function saveWeightsAction(weights: {
 
   const keepSet = weights.map(w => w.assessment_type.trim())
 
+  const inferCategory = (type: string, cat?: 'ca' | 'exam'): 'ca' | 'exam' => {
+    if (cat === 'ca' || cat === 'exam') return cat
+    const upper = type.trim().toUpperCase()
+    if (
+      ['MID-TERM', 'MIDTERM', 'TERMINAL', 'FINAL', 'OPENER', 'MOCK'].includes(upper) ||
+      upper.includes('EXAM')
+    ) {
+      return 'exam'
+    }
+    return 'ca'
+  }
+
   try {
     // 3. Upsert each weight record in assessment_weights
     for (const w of weights) {
+      const category = inferCategory(w.assessment_type, w.assessment_category)
       const { error: upsertErr } = await supabase
         .from('assessment_weights')
         .upsert({
@@ -52,6 +66,7 @@ export async function saveWeightsAction(weights: {
           weight: Number(w.weight),
           is_active: w.is_active,
           display_order: w.display_order,
+          assessment_category: category,
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'assessment_type'
@@ -81,7 +96,8 @@ export async function saveWeightsAction(weights: {
       type: w.assessment_type.trim(),
       weight: Number(w.weight),
       is_active: w.is_active,
-      display_order: w.display_order
+      display_order: w.display_order,
+      assessment_category: inferCategory(w.assessment_type, w.assessment_category)
     }))
 
     const { error: settingsErr } = await supabase

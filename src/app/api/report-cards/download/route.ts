@@ -80,7 +80,18 @@ async function computeClassStudentRanks(
         if (et.type.toUpperCase() === 'QUIZZES') {
           examScores[et.type] = quizzesAvg
           if (quizzesAvg !== null) hasAnyScore = true
-        } else if (et.type.toUpperCase() === 'CA' || et.type.toUpperCase().includes('HOME WORKS') || et.type.toUpperCase().includes('H/W')) {
+        } else if (et.type.toUpperCase() === 'CA') {
+          const caMark = subjMarks.find((m: any) => (m.assessment_type || '').toUpperCase().trim() === 'CA')
+          const caMarkPct = caMark ? parseMarkScore(caMark).percentage : null
+          const combinedCa =
+            caMarkPct !== null && activityAvg !== null
+              ? (caMarkPct + activityAvg) / 2
+              : caMarkPct !== null
+              ? caMarkPct
+              : activityAvg
+          examScores[et.type] = combinedCa
+          if (combinedCa !== null) hasAnyScore = true
+        } else if (et.type.toUpperCase().includes('HOME WORKS') || et.type.toUpperCase().includes('H/W')) {
           examScores[et.type] = activityAvg
           if (activityAvg !== null) hasAnyScore = true
         } else {
@@ -381,7 +392,16 @@ export const GET = route(
         assessmentConfigs.forEach((et: any) => {
           if (et.type.toUpperCase() === 'QUIZZES') {
             examScores[et.type] = quizzesAvg
-          } else if (et.type.toUpperCase() === 'CA' || et.type.toUpperCase().includes('HOME WORKS') || et.type.toUpperCase().includes('H/W')) {
+          } else if (et.type.toUpperCase() === 'CA') {
+            const caMark = subjMarks.find((m: any) => (m.assessment_type || '').toUpperCase().trim() === 'CA')
+            const caMarkPct = caMark ? parseMarkScore(caMark).percentage : null
+            examScores[et.type] =
+              caMarkPct !== null && activityAvg !== null
+                ? (caMarkPct + activityAvg) / 2
+                : caMarkPct !== null
+                ? caMarkPct
+                : activityAvg
+          } else if (et.type.toUpperCase().includes('HOME WORKS') || et.type.toUpperCase().includes('H/W')) {
             examScores[et.type] = activityAvg
           } else {
             const markRecord = subjMarks.find((m: any) => {

@@ -66,7 +66,7 @@ export default async function PrincipalAdmissionsPage() {
   }
 
   // 3. Backfill & fetch admission fee invoices (graceful if migration not yet applied)
-  let invoicesByAppId: Record<string, any[]> = {}
+  const invoicesByAppId: Record<string, any[]> = {}
   try {
     await ensureMissingAdmissionInvoices(supabase)
     const { data: invData } = await supabase
