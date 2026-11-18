@@ -1,6 +1,7 @@
 import { normalizeRoles } from '@/lib/auth/roles'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
+import { fetchErpTeachers } from '@/lib/timetableContext'
 import TimetableClient from './TimetableClient'
 
 export default async function TimetablePage() {
@@ -26,12 +27,8 @@ export default async function TimetablePage() {
     .select('*')
     .order('name', { ascending: true })
 
-  // Fetch teachers
-  const { data: teachers } = await supabase
-    .from('profiles')
-    .select('id, first_name, last_name')
-    .eq('role', 'Teacher')
-    .order('first_name', { ascending: true })
+  // Fetch teachers uniformly from User Management (single & multi-role)
+  const teachers = await fetchErpTeachers(supabase)
 
   // Fetch allocations (class_subjects table)
   const { data: allocations } = await supabase
@@ -42,6 +39,12 @@ export default async function TimetablePage() {
       teacher_id,
       subject_id,
       periods_per_week,
+      periods_per_card,
+      group_id,
+      allowed_classroom_ids,
+      joint_class_ids,
+      co_teacher_ids,
+      color,
       profiles (first_name, last_name),
       subjects (name)
     `)
@@ -51,7 +54,7 @@ export default async function TimetablePage() {
     <TimetableClient 
       classes={classes || []}
       teachers={teachers || []}
-      allocations={(allocations || []) as any}
+      allocations={(allocations || []) as unknown as React.ComponentProps<typeof TimetableClient>['allocations']}
     />
   )
 }
